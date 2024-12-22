@@ -2,11 +2,13 @@ package xli
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"slices"
+	"text/template"
 
 	"github.com/lesomnus/xli/internal"
 	"github.com/lesomnus/xli/lex"
@@ -14,11 +16,12 @@ import (
 )
 
 type Command struct {
-	Name    string
-	Aliases []string
-	Brief   string
-	Synop   string
-	Usage   Stringer
+	Category string
+	Name     string
+	Aliases  []string
+	Brief    string
+	Synop    string
+	Usage    Stringer
 
 	Flags    Flags
 	Args     Args
@@ -35,23 +38,19 @@ type Command struct {
 	parent *Command
 }
 
-type Commands []*Command
-
-func (cs Commands) Get(name string) *Command {
-	for _, c := range cs {
-		if c.Name == name {
-			return c
-		}
-		if slices.Contains(c.Aliases, name) {
-			return c
-		}
-	}
-
-	return nil
-}
-
 func (c *Command) Parent() *Command {
 	return c.parent
+}
+
+func (c *Command) Tree() []*Command {
+	vs := []*Command{}
+	p := c
+	for p != nil {
+		vs = append(vs, p)
+		p = p.parent
+	}
+	slices.Reverse(vs)
+	return vs
 }
 
 func (c *Command) Root() *Command {
@@ -143,21 +142,22 @@ L:
 			if len(args) > 0 {
 				return ctx, fmt.Errorf("flags are must be set at the behind of the arguments: %s", v)
 			}
+			if n := v.Name(); n == "help" || n == "h" {
+				c.PrintHelp(c)
+				return ctx, nil
+			}
 
 			f := c.Flags.Get(v.Name())
 			if f == nil {
 				return ctx, fmt.Errorf("unknown flag: %s", v)
 			}
 
-			a := v.Arg()
 			if _, ok := f.(internal.FlagTagger[bool]); ok {
 				// Flag is a switch
-				if a == nil {
-					// mock arg.
-					b := lex.Arg("true")
-					a = &b
+				if v.Arg() == nil {
+					v = v.WithArg("true")
 				}
-			} else if a == nil {
+			} else if v.Arg() == nil {
 				// Flag is not a switch and requires value but does not have one.
 				i++
 				if i == len(args_rest) {
@@ -171,13 +171,12 @@ L:
 				case *lex.Flag:
 					return ctx, fmt.Errorf("%s: no value is given but was flag: %s", v, w)
 				case lex.Arg:
-					a = &w
+					v = v.WithArg(w)
 				default:
 					panic("unknown lex item")
 				}
 			}
 
-			v = v.WithArg(*a)
 			flags = append(flags, v)
 
 		case lex.Arg:
@@ -202,7 +201,7 @@ L:
 	}
 
 	if c_next == nil {
-		// There is no more subcommands.
+		// There are no more subcommands.
 		m := mode.From(ctx).NoPass()
 		ctx = mode.Into(ctx, m)
 	}
@@ -260,7 +259,60 @@ L:
 		}
 	}
 	if c_next != nil {
+		c_next.parent = c
 		return c_next.run(ctx, args_prev, args_rest)
 	}
 	return ctx, nil
+}
+
+//go:embed help.go.tpl
+var DefaultHelpTemplate string
+
+func (c *Command) PrintHelp(w io.Writer) {
+	// TODO: custom template; pass by context?
+	tpl := template.New("")
+	if _, err := tpl.Parse(DefaultHelpTemplate); err != nil {
+		panic(err)
+	}
+	if err := tpl.Execute(w, c); err != nil {
+		panic(err)
+	}
+}
+
+type Commands []*Command
+
+func (cs Commands) Get(name string) *Command {
+	for _, c := range cs {
+		if c.Name == name {
+			return c
+		}
+		if slices.Contains(c.Aliases, name) {
+			return c
+		}
+	}
+
+	return nil
+}
+
+func (cs Commands) ByCategory() []Commands {
+	i := map[string]int{}
+	vs := []Commands{}
+	for _, c := range cs {
+		j, ok := i[c.Category]
+		if !ok {
+			j = len(vs)
+			i[c.Category] = j
+			vs = append(vs, Commands{})
+		}
+
+		vs[j] = append(vs[j], c)
+	}
+	return vs
+}
+
+func (cs Commands) WithCategory(name string, vs ...*Command) Commands {
+	for _, v := range vs {
+		v.Category = name
+	}
+	return append(cs, vs...)
 }
