@@ -8,7 +8,7 @@ import (
 )
 
 type Parser[T any] interface {
-	Parse(v string) (T, error)
+	Parse(s string) (T, error)
 	ToString(v T) string
 }
 

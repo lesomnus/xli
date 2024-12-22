@@ -8,14 +8,14 @@ type Switch = Flag[bool, SwitchParser]
 
 type SwitchParser struct{}
 
-func (SwitchParser) Parse(v string) (bool, error) {
-	switch v {
+func (SwitchParser) Parse(s string) (bool, error) {
+	switch s {
 	case "false":
 		return false, nil
 	case "", "true":
 		return true, nil
 	default:
-		return false, fmt.Errorf(`invalid value: expected "true" or "false" but %s`, v)
+		return false, fmt.Errorf(`invalid value: expected "true" or "false" but %s`, s)
 	}
 }
 
