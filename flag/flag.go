@@ -10,13 +10,14 @@ import (
 type Parser[T any] interface {
 	Parse(s string) (T, error)
 	ToString(v T) string
+	String() string
 }
 
 type Flag[T any, P Parser[T]] struct {
-	Name    string
-	Aliases []rune
-	Brief   string
-	Synop   string
+	Name  string
+	Alias rune
+	Brief string
+	Synop string
 
 	Value  *T
 	Action func(ctx context.Context, cmd *xli.Command, v T) (context.Context, error)
@@ -28,10 +29,12 @@ type Flag[T any, P Parser[T]] struct {
 
 func (f *Flag[T, P]) Info() *xli.FlagInfo {
 	return &xli.FlagInfo{
-		Name:    f.Name,
-		Aliases: f.Aliases,
-		Brief:   f.Brief,
-		Synop:   f.Synop,
+		Name:  f.Name,
+		Alias: f.Alias,
+		Brief: f.Brief,
+		Synop: f.Synop,
+
+		Type: f.Parser.String(),
 	}
 }
 

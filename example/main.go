@@ -17,7 +17,8 @@ func main() {
 		Synop: "Long description will be printed here",
 		Flags: xli.Flags{
 			&flag.String{Name: "foo", Brief: "foo-brief"},
-			&flag.String{Name: "bar", Brief: "bar-brief"},
+			&flag.String{Name: "bar", Brief: "bar-brief", Alias: 'b'},
+			&flag.Uint32{Name: "size", Brief: "size-brief", Alias: 's'},
 		},
 		Args: xli.Args{
 			&arg.String{Name: "FOO", Brief: "FOO-brief"},
@@ -36,12 +37,14 @@ func main() {
 			},
 		}.WithCategory("fruits",
 			&xli.Command{
-				Name:  "apple",
-				Brief: "looks red",
+				Name:    "apple",
+				Aliases: []string{"app", "ap"},
+				Brief:   "looks red",
 			},
 			&xli.Command{
-				Name:  "banana",
-				Brief: "looks yellow",
+				Name:    "banana",
+				Aliases: []string{"bnn"},
+				Brief:   "looks yellow",
 			},
 			&xli.Command{
 				Name:  "kiwi",

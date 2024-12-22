@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 	"text/template"
 
 	"github.com/lesomnus/xli/internal"
@@ -36,6 +37,13 @@ type Command struct {
 	PostAction Action // Executed after action, regardless of whether action returns an error.
 
 	parent *Command
+}
+
+func (c *Command) String() string {
+	vs := make([]string, 1, len(c.Aliases)+1)
+	vs[0] = c.Name
+	vs = append(vs, c.Aliases...)
+	return strings.Join(vs, ",")
 }
 
 func (c *Command) Parent() *Command {

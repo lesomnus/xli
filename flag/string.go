@@ -15,3 +15,7 @@ func (StringParser) Parse(s string) (string, error) {
 func (StringParser) ToString(v string) string {
 	return fmt.Sprintf("%q", v)
 }
+
+func (StringParser) String() string {
+	return "string"
+}

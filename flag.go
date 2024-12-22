@@ -2,16 +2,27 @@ package xli
 
 import (
 	"context"
+	"fmt"
 )
 
 type FlagInfo struct {
 	Category string
 	Name     string
-	Aliases  []rune
+	Alias    rune
+
+	Type string
 
 	Brief string
 	Synop string
 	Usage Stringer
+}
+
+func (i *FlagInfo) String() string {
+	if i.Alias == 0 {
+		return fmt.Sprintf("   --%s %s", i.Name, i.Type)
+	} else {
+		return fmt.Sprintf("-%c,--%s %s", i.Alias, i.Name, i.Type)
+	}
 }
 
 type Flag interface {

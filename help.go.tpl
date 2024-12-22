@@ -37,7 +37,7 @@ Commands:{{ range $.Commands.ByCategory -}}
 			{{ printf "\n  %s:" $category -}}
 		{{ end -}}
 		{{ range . -}}
-			{{ printf "\n    %-10s %s" .Name .Brief -}}
+			{{ printf "\n    %-20s %s" .String .Brief -}}
 		{{ end -}}
 	{{ end -}}
 {{ end }}
@@ -49,7 +49,7 @@ Options:{{ range $.Flags.ByCategory -}}
 			{{ printf "\n  %s:" $category -}}
 		{{ end -}}
 		{{ range . -}}{{ with .Info -}}
-			{{ printf "\n    %-10s %s" .Name .Brief -}}
+			{{ printf "\n    %-20s %s" .String .Brief -}}
 		{{ end -}}{{ end -}}
 	{{ end -}}
 {{ end }}

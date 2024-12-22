@@ -26,3 +26,7 @@ func (SwitchParser) ToString(v bool) string {
 		return "false"
 	}
 }
+
+func (SwitchParser) String() string {
+	return ""
+}
