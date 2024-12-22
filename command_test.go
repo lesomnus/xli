@@ -9,6 +9,7 @@ import (
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flag"
+	"github.com/lesomnus/xli/mode"
 	"github.com/stretchr/testify/require"
 )
 
@@ -538,7 +539,7 @@ func TestCommandParse(t *testing.T) {
 		}
 
 		_, err := c.Run(context.TODO(), []string{"foo", "bar", "baz", "qux"})
-		require.ErrorContains(t, err, "unknown subcommand: baz")
+		require.ErrorContains(t, err, `too many arguments: "baz"`)
 	})
 	t.Run("switches, flags, and args", func(t *testing.T) {
 		c := &xli.Command{
@@ -594,7 +595,8 @@ func TestCommandParse(t *testing.T) {
 			"--bar", "b",
 			"qux",
 		})
-		require.ErrorContains(t, err, "unknown flag: --bar")
+		require.ErrorContains(t, err, "flags are must be set at the behind")
+		require.ErrorContains(t, err, "--bar")
 	})
 	t.Run("flag with value in single arg in the middle of args", func(t *testing.T) {
 		c := &xli.Command{
@@ -614,7 +616,8 @@ func TestCommandParse(t *testing.T) {
 			"--bar=b",
 			"qux",
 		})
-		require.ErrorContains(t, err, `unknown flag: --bar="b"`)
+		require.ErrorContains(t, err, "flags are must be set at the behind")
+		require.ErrorContains(t, err, `--bar="b"`)
 	})
 	t.Run("subcommand with switches, flags, and args", func(t *testing.T) {
 		c := &xli.Command{
@@ -676,5 +679,86 @@ func TestCommandParse(t *testing.T) {
 		require.Equal(t, "flag_a", *bar.Flags.Get("flag_a").(*flag.String).Value)
 		require.Equal(t, "foo_a", *bar.Args.Get("FOO_a").(*arg.String).Value)
 		require.Equal(t, "bar_a", *bar.Args.Get("BAR_a").(*arg.String).Value)
+	})
+}
+
+func TestCommandMode(t *testing.T) {
+	appender := func(vs *[]string, ms *[]mode.Mode, l string) xli.Action {
+		return func(ctx context.Context, cmd *xli.Command) (context.Context, error) {
+			*vs = append(*vs, l)
+			*ms = append(*ms, mode.From(ctx))
+			return ctx, nil
+		}
+	}
+
+	t.Run("run", func(t *testing.T) {
+		vs := []string{}
+		ms := []mode.Mode{}
+		c := &xli.Command{
+			Name: "root",
+			Commands: xli.Commands{
+				&xli.Command{
+					Name: "foo",
+					Args: xli.Args{
+						&arg.String{
+							Name: "ARG",
+							Action: func(ctx context.Context, cmd *xli.Command, v string) (context.Context, error) {
+								vs = append(vs, "foo_arg")
+								ms = append(ms, mode.From(ctx))
+								return ctx, nil
+							},
+						},
+					},
+					Commands: xli.Commands{
+						&xli.Command{
+							Name: "bar",
+							Args: xli.Args{
+								&arg.String{
+									Name: "ARG",
+									Action: func(ctx context.Context, cmd *xli.Command, v string) (context.Context, error) {
+										vs = append(vs, "bar_arg")
+										ms = append(ms, mode.From(ctx))
+										return ctx, nil
+									},
+								},
+							},
+							PreAction:  appender(&vs, &ms, "bar-pre"),
+							Action:     appender(&vs, &ms, "bar"),
+							PostAction: appender(&vs, &ms, "bar-post"),
+						},
+					},
+					PreAction:  appender(&vs, &ms, "foo-pre"),
+					Action:     appender(&vs, &ms, "foo"),
+					PostAction: appender(&vs, &ms, "foo-post"),
+				},
+			},
+			PreAction:  appender(&vs, &ms, "root-pre"),
+			Action:     appender(&vs, &ms, "root"),
+			PostAction: appender(&vs, &ms, "root-post"),
+		}
+
+		_, err := c.Run(context.TODO(), []string{"foo", "something", "bar", "else"})
+		require.NoError(t, err)
+		require.Equal(t, []string{
+			"root-pre", "root",
+			/* foo */ "foo-pre", "foo_arg", "foo",
+			/* | bar */ "bar-pre", "bar_arg", "bar",
+			/* | bar */ "bar-post",
+			/* foo */ "foo-post",
+			"root-post",
+		}, vs)
+		require.Equal(t, []mode.Mode{
+			mode.Run | mode.Pass, // root-pre
+			mode.Run | mode.Pass, // root
+			mode.Run | mode.Pass, // foo-pre
+			mode.Run | mode.Pass, // foo_arg
+			mode.Run | mode.Pass, // foo
+			mode.Run,             // bar-pre
+			mode.Run,             // bar_arg
+			mode.Run,             // bar
+			mode.Run,             // bar-post
+			mode.Run | mode.Pass, // foo-post
+			mode.Run | mode.Pass, // root-post
+		}, ms)
 	})
 }

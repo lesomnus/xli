@@ -99,3 +99,9 @@ func (f *Flag) Spread() []*Flag {
 	fs[0].raw = f.raw[:2]
 	return fs
 }
+
+func (f *Flag) WithArg(a Arg) *Flag {
+	f_ := *f
+	f_.arg = &a
+	return &f_
+}

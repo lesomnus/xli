@@ -9,16 +9,22 @@ import (
 type Mode int
 
 const (
-	Unspecified Mode = 0b00_00
+	Unspecified Mode = 0b00_0
 
-	Pass = 0b00_11 // There are more commands to be executed.
-	Help = 0b00_01 // Command is executed to print help message.
-	Tap  = 0b01_01 // Command is executed to get completions.
-	Run  = 0b10_01 // Command is executed to do something.
+	Pass = 0b00_1 // There are more commands to be executed.
+	Help = 0b01_0 // Command is executed to print help message.
+	Tap  = 0b10_0 // Command is executed to get completions.
+	Run  = 0b11_0 // Command is executed to do something.
+
+	Kind = 0b11_0
 )
 
 func (m Mode) Is(v Mode) bool {
 	return m&v == v
+}
+
+func (m Mode) NoPass() Mode {
+	return m & ^Pass
 }
 
 type ctxKey struct{}
