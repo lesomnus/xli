@@ -15,12 +15,12 @@ func main() {
 		Name:  "root",
 		Brief: "root-brief",
 		Synop: "Long description will be printed here",
-		Flags: xli.Flags{
+		Flags: flg.Flags{
 			&flg.String{Name: "foo", Brief: "foo-brief"},
 			&flg.String{Name: "bar", Brief: "bar-brief", Alias: 'b'},
 			&flg.Uint32{Name: "size", Brief: "size-brief", Alias: 's'},
 		},
-		Args: xli.Args{
+		Args: arg.Args{
 			&arg.String{Name: "FOO", Brief: "FOO-brief"},
 			&arg.String{Name: "BAR", Brief: "BAR-brief"},
 		},
@@ -28,10 +28,10 @@ func main() {
 			&xli.Command{
 				Name:  "foo",
 				Brief: "cmd-foo-brief",
-				Flags: xli.Flags{
+				Flags: flg.Flags{
 					&flg.String{Name: "baz"},
 				},
-				Args: xli.Args{
+				Args: arg.Args{
 					&arg.String{Name: "BAZ"},
 				},
 			},

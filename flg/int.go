@@ -7,13 +7,13 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-type Int = Flag[int, IntParser]
-type Int32 = Flag[int32, Int32Parser]
-type Int64 = Flag[int64, Int64Parser]
+type Int = Base[int, IntParser]
+type Int32 = Base[int32, Int32Parser]
+type Int64 = Base[int64, Int64Parser]
 
-type Uint = Flag[uint, UintParser]
-type Uint32 = Flag[uint32, Uint32Parser]
-type Uint64 = Flag[uint64, Uint64Parser]
+type Uint = Base[uint, UintParser]
+type Uint32 = Base[uint32, Uint32Parser]
+type Uint64 = Base[uint64, Uint64Parser]
 
 type intParserBase[T constraints.Integer] struct{}
 

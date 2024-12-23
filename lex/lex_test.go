@@ -8,6 +8,10 @@ import (
 )
 
 func TestLex(t *testing.T) {
+	t.Run("end of command", func(t *testing.T) {
+		u := lex.Lex("--")
+		require.IsType(t, lex.EndOfCommand(""), u)
+	})
 	t.Run("arg", func(t *testing.T) {
 		u := lex.Lex("bar")
 		require.IsType(t, lex.Arg(""), u)

@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type Switch = Flag[bool, SwitchParser]
+type Switch = Base[bool, SwitchParser]
 
 type SwitchParser struct{}
 

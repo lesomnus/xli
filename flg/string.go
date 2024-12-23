@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type String = Flag[string, StringParser]
+type String = Base[string, StringParser]
 
 type StringParser struct{}
 

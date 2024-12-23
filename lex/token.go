@@ -31,6 +31,16 @@ func (e *Err) Unwrap() error {
 	return e.err
 }
 
+type EndOfCommand string
+
+func (EndOfCommand) Raw() string {
+	return "--"
+}
+
+func (EndOfCommand) String() string {
+	return "--"
+}
+
 type Arg string
 
 func (f Arg) Raw() string {

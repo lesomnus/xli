@@ -11,7 +11,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/lesomnus/xli/internal"
+	"github.com/lesomnus/xli/arg"
+	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/lex"
 	"github.com/lesomnus/xli/mode"
 )
@@ -24,8 +25,8 @@ type Command struct {
 	Synop    string
 	Usage    Stringer
 
-	Flags    Flags
-	Args     Args
+	Flags    flg.Flags
+	Args     arg.Args
 	Commands Commands
 
 	io.ReadCloser
@@ -67,6 +68,14 @@ func (c *Command) Root() *Command {
 		p = p.parent
 	}
 	return p
+}
+
+func (c *Command) GetFlags() flg.Flags {
+	return c.Flags
+}
+
+func (c *Command) GetArgs() arg.Args {
+	return c.Args
 }
 
 func (c *Command) Print(vs ...any) (int, error) {
@@ -140,9 +149,18 @@ func (c *Command) run(ctx context.Context, args_prev []string, args_rest []strin
 }
 
 func (c *Command) action(ctx context.Context, args_prev []string, args_rest []string) (context.Context, error) {
+	is_opt := slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
+		return a.IsOptional()
+	})
+	if is_opt && len(c.Commands) > 0 {
+		panic(fmt.Sprintf("%s: command cannot have optional argument if it has subcommands", c.String()))
+	}
+
 	var (
 		flags  = []*lex.Flag{}
 		args   = []string{}
+		remain = []string{}
+
 		c_next *Command
 	)
 	// It collects `flags` and `args` without parsing.
@@ -153,6 +171,12 @@ L:
 		switch v := t.(type) {
 		case *lex.Err:
 			return ctx, v
+
+		case lex.EndOfCommand:
+			remain = args_rest[i:]
+			args_rest = []string{}
+			break L
+
 		case *lex.Flag:
 			if len(args) > 0 {
 				return ctx, fmt.Errorf("flags are must be set at the behind of the arguments: %s", v)
@@ -173,7 +197,7 @@ L:
 				return ctx, fmt.Errorf("unknown flag: %s", v)
 			}
 
-			if _, ok := f.(internal.FlagTagger[bool]); ok {
+			if _, ok := f.(*flg.Switch); ok {
 				// Flag is a switch
 				if v.Arg() == nil {
 					v = v.WithArg("true")
@@ -201,7 +225,7 @@ L:
 			flags = append(flags, v)
 
 		case lex.Arg:
-			if len(args) < len(c.Args) {
+			if is_opt || len(args) < len(c.Args) {
 				args = append(args, v.Raw())
 				continue
 			}
@@ -216,6 +240,7 @@ L:
 
 			args_rest = args_rest[i+1:]
 			break L
+
 		default:
 			panic("unknown lex item")
 		}
@@ -243,7 +268,7 @@ L:
 			return ctx, fmt.Errorf("unknown flag: %s", h)
 		}
 
-		ctx_, err := h.Handle(ctx, c, v.Arg().Raw())
+		ctx_, err := h.Handle(ctx, v.Arg().Raw())
 		if ctx_ != nil {
 			ctx = ctx_
 		}
@@ -254,8 +279,18 @@ L:
 
 	i := 0
 	for _, h := range c.Args {
+		if i == len(args) {
+			if h.IsOptional() {
+				break
+			}
+			if _, ok := h.(*arg.Remains); ok {
+				break
+			}
+			return ctx, fmt.Errorf("argument not given: %q", h.Info().Name)
+		}
+
 		// Parser can consume multiple arguments.
-		ctx_, n, err := h.Prase(ctx, c, args_prev, args[i:])
+		ctx_, n, err := h.Prase(ctx, args_prev, args[i:])
 		if i+n > len(args) {
 			panic(fmt.Sprintf(`argument parser reported that it parsed more arguments than were given: "%s" parse %v`, h.Info().Name, args[i:]))
 		}
@@ -268,6 +303,21 @@ L:
 		}
 
 		i += n
+	}
+	if len(c.Args) > 0 {
+		if h, ok := c.Args[len(c.Args)-1].(*arg.Remains); ok {
+			if !h.IsOptional() && len(remain) == 0 {
+				return ctx, fmt.Errorf("argument not given: %q", h.Info().Name)
+			}
+
+			ctx_, _, err := h.Prase(ctx, args_prev, remain)
+			if ctx_ != nil {
+				ctx = ctx_
+			}
+			if err != nil {
+				return ctx, fmt.Errorf("invalid argument: %q: %w", remain, err)
+			}
+		}
 	}
 
 	ctx_, err := c.Action(ctx, c)

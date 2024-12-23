@@ -2,106 +2,67 @@ package flg
 
 import (
 	"context"
-
-	"github.com/lesomnus/xli"
-	"github.com/lesomnus/xli/internal"
+	"fmt"
 )
 
-type Parser[T any] interface {
-	Parse(s string) (T, error)
-	ToString(v T) string
-	String() string
-}
+type Info struct {
+	Category string
+	Name     string
+	Alias    rune
 
-type Flag[T any, P Parser[T]] struct {
-	Name  string
-	Alias rune
+	Type  string
 	Brief string
 	Synop string
-
-	Value  *T
-	Action func(ctx context.Context, cmd *xli.Command, v T) (context.Context, error)
-
-	Parser P
-
-	count int
-	internal.FlagTag[T]
+	Usage fmt.Stringer
 }
 
-func (f *Flag[T, P]) Info() *xli.FlagInfo {
-	return &xli.FlagInfo{
-		Name:  f.Name,
-		Alias: f.Alias,
-		Brief: f.Brief,
-		Synop: f.Synop,
-
-		Type: f.Parser.String(),
-	}
-}
-
-func (f *Flag[T, P]) Handle(ctx context.Context, cmd *xli.Command, v string) (context.Context, error) {
-	w, err := f.Parser.Parse(v)
-	if err != nil {
-		return ctx, err
-	}
-
-	f.count++
-	if f.Value == nil {
-		f.Value = &w
+func (i *Info) String() string {
+	if i.Alias == 0 {
+		return fmt.Sprintf("   --%s %s", i.Name, i.Type)
 	} else {
-		*f.Value = w
+		return fmt.Sprintf("-%c,--%s %s", i.Alias, i.Name, i.Type)
 	}
-	if a := f.Action; a != nil {
-		return a(ctx, cmd, w)
-	}
-	return ctx, nil
 }
 
-func (f *Flag[T, P]) Count() int {
-	return f.count
+type Flag interface {
+	Info() *Info
+	Handle(ctx context.Context, v string) (context.Context, error)
+
+	Count() int
+	Default() (string, bool)
 }
 
-func (f *Flag[T, P]) Default() (string, bool) {
-	if f.Value == nil {
-		return "", false
+type Flags []Flag
+
+func (fs Flags) Get(name string) Flag {
+	for _, f := range fs {
+		if f.Info().Name == name {
+			return f
+		}
 	}
 
-	return f.Parser.ToString(*f.Value), true
+	return nil
 }
 
-func (f *Flag[T, P]) Get() (T, bool) {
-	if f.Value == nil {
-		var z T
-		return z, false
+func (fs Flags) ByCategory() []Flags {
+	i := map[string]int{}
+	vs := []Flags{}
+	for _, f := range fs {
+		j, ok := i[f.Info().Category]
+		if !ok {
+			j = len(vs)
+			i[f.Info().Category] = j
+			vs = append(vs, Flags{})
+		}
+
+		vs[j] = append(vs[j], f)
 	}
-	return *f.Value, true
+	return vs
 }
 
-func Visit[T any](c *xli.Command, name string, visitor func(v T)) bool {
-	f := c.Flags.Get(name)
-	if f == nil {
-		return false
+func (fs Flags) WithCategory(name string, vs ...Flag) Flags {
+	for _, v := range vs {
+		v.Info().Category = name
 	}
-
-	g, ok := f.(interface{ Get() (T, bool) })
-	if !ok {
-		return false
-	}
-
-	v, ok := g.Get()
-	if !ok {
-		return false
-	}
-
-	visitor(v)
-	return true
-}
-
-func VisitP[T any](c *xli.Command, name string, dst *T) bool {
-	if dst == nil {
-		return false
-	}
-	return Visit(c, name, func(v T) {
-		*dst = v
-	})
+	return append(fs, vs...)
 }

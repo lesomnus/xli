@@ -19,6 +19,9 @@ func Lex(v string) Token {
 			err: errors.New("three dashes"),
 		}
 	}
+	if v == "--" {
+		return EndOfCommand("")
+	}
 
 	j := strings.IndexFunc(v, func(r rune) bool {
 		return r == '='
