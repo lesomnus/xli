@@ -8,7 +8,7 @@ import (
 
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
-	"github.com/lesomnus/xli/flag"
+	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/mode"
 	"github.com/stretchr/testify/require"
 )
@@ -261,7 +261,7 @@ func TestCommandLifCycle(t *testing.T) {
 				{
 					Name: "foo",
 					Flags: xli.Flags{
-						&flag.String{
+						&flg.String{
 							Name: "flag",
 							Action: func(ctx context.Context, cmd *xli.Command, v string) (context.Context, error) {
 								vs = append(vs, "flag")
@@ -341,28 +341,28 @@ func TestCommandParse(t *testing.T) {
 	t.Run("switch", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.Switch{Name: "foo"},
+				&flg.Switch{Name: "foo"},
 			},
 		}
 
 		_, err := c.Run(context.TODO(), []string{"--foo"})
 		require.NoError(t, err)
 
-		v := c.Flags.Get("foo").(*flag.Switch)
+		v := c.Flags.Get("foo").(*flg.Switch)
 		require.NotNil(t, v)
 		require.Equal(t, true, *v.Value)
 	})
 	t.Run("switch off", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.Switch{Name: "foo"},
+				&flg.Switch{Name: "foo"},
 			},
 		}
 
 		_, err := c.Run(context.TODO(), nil)
 		require.NoError(t, err)
 
-		v := c.Flags.Get("foo").(*flag.Switch)
+		v := c.Flags.Get("foo").(*flg.Switch)
 		require.NotNil(t, v)
 
 		// Note that value is nil since the flag is not given
@@ -371,63 +371,63 @@ func TestCommandParse(t *testing.T) {
 	t.Run("switch with true", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.Switch{Name: "foo"},
+				&flg.Switch{Name: "foo"},
 			},
 		}
 
 		_, err := c.Run(context.TODO(), []string{"--foo=true"})
 		require.NoError(t, err)
 
-		v := c.Flags.Get("foo").(*flag.Switch)
+		v := c.Flags.Get("foo").(*flg.Switch)
 		require.NotNil(t, v)
 		require.Equal(t, true, *v.Value)
 	})
 	t.Run("switch with false", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.Switch{Name: "foo"},
+				&flg.Switch{Name: "foo"},
 			},
 		}
 
 		_, err := c.Run(context.TODO(), []string{"--foo=false"})
 		require.NoError(t, err)
 
-		v := c.Flags.Get("foo").(*flag.Switch)
+		v := c.Flags.Get("foo").(*flg.Switch)
 		require.NotNil(t, v)
 		require.Equal(t, false, *v.Value)
 	})
 	t.Run("flag with value", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.String{Name: "foo"},
+				&flg.String{Name: "foo"},
 			},
 		}
 
 		_, err := c.Run(context.TODO(), []string{"--foo", "bar"})
 		require.NoError(t, err)
 
-		v := c.Flags.Get("foo").(*flag.String)
+		v := c.Flags.Get("foo").(*flg.String)
 		require.NotNil(t, v)
 		require.Equal(t, "bar", *v.Value)
 	})
 	t.Run("flag with value in single arg", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.String{Name: "foo"},
+				&flg.String{Name: "foo"},
 			},
 		}
 
 		_, err := c.Run(context.TODO(), []string{"--foo=bar"})
 		require.NoError(t, err)
 
-		v := c.Flags.Get("foo").(*flag.String)
+		v := c.Flags.Get("foo").(*flg.String)
 		require.NotNil(t, v)
 		require.Equal(t, "bar", *v.Value)
 	})
 	t.Run("flag with no value", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.String{Name: "foo"},
+				&flg.String{Name: "foo"},
 			},
 		}
 
@@ -437,7 +437,7 @@ func TestCommandParse(t *testing.T) {
 	t.Run("flag with no value but flag", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.String{Name: "foo"},
+				&flg.String{Name: "foo"},
 			},
 		}
 
@@ -447,8 +447,8 @@ func TestCommandParse(t *testing.T) {
 	t.Run("invalid flag syntax", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.String{Name: "foo"},
-				&flag.String{Name: "bar"},
+				&flg.String{Name: "foo"},
+				&flg.String{Name: "bar"},
 			},
 		}
 
@@ -461,10 +461,10 @@ func TestCommandParse(t *testing.T) {
 	t.Run("switches and flags", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.Switch{Name: "foo"},
-				&flag.Switch{Name: "bar"},
-				&flag.String{Name: "baz"},
-				&flag.String{Name: "qux"},
+				&flg.Switch{Name: "foo"},
+				&flg.Switch{Name: "bar"},
+				&flg.String{Name: "baz"},
+				&flg.String{Name: "qux"},
 			},
 		}
 
@@ -476,19 +476,19 @@ func TestCommandParse(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		foo := c.Flags.Get("foo").(*flag.Switch)
+		foo := c.Flags.Get("foo").(*flg.Switch)
 		require.NotNil(t, foo)
 		require.Equal(t, true, *foo.Value)
 
-		bar := c.Flags.Get("bar").(*flag.Switch)
+		bar := c.Flags.Get("bar").(*flg.Switch)
 		require.NotNil(t, bar)
 		require.Equal(t, false, *bar.Value)
 
-		baz := c.Flags.Get("baz").(*flag.String)
+		baz := c.Flags.Get("baz").(*flg.String)
 		require.NotNil(t, baz)
 		require.Equal(t, "a", *baz.Value)
 
-		qux := c.Flags.Get("qux").(*flag.String)
+		qux := c.Flags.Get("qux").(*flg.String)
 		require.NotNil(t, qux)
 		require.Equal(t, "b", *qux.Value)
 	})
@@ -544,8 +544,8 @@ func TestCommandParse(t *testing.T) {
 	t.Run("switches, flags, and args", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.Switch{Name: "foo"},
-				&flag.String{Name: "bar"},
+				&flg.Switch{Name: "foo"},
+				&flg.String{Name: "bar"},
 			},
 			Args: xli.Args{
 				&arg.String{Name: "BAZ"},
@@ -561,11 +561,11 @@ func TestCommandParse(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		foo := c.Flags.Get("foo").(*flag.Switch)
+		foo := c.Flags.Get("foo").(*flg.Switch)
 		require.NotNil(t, foo)
 		require.Equal(t, true, *foo.Value)
 
-		bar := c.Flags.Get("bar").(*flag.String)
+		bar := c.Flags.Get("bar").(*flg.String)
 		require.NotNil(t, bar)
 		require.Equal(t, "a", *bar.Value)
 
@@ -580,8 +580,8 @@ func TestCommandParse(t *testing.T) {
 	t.Run("flag in the middle of args", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.String{Name: "foo"},
-				&flag.String{Name: "bar"},
+				&flg.String{Name: "foo"},
+				&flg.String{Name: "bar"},
 			},
 			Args: xli.Args{
 				&arg.String{Name: "BAZ"},
@@ -601,8 +601,8 @@ func TestCommandParse(t *testing.T) {
 	t.Run("flag with value in single arg in the middle of args", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.String{Name: "foo"},
-				&flag.String{Name: "bar"},
+				&flg.String{Name: "foo"},
+				&flg.String{Name: "bar"},
 			},
 			Args: xli.Args{
 				&arg.String{Name: "BAZ"},
@@ -622,8 +622,8 @@ func TestCommandParse(t *testing.T) {
 	t.Run("subcommand with switches, flags, and args", func(t *testing.T) {
 		c := &xli.Command{
 			Flags: xli.Flags{
-				&flag.Switch{Name: "switch"},
-				&flag.String{Name: "flag"},
+				&flg.Switch{Name: "switch"},
+				&flg.String{Name: "flag"},
 			},
 			Args: xli.Args{
 				&arg.String{Name: "FOO"},
@@ -633,8 +633,8 @@ func TestCommandParse(t *testing.T) {
 				{
 					Name: "foo",
 					Flags: xli.Flags{
-						&flag.Switch{Name: "switch_1"},
-						&flag.String{Name: "flag_1"},
+						&flg.Switch{Name: "switch_1"},
+						&flg.String{Name: "flag_1"},
 					},
 					Args: xli.Args{
 						&arg.String{Name: "FOO_1"},
@@ -644,8 +644,8 @@ func TestCommandParse(t *testing.T) {
 						{
 							Name: "bar",
 							Flags: xli.Flags{
-								&flag.Switch{Name: "switch_a"},
-								&flag.String{Name: "flag_a"},
+								&flg.Switch{Name: "switch_a"},
+								&flg.String{Name: "flag_a"},
 							},
 							Args: xli.Args{
 								&arg.String{Name: "FOO_a"},
@@ -663,20 +663,20 @@ func TestCommandParse(t *testing.T) {
 			"bar", "--switch_a", "--flag_a=flag_a", "foo_a", "bar_a",
 		})
 		require.NoError(t, err)
-		require.Equal(t, true, *c.Flags.Get("switch").(*flag.Switch).Value)
-		require.Equal(t, "flag", *c.Flags.Get("flag").(*flag.String).Value)
+		require.Equal(t, true, *c.Flags.Get("switch").(*flg.Switch).Value)
+		require.Equal(t, "flag", *c.Flags.Get("flag").(*flg.String).Value)
 		require.Equal(t, "foo", *c.Args.Get("FOO").(*arg.String).Value)
 		require.Equal(t, "bar", *c.Args.Get("BAR").(*arg.String).Value)
 
 		foo := c.Commands.Get("foo")
-		require.Equal(t, true, *foo.Flags.Get("switch_1").(*flag.Switch).Value)
-		require.Equal(t, "flag_1", *foo.Flags.Get("flag_1").(*flag.String).Value)
+		require.Equal(t, true, *foo.Flags.Get("switch_1").(*flg.Switch).Value)
+		require.Equal(t, "flag_1", *foo.Flags.Get("flag_1").(*flg.String).Value)
 		require.Equal(t, "foo_1", *foo.Args.Get("FOO_1").(*arg.String).Value)
 		require.Equal(t, "bar_1", *foo.Args.Get("BAR_1").(*arg.String).Value)
 
 		bar := foo.Commands.Get("bar")
-		require.Equal(t, true, *bar.Flags.Get("switch_a").(*flag.Switch).Value)
-		require.Equal(t, "flag_a", *bar.Flags.Get("flag_a").(*flag.String).Value)
+		require.Equal(t, true, *bar.Flags.Get("switch_a").(*flg.Switch).Value)
+		require.Equal(t, "flag_a", *bar.Flags.Get("flag_a").(*flg.String).Value)
 		require.Equal(t, "foo_a", *bar.Args.Get("FOO_a").(*arg.String).Value)
 		require.Equal(t, "bar_a", *bar.Args.Get("BAR_a").(*arg.String).Value)
 	})

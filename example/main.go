@@ -7,7 +7,7 @@ import (
 
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
-	"github.com/lesomnus/xli/flag"
+	"github.com/lesomnus/xli/flg"
 )
 
 func main() {
@@ -16,9 +16,9 @@ func main() {
 		Brief: "root-brief",
 		Synop: "Long description will be printed here",
 		Flags: xli.Flags{
-			&flag.String{Name: "foo", Brief: "foo-brief"},
-			&flag.String{Name: "bar", Brief: "bar-brief", Alias: 'b'},
-			&flag.Uint32{Name: "size", Brief: "size-brief", Alias: 's'},
+			&flg.String{Name: "foo", Brief: "foo-brief"},
+			&flg.String{Name: "bar", Brief: "bar-brief", Alias: 'b'},
+			&flg.Uint32{Name: "size", Brief: "size-brief", Alias: 's'},
 		},
 		Args: xli.Args{
 			&arg.String{Name: "FOO", Brief: "FOO-brief"},
@@ -29,7 +29,7 @@ func main() {
 				Name:  "foo",
 				Brief: "cmd-foo-brief",
 				Flags: xli.Flags{
-					&flag.String{Name: "baz"},
+					&flg.String{Name: "baz"},
 				},
 				Args: xli.Args{
 					&arg.String{Name: "BAZ"},
