@@ -39,16 +39,25 @@ func Join(as ...Action) Action {
 	}
 }
 
-func On(m mode.Mode, a Action) Action {
+func OnF(f func(m mode.Mode) bool, a Action) Action {
 	return func(ctx context.Context, cmd *Command) (context.Context, error) {
-		if mode.From(ctx) != m {
+		m := mode.From(ctx)
+		if !f(m) {
 			return ctx, nil
 		}
 		return a(ctx, cmd)
 	}
 }
 
-func OnHelp(a Action) Action { return On(mode.Help, a) }
-func OnPass(a Action) Action { return On(mode.Pass, a) }
-func OnRun(a Action) Action  { return On(mode.Run, a) }
-func OnTap(a Action) Action  { return On(mode.Tap, a) }
+func On(m mode.Mode, a Action) Action {
+	return OnF(func(m_ mode.Mode) bool { return m_&m == m }, a)
+}
+
+func OnExact(m mode.Mode, a Action) Action {
+	return OnF(func(m_ mode.Mode) bool { return m_ == m }, a)
+}
+
+func OnPass(a Action) Action { return OnExact(mode.Pass|mode.Run, a) }
+func OnHelp(a Action) Action { return OnExact(mode.Help, a) }
+func OnTap(a Action) Action  { return OnExact(mode.Tap, a) }
+func OnRun(a Action) Action  { return OnExact(mode.Run, a) }

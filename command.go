@@ -151,8 +151,11 @@ L:
 				return ctx, fmt.Errorf("flags are must be set at the behind of the arguments: %s", v)
 			}
 			if n := v.Name(); n == "help" || n == "h" {
+				m := mode.From(ctx).NoPass()
+				ctx = mode.Into(ctx, m)
+				ctx, err := c.PreAction(ctx, c)
 				c.PrintHelp(c)
-				return ctx, nil
+				return ctx, err
 			}
 
 			f := c.Flags.Get(v.Name())
