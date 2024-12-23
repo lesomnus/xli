@@ -9,6 +9,10 @@ import (
 
 type Action func(ctx context.Context, cmd *Command) (context.Context, error)
 
+var noop Action = func(ctx context.Context, cmd *Command) (context.Context, error) {
+	return ctx, nil
+}
+
 func Chain(as ...Action) Action {
 	return func(ctx context.Context, cmd *Command) (context.Context, error) {
 		for _, a := range as {

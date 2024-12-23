@@ -26,6 +26,9 @@ func TestCommandLifeCycle(t *testing.T) {
 
 		_, err := c.Run(context.TODO(), nil)
 		require.NoError(t, err)
+
+		_, err = c.Run(context.TODO(), []string{"--help"})
+		require.NoError(t, err)
 	})
 	t.Run("actions", func(t *testing.T) {
 		vs := []string{}

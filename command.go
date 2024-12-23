@@ -104,6 +104,15 @@ func (c *Command) Run(ctx context.Context, args []string) (context.Context, erro
 }
 
 func (c *Command) run(ctx context.Context, args_prev []string, args_rest []string) (context.Context, error) {
+	if c.PreAction == nil {
+		c.PreAction = noop
+	}
+	if c.Action == nil {
+		c.Action = noop
+	}
+	if c.PostAction == nil {
+		c.PostAction = noop
+	}
 	if c.ReadCloser == nil {
 		c.ReadCloser = os.Stdin
 	}
@@ -120,11 +129,9 @@ func (c *Command) run(ctx context.Context, args_prev []string, args_rest []strin
 	}
 
 	errs := []error{err, nil}
-	if a := c.PostAction; a != nil {
-		ctx_, errs[1] = c.PostAction(ctx, c)
-		if ctx_ != nil {
-			ctx = ctx_
-		}
+	ctx_, errs[1] = c.PostAction(ctx, c)
+	if ctx_ != nil {
+		ctx = ctx_
 	}
 
 	m := mode.From(ctx)
@@ -153,7 +160,10 @@ L:
 			if n := v.Name(); n == "help" || n == "h" {
 				m := mode.From(ctx).NoPass()
 				ctx = mode.Into(ctx, m)
-				ctx, err := c.PreAction(ctx, c)
+				ctx_, err := c.PreAction(ctx, c)
+				if ctx_ != nil {
+					ctx = ctx_
+				}
 				c.PrintHelp(c)
 				return ctx, err
 			}
@@ -260,14 +270,12 @@ L:
 		i += n
 	}
 
-	if action := c.Action; action != nil {
-		ctx_, err := action(ctx, c)
-		if ctx_ != nil {
-			ctx = ctx_
-		}
-		if err != nil {
-			return ctx, err
-		}
+	ctx_, err := c.Action(ctx, c)
+	if ctx_ != nil {
+		ctx = ctx_
+	}
+	if err != nil {
+		return ctx, err
 	}
 	if c_next != nil {
 		c_next.parent = c
