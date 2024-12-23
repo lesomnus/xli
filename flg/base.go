@@ -39,10 +39,6 @@ func (f *Base[T, P]) Info() *Info {
 	}
 }
 
-func (f *Base[T, P]) UnderlyingParser() any {
-	return f.Parser
-}
-
 func (f *Base[T, P]) Handle(ctx context.Context, v string) (context.Context, error) {
 	w, err := f.Parser.Parse(v)
 	if err != nil {

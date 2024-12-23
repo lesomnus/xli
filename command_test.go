@@ -542,6 +542,21 @@ func TestCommandArg(t *testing.T) {
 		bar := c.Args.Get("BAR").(*arg.String).Value
 		require.Nil(t, bar)
 	})
+	t.Run("consume many", func(t *testing.T) {
+		c := &xli.Command{
+			Args: arg.Args{
+				&arg.String{Name: "FOO"},
+				&arg.RestStrings{Name: "BAR"},
+			},
+		}
+
+		_, err := c.Run(context.TODO(), []string{"foo", "bar", "baz", "qux"})
+		require.NoError(t, err)
+		require.Equal(t, "foo", *c.Args.Get("FOO").(*arg.String).Value)
+
+		bar := c.Args.Get("BAR").(*arg.RestStrings).Value
+		require.Equal(t, []string{"bar", "baz", "qux"}, bar)
+	})
 }
 func TestCommandPraseEndOfCommands(t *testing.T) {
 	t.Run("remains", func(t *testing.T) {

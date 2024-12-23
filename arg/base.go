@@ -35,7 +35,7 @@ func (a *Base[T, P]) Info() *Info {
 	}
 }
 
-func (a Base[T, P]) Get() (T, bool) {
+func (a *Base[T, P]) Get() (T, bool) {
 	if a.Value == nil {
 		var z T
 		return z, false
@@ -43,12 +43,8 @@ func (a Base[T, P]) Get() (T, bool) {
 	return *a.Value, true
 }
 
-func (a Base[T, P]) IsOptional() bool {
+func (a *Base[T, P]) IsOptional() bool {
 	return a.Optional
-}
-
-func (a Base[T, P]) UnderlyingParser() any {
-	return a.Parser
 }
 
 func (a *Base[T, P]) Prase(ctx context.Context, prev []string, rest []string) (context.Context, int, error) {
@@ -63,7 +59,11 @@ func (a *Base[T, P]) Prase(ctx context.Context, prev []string, rest []string) (c
 		*a.Value = v
 	}
 	if a.Action != nil {
-		ctx, err = a.Action(ctx, v)
+		ctx_, err := a.Action(ctx, v)
+		if ctx_ != nil {
+			ctx = ctx_
+		}
+		return ctx, n, err
 	}
-	return ctx, n, err
+	return ctx, n, nil
 }

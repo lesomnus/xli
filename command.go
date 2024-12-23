@@ -164,7 +164,7 @@ func (c *Command) action(ctx context.Context, args_prev []string, args_rest []st
 		c_next *Command
 	)
 	// It collects `flags` and `args` without parsing.
-	// Sets `c_next` if the one is found.
+	// Sets `c_next` if the subcommand is found.
 L:
 	for i := 0; i < len(args_rest); i++ {
 		t := lex.Lex(args_rest[i])
