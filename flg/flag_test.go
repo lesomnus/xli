@@ -42,3 +42,25 @@ func TestVisit(t *testing.T) {
 		require.Empty(t, v)
 	})
 }
+
+func TestVisitP(t *testing.T) {
+	c := &xli.Command{
+		Flags: xli.Flags{
+			&flg.String{Name: "foo"},
+		},
+	}
+	_, err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
+	require.NoError(t, err)
+
+	t.Run("given", func(t *testing.T) {
+		v := ""
+		ok := flg.VisitP(c, "foo", &v)
+		require.True(t, ok)
+		require.Equal(t, "baz", v)
+	})
+
+	t.Run("dst is nil", func(t *testing.T) {
+		ok := flg.VisitP[string](c, "foo", nil)
+		require.False(t, ok)
+	})
+}

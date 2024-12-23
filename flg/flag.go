@@ -96,3 +96,12 @@ func Visit[T any](c *xli.Command, name string, visitor func(v T)) bool {
 	visitor(v)
 	return true
 }
+
+func VisitP[T any](c *xli.Command, name string, dst *T) bool {
+	if dst == nil {
+		return false
+	}
+	return Visit(c, name, func(v T) {
+		*dst = v
+	})
+}
