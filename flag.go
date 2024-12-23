@@ -29,6 +29,7 @@ type Flag interface {
 	Info() *FlagInfo
 	Handle(ctx context.Context, cmd *Command, v string) (context.Context, error)
 
+	Count() int
 	Default() (string, bool)
 }
 

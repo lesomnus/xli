@@ -24,6 +24,7 @@ type Flag[T any, P Parser[T]] struct {
 
 	Parser P
 
+	count int
 	internal.FlagTag[T]
 }
 
@@ -44,6 +45,7 @@ func (f *Flag[T, P]) Handle(ctx context.Context, cmd *xli.Command, v string) (co
 		return ctx, err
 	}
 
+	f.count++
 	if f.Value == nil {
 		f.Value = &w
 	} else {
@@ -55,10 +57,42 @@ func (f *Flag[T, P]) Handle(ctx context.Context, cmd *xli.Command, v string) (co
 	return ctx, nil
 }
 
+func (f *Flag[T, P]) Count() int {
+	return f.count
+}
+
 func (f *Flag[T, P]) Default() (string, bool) {
 	if f.Value == nil {
 		return "", false
 	}
 
 	return f.Parser.ToString(*f.Value), true
+}
+
+func (f *Flag[T, P]) Get() (T, bool) {
+	if f.Value == nil {
+		var z T
+		return z, false
+	}
+	return *f.Value, true
+}
+
+func Visit[T any](c *xli.Command, name string, visitor func(v T)) bool {
+	f := c.Flags.Get(name)
+	if f == nil {
+		return false
+	}
+
+	g, ok := f.(interface{ Get() (T, bool) })
+	if !ok {
+		return false
+	}
+
+	v, ok := g.Get()
+	if !ok {
+		return false
+	}
+
+	visitor(v)
+	return true
 }

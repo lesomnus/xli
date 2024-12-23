@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCommandLifCycle(t *testing.T) {
+func TestCommandLifeCycle(t *testing.T) {
 	appender := func(vs *[]string, v string, err error) xli.Action {
 		return func(ctx context.Context, cmd *xli.Command) (context.Context, error) {
 			(*vs) = append((*vs), v)
