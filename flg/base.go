@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+type Action[T any] func(ctx context.Context, v T) error
+
 type Parser[T any] interface {
 	Parse(s string) (T, error)
 	ToString(v T) string
@@ -20,7 +22,7 @@ type Base[T any, P Parser[T]] struct {
 	Usage fmt.Stringer
 
 	Value  *T
-	Action func(ctx context.Context, v T) (context.Context, error)
+	Action Action[T]
 
 	Parser P
 
@@ -39,10 +41,10 @@ func (f *Base[T, P]) Info() *Info {
 	}
 }
 
-func (f *Base[T, P]) Handle(ctx context.Context, v string) (context.Context, error) {
+func (f *Base[T, P]) Handle(ctx context.Context, v string) error {
 	w, err := f.Parser.Parse(v)
 	if err != nil {
-		return ctx, err
+		return err
 	}
 
 	f.count++
@@ -54,7 +56,7 @@ func (f *Base[T, P]) Handle(ctx context.Context, v string) (context.Context, err
 	if a := f.Action; a != nil {
 		return a(ctx, w)
 	}
-	return ctx, nil
+	return nil
 }
 
 func (f *Base[T, P]) Count() int {

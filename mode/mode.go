@@ -3,7 +3,6 @@ package mode
 import (
 	"context"
 	"slices"
-	"strings"
 )
 
 type Mode int
@@ -44,7 +43,7 @@ func Into(ctx context.Context, v Mode) context.Context {
 
 func Resolve(args []string) Mode {
 	if slices.ContainsFunc(args, func(v string) bool {
-		return strings.HasPrefix(v, "--help") || strings.HasPrefix(v, "-h")
+		return v == "--help" || v == "-h"
 	}) {
 		return Help
 	}

@@ -19,11 +19,11 @@ type RestParser[T any, P Parser[T]] struct {
 	Base P
 }
 
-func (p *RestParser[T, P]) Prase(ctx context.Context, prev []string, rest []string) ([]T, int, error) {
+func (p *RestParser[T, P]) Prase(ctx context.Context, rest []string) ([]T, int, error) {
 	vs := []T{}
 	i := 0
 	for i < len(rest) {
-		v, n, err := p.Base.Parse(ctx, prev, rest[i:])
+		v, n, err := p.Base.Parse(ctx, rest[i:])
 		i += n
 		if n == 0 || err != nil {
 			return nil, i, err
@@ -46,18 +46,26 @@ type Rest[T any, P Parser[T]] struct {
 	Usage fmt.Stringer
 
 	Value  []T
-	Action func(ctx context.Context, v []T) (context.Context, error)
+	Action func(ctx context.Context, v []T) error
 
 	Parser RestParser[T, P]
 }
 
+func (a *Rest[T, P]) String() string {
+	return fmt.Sprintf("[%s...]", a.Name)
+}
+
 func (a *Rest[T, P]) Info() *Info {
+	usage := a.Usage
+	if usage == nil {
+		usage = a
+	}
 	return &Info{
 		Name: a.Name,
 
 		Brief: a.Brief,
 		Synop: a.Synop,
-		Usage: a.Usage,
+		Usage: usage,
 	}
 }
 
@@ -70,20 +78,23 @@ func (a *Rest[T, P]) IsOptional() bool {
 	return true
 }
 
-func (a *Rest[T, P]) Prase(ctx context.Context, prev []string, rest []string) (context.Context, int, error) {
-	vs, n, err := a.Parser.Prase(ctx, prev, rest)
+func (a *Rest[T, P]) IsMany() bool {
+	return true
+}
+
+func (a *Rest[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
+	vs, n, err := a.Parser.Prase(ctx, rest)
 	if n == 0 || err != nil {
-		return ctx, n, err
+		return n, err
 	}
 
 	a.Value = vs
 
 	if a.Action != nil {
-		ctx_, err := a.Action(ctx, vs)
-		if ctx_ != nil {
-			ctx = ctx_
+		err := a.Action(ctx, vs)
+		if err != nil {
+			return n, err
 		}
-		return ctx, n, err
 	}
-	return ctx, n, nil
+	return n, nil
 }

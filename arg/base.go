@@ -5,8 +5,10 @@ import (
 	"fmt"
 )
 
+type Action[T any] func(ctx context.Context, v T) error
+
 type Parser[T any] interface {
-	Parse(ctx context.Context, prev []string, rest []string) (T, int, error)
+	Parse(ctx context.Context, rest []string) (T, int, error)
 	String() string
 }
 
@@ -18,20 +20,32 @@ type Base[T any, P Parser[T]] struct {
 	Usage fmt.Stringer
 
 	Value  *T
-	Action func(ctx context.Context, v T) (context.Context, error)
+	Action Action[T]
 
 	Optional bool
 
 	Parser P
 }
 
+func (a *Base[T, P]) String() string {
+	if a.Optional {
+		return fmt.Sprintf("[%s]", a.Name)
+	} else {
+		return fmt.Sprintf("<%s>", a.Name)
+	}
+}
+
 func (a *Base[T, P]) Info() *Info {
+	usage := a.Usage
+	if usage == nil {
+		usage = a
+	}
 	return &Info{
 		Name: a.Name,
 
 		Brief: a.Brief,
 		Synop: a.Synop,
-		Usage: a.Usage,
+		Usage: usage,
 	}
 }
 
@@ -47,10 +61,14 @@ func (a *Base[T, P]) IsOptional() bool {
 	return a.Optional
 }
 
-func (a *Base[T, P]) Prase(ctx context.Context, prev []string, rest []string) (context.Context, int, error) {
-	v, n, err := a.Parser.Parse(ctx, prev, rest)
+func (a *Base[T, P]) IsMany() bool {
+	return false
+}
+
+func (a *Base[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
+	v, n, err := a.Parser.Parse(ctx, rest)
 	if n == 0 || err != nil {
-		return ctx, n, err
+		return n, err
 	}
 
 	if a.Value == nil {
@@ -59,11 +77,9 @@ func (a *Base[T, P]) Prase(ctx context.Context, prev []string, rest []string) (c
 		*a.Value = v
 	}
 	if a.Action != nil {
-		ctx_, err := a.Action(ctx, v)
-		if ctx_ != nil {
-			ctx = ctx_
+		if err := a.Action(ctx, v); err != nil {
+			return n, err
 		}
-		return ctx, n, err
 	}
-	return ctx, n, nil
+	return n, nil
 }

@@ -26,7 +26,7 @@ func (i *Info) String() string {
 
 type Flag interface {
 	Info() *Info
-	Handle(ctx context.Context, v string) (context.Context, error)
+	Handle(ctx context.Context, v string) error
 
 	Count() int
 	Default() (string, bool)

@@ -18,7 +18,7 @@ func TestFlagCount(t *testing.T) {
 	v := c.Flags.Get("foo")
 	require.Equal(t, 0, v.Count())
 
-	_, err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
+	err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
 	require.NoError(t, err)
 	require.Equal(t, 2, v.Count())
 }

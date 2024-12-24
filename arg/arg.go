@@ -15,8 +15,10 @@ type Info struct {
 
 type Arg interface {
 	Info() *Info
-	Prase(ctx context.Context, pre []string, rest []string) (context.Context, int, error)
+	Prase(ctx context.Context, rest []string) (int, error)
+
 	IsOptional() bool
+	IsMany() bool
 }
 
 type Args []Arg

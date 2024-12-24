@@ -8,10 +8,7 @@ type String = Base[string, StringParser]
 
 type StringParser struct{}
 
-func (StringParser) Parse(ctx context.Context, prev []string, rest []string) (string, int, error) {
-	if len(rest) == 0 {
-		return "", 0, nil
-	}
+func (StringParser) Parse(ctx context.Context, rest []string) (string, int, error) {
 	return rest[0], 1, nil
 }
 

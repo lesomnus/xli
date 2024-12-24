@@ -1,4 +1,4 @@
 # xli
 
-Build your CLI within context.
+Build your CLI like a middleware
 

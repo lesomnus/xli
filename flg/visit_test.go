@@ -16,7 +16,7 @@ func TestVisit(t *testing.T) {
 			&flg.String{Name: "qux"},
 		},
 	}
-	_, err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
+	err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
 	require.NoError(t, err)
 
 	t.Run("given", func(t *testing.T) {
@@ -49,7 +49,7 @@ func TestVisitP(t *testing.T) {
 			&flg.String{Name: "foo"},
 		},
 	}
-	_, err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
+	err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
 	require.NoError(t, err)
 
 	t.Run("given", func(t *testing.T) {

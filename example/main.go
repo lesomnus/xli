@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
@@ -20,11 +21,23 @@ func main() {
 			&flg.String{Name: "bar", Brief: "bar-brief", Alias: 'b'},
 			&flg.Uint32{Name: "size", Brief: "size-brief", Alias: 's'},
 		},
-		Args: arg.Args{
-			&arg.String{Name: "FOO", Brief: "FOO-brief"},
-			&arg.String{Name: "BAR", Brief: "BAR-brief"},
-		},
 		Commands: xli.Commands{
+			&xli.Command{
+				Name:  "echo",
+				Brief: "display a line of text",
+				Args: arg.Args{
+					&arg.RestStrings{
+						Name:  "STRING",
+						Brief: "String to display",
+					},
+				},
+				Action: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+					arg.Visit(cmd, "STRING", func(vs []string) {
+						cmd.Println(strings.Join(vs, " "))
+					})
+					return next(ctx)
+				}),
+			},
 			&xli.Command{
 				Name:  "foo",
 				Brief: "cmd-foo-brief",
@@ -53,6 +66,7 @@ func main() {
 		),
 	}
 
-	_, err := c.Run(context.TODO(), os.Args[1:])
-	fmt.Printf("err: %v\n", err)
+	if err := c.Run(context.TODO(), os.Args[1:]); err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
 }

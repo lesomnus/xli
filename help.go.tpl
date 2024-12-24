@@ -16,21 +16,26 @@ Usage:
 	{{ range . -}}
 		{{ print .Name " " -}}
 		{{ range .Args -}}
-			{{ print "<" .Name "> " -}}
+			{{ .Info.Usage.String -}}
 		{{ end -}}
 	{{ end -}}
 	{{ if len $.Flags    | ne 0 }}[options] {{ end -}}
 	{{ if len $.Commands | ne 0 }}[command]{{ end -}}
-	{{ print "\n" -}}
 	{{ range . -}}
+		{{ if len .Args | ne 0 -}}
+			{{ printf "\n" -}}
+		{{ end -}}
+
 		{{ range .Args -}}
 			{{ if len .Brief | ne 0 -}}
-				{{ printf "  %s:\n    %s\n" .Name .Brief -}}
+				{{ printf "\n  %s:\n    %s\n" .Name .Brief -}}
 			{{ end -}}
 		{{ end -}}
 	{{ end -}}
-{{ end }}
-{{ if len $.Commands | ne 0 -}}
+{{ end -}}
+
+{{ if len $.Commands | ne 0 }}
+
 Commands:{{ range $.Commands.ByCategory -}}
 		{{ $category := (index . 0).Category -}}
 		{{ if len $category | ne 0 -}}
@@ -40,9 +45,10 @@ Commands:{{ range $.Commands.ByCategory -}}
 			{{ printf "\n    %-20s %s" .String .Brief -}}
 		{{ end -}}
 	{{ end -}}
-{{ end }}
+{{ end -}}
 
-{{ if len $.Flags | ne 0 -}}
+{{ if len $.Flags | ne 0 }}
+
 Options:{{ range $.Flags.ByCategory -}}
 		{{ $category := (index . 0).Info.Category -}}
 		{{ if len $category | ne 0 -}}
@@ -52,5 +58,6 @@ Options:{{ range $.Flags.ByCategory -}}
 			{{ printf "\n    %-20s %s" .String .Brief -}}
 		{{ end -}}{{ end -}}
 	{{ end -}}
-{{ end }}
+{{ end -}}
 
+{{ print "\n" -}}
