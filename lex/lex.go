@@ -39,20 +39,5 @@ func Lex(v string) Token {
 		}
 	}
 
-	j := strings.IndexFunc(v, func(r rune) bool {
-		return r == '='
-	})
-	if j > 0 {
-		arg := Arg(v[j+1:])
-		return &Flag{
-			raw:  v,      // --flag=arg
-			name: v[i:j], // flag
-			arg:  &arg,   // arg
-		}
-	} else {
-		return &Flag{
-			raw:  v,     // --flag
-			name: v[i:], // flag
-		}
-	}
+	return Flag(v)
 }

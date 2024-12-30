@@ -59,46 +59,59 @@ func (f Arg) String() string {
 //	 --foo=bar
 //	   ^^^ ^^^
 //	Name() Arg()
-type Flag struct {
-	raw  string
-	name string
-	arg  *Arg
-}
+type Flag string
 
-func (f *Flag) Raw() string {
-	return f.raw
-}
-
-func (f *Flag) IsShort() bool {
-	return !strings.HasPrefix(f.raw, "--")
-}
-
-func (f *Flag) IsStacked() bool {
-	return f.IsShort() && len(f.raw) > 2
-}
-
-func (f *Flag) Name() string {
-	return f.name
-}
-
-func (f *Flag) String() string {
-	b := strings.Builder{}
-	if f.IsShort() {
-		b.WriteString("-")
-	} else {
-		b.WriteString("--")
+// Returns index for name and arg.
+// `j` will -1 if there is no arg.
+//
+//	--name=arg
+//	  ^    ^
+//	  i    j
+func (f Flag) indexes() (int, int) {
+	i := strings.IndexFunc(string(f), func(r rune) bool { return r != '-' })
+	j := strings.IndexRune(string(f)[i:], '=')
+	if j < 0 {
+		return i, -1
 	}
-	b.WriteString(f.name)
-	if f.arg != nil {
-		b.WriteString("=")
-		b.WriteString(f.arg.String())
-	}
-
-	return b.String()
+	return i, i + j + 1
 }
 
-func (f *Flag) Arg() *Arg {
-	return f.arg
+func (f Flag) Raw() string {
+	return string(f)
+}
+
+func (f Flag) IsShort() bool {
+	return !strings.HasPrefix(string(f), "--")
+}
+
+func (f Flag) IsStacked() bool {
+	return f.IsShort() && len(string(f)) > 2
+}
+
+func (f Flag) Name() string {
+	i, j := f.indexes()
+	if j < 0 {
+		return string(f)[i:]
+	}
+	return string(f)[i : j-1]
+}
+
+func (f Flag) Arg() (Arg, bool) {
+	_, j := f.indexes()
+	if j < 0 {
+		return "", false
+	}
+
+	return Arg(string(f)[j:]), true
+}
+
+func (f Flag) String() string {
+	_, j := f.indexes()
+	v := string(f)
+	if j < 0 {
+		return v
+	}
+	return fmt.Sprintf("%s=%q", v[:j-1], v[j:])
 }
 
 // Spread converts stacked flags into individual flags like:
@@ -107,34 +120,48 @@ func (f *Flag) Arg() *Arg {
 //	"-bar=foo" -> ["-b", "a", "r=foo"]
 //	"-b" -> ["-b"]
 //	"--bar" -> ["--bar"]
-func (f *Flag) Spread() []*Flag {
-	if !f.IsShort() {
-		return []*Flag{f}
+func (f Flag) Spread() []Flag {
+	i, j := f.indexes()
+	if i > 1 {
+		// Long one.
+		return []Flag{f}
 	}
 
-	fs := make([]*Flag, len(f.name))
-	for i, r := range f.name {
-		fs[i] = &Flag{
-			raw:  string(r),
-			name: string(r),
-		}
+	// Index of name end.
+	k := j - 1
+	if k < 0 {
+		k = len(f)
 	}
 
-	// First flag contains leading dash.
-	fs[0].raw = f.raw[:2]
+	v := string(f)
+	n := v[i:k]
 
-	if f.arg != nil {
-		l := len(fs) - 1
-		fl := fs[l]
-		fl.raw = f.raw[l+1:]
-		fl.arg = f.arg
+	x := i + 1
+	y := k - 1
+
+	//  |-n-|
+	// -abcde=foo
+	//  ^^  ^^^
+	//  ix  ykj
+
+	vs := make([]Flag, len(n))
+	vs[0] = Flag(v[:x])
+	vs[len(n)-1] = Flag(v[y:])
+
+	for ; x < y; x++ {
+		vs[x-i] = Flag(v[x])
 	}
 
-	return fs
+	return vs
 }
 
-func (f *Flag) WithArg(a Arg) *Flag {
-	f_ := *f
-	f_.arg = &a
-	return &f_
+func (f Flag) WithArg(a Arg) Flag {
+	_, j := f.indexes()
+	if j > 0 {
+		j -= 1
+	} else {
+		j = len(f)
+	}
+
+	return Flag(fmt.Sprintf("%s=%s", string(f)[:j], string(a)))
 }

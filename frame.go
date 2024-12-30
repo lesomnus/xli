@@ -17,7 +17,7 @@ type frame struct {
 	c_curr *Command
 	c_next *Command
 
-	flags  []*lex.Flag
+	flags  []lex.Flag
 	args   []string
 	rest   []string // args for next command
 	remain []string // remain args after end of command
@@ -38,7 +38,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 
 	f := &frame{
 		c_curr: cmd,
-		flags:  []*lex.Flag{},
+		flags:  []lex.Flag{},
 		args:   []string{},
 	}
 	for i := 0; i < len(args_rest); i++ {
@@ -52,7 +52,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 			f.remain = args_rest[i:]
 			return f, nil
 
-		case *lex.Flag:
+		case lex.Flag:
 			if len(f.args) > 0 {
 				return nil, fmt.Errorf("flags are must be set at the behind of the arguments: %s", v)
 			}
@@ -65,11 +65,11 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				return nil, fmt.Errorf("unknown flag: %s", v)
 			} else if _, ok := f.(*flg.Switch); ok {
 				// Flag is a switch
-				if v.Arg() == nil {
+				if _, ok := v.Arg(); !ok {
 					v = v.WithArg("true")
 				}
-			} else if v.Arg() == nil {
-				// Flag is not a switch and requires value but does not have one.
+			} else if _, ok := v.Arg(); !ok {
+				// Flag is not a switch and requires a value but does not have one.
 				i++
 				if i == len(args_rest) {
 					// There are no more args.
@@ -81,7 +81,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 					return nil, fmt.Errorf("%s: %w", v, w)
 				case lex.EndOfCommand:
 					return nil, fmt.Errorf("%s: no value is given", v)
-				case *lex.Flag:
+				case lex.Flag:
 					return nil, fmt.Errorf("%s: no value is given but was flag: %s", v, w)
 				case lex.Arg:
 					v = v.WithArg(w)
@@ -128,7 +128,12 @@ func (f *frame) prepare(ctx context.Context) error {
 		if h == nil {
 			return fmt.Errorf("unknown flag: %s", h)
 		}
-		if err := h.Handle(ctx, v.Arg().Raw()); err != nil {
+
+		a, ok := v.Arg()
+		if !ok {
+			a = lex.Arg("true")
+		}
+		if err := h.Handle(ctx, a.Raw()); err != nil {
 			return fmt.Errorf("invalid flag: %s: %w", v, err)
 		}
 	}
