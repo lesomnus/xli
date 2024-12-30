@@ -20,6 +20,13 @@ func TestLex(t *testing.T) {
 		require.Equal(t, "bar", v.Raw())
 		require.Equal(t, `"bar"`, v.String())
 	})
+	t.Run("single dash is an arg", func(t *testing.T) {
+		u := lex.Lex("-")
+		require.IsType(t, lex.Arg(""), u)
+
+		v := u.(lex.Arg)
+		require.Equal(t, "-", v.Raw())
+	})
 	t.Run("flag", func(t *testing.T) {
 		u := lex.Lex("--foo")
 		require.IsType(t, &lex.Flag{}, u)
@@ -91,13 +98,25 @@ func TestLex(t *testing.T) {
 		require.Equal(t, "bar baz", w.Raw())
 		require.Equal(t, `"bar baz"`, w.String())
 	})
-	t.Run("three dashes", func(t *testing.T) {
-		u := lex.Lex("---foo=bar")
-		require.IsType(t, &lex.Err{}, u)
+	t.Run("too many dashes", func(t *testing.T) {
+		tcs := []string{
+			"---",
+			"----",
+			"---foo",
+			"----foo",
+			"---foo=bar",
+			"----foo=bar",
+		}
+		for _, tc := range tcs {
+			t.Log("tc:", tc)
 
-		v := u.(*lex.Err)
-		require.Equal(t, "---foo=bar", v.Raw())
-		require.Contains(t, v.String(), "[!")
+			u := lex.Lex(tc)
+			require.IsType(t, &lex.Err{}, u)
+
+			v := u.(*lex.Err)
+			require.Equal(t, tc, v.Raw())
+			require.Contains(t, v.String(), "[!")
+		}
 	})
 	t.Run("spread", func(t *testing.T) {
 		u := lex.Lex("-abc")

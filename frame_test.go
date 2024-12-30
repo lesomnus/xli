@@ -104,7 +104,7 @@ func TestFrameParseFlags(t *testing.T) {
 			"---foo=a",
 			"--bar=b",
 		})
-		require.ErrorContains(t, err, "three dashes: ---foo=a")
+		require.ErrorContains(t, err, "too many dashes: ---foo=a")
 	})
 }
 
