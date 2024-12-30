@@ -51,6 +51,14 @@ func (f Arg) String() string {
 	return fmt.Sprintf("%q", string(f))
 }
 
+// Flag holds an argument such as "-*" or "--*" where `*` is any printable character.
+// Flag is short if there is single dash or long if there are two dashes.
+// Its component can be accessed by:
+//
+//	  -foo=bar
+//	 --foo=bar
+//	   ^^^ ^^^
+//	Name() Arg()
 type Flag struct {
 	raw  string
 	name string
@@ -63,6 +71,10 @@ func (f *Flag) Raw() string {
 
 func (f *Flag) IsShort() bool {
 	return !strings.HasPrefix(f.raw, "--")
+}
+
+func (f *Flag) IsStacked() bool {
+	return f.IsShort() && len(f.raw) > 2
 }
 
 func (f *Flag) Name() string {
@@ -89,10 +101,12 @@ func (f *Flag) Arg() *Arg {
 	return f.arg
 }
 
-// Spread convert stacked flags into individual flags like:
-// "-bar" -> ["-b", "a", "r"]
-// "-b" -> ["-b"]
-// "--bar" -> ["--bar"]
+// Spread converts stacked flags into individual flags like:
+//
+//	"-bar" -> ["-b", "a", "r"]
+//	"-bar=foo" -> ["-b", "a", "r=foo"]
+//	"-b" -> ["-b"]
+//	"--bar" -> ["--bar"]
 func (f *Flag) Spread() []*Flag {
 	if !f.IsShort() {
 		return []*Flag{f}
@@ -106,7 +120,16 @@ func (f *Flag) Spread() []*Flag {
 		}
 	}
 
+	// First flag contains leading dash.
 	fs[0].raw = f.raw[:2]
+
+	if f.arg != nil {
+		l := len(fs) - 1
+		fl := fs[l]
+		fl.raw = f.raw[l+1:]
+		fl.arg = f.arg
+	}
+
 	return fs
 }
 
