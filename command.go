@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"text/template"
@@ -143,6 +144,17 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 		}
 
 		ctx = mode.Into(ctx, m|mode.Pass)
+	}
+
+	// Set ios if not set.
+	if c.ReadCloser == nil {
+		c.ReadCloser = os.Stdin
+	}
+	if c.WriteCloser == nil {
+		c.WriteCloser = os.Stdout
+	}
+	if c.ErrWriter == nil {
+		c.ErrWriter = os.Stderr
 	}
 
 	// Actions are invoked sequentially.

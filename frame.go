@@ -3,7 +3,6 @@ package xli
 import (
 	"context"
 	"fmt"
-	"os"
 	"slices"
 
 	"github.com/lesomnus/xli/arg"
@@ -180,18 +179,23 @@ func (f *frame) execute(ctx context.Context) error {
 	if c.Action == nil {
 		c.Action = noop
 	}
-	if c.ReadCloser == nil {
-		c.ReadCloser = os.Stdin
-	}
-	if c.WriteCloser == nil {
-		c.WriteCloser = os.Stdout
-	}
-	if c.ErrWriter == nil {
-		c.ErrWriter = os.Stderr
-	}
 
 	if next := f.next; next != nil {
-		return c.Action(ctx, c, next.execute)
+		next.c_curr.parent = c
+		return c.Action(ctx, c, func(ctx context.Context) error {
+			c_next := next.c_curr
+			if c_next.ReadCloser == nil {
+				c_next.ReadCloser = c.ReadCloser
+			}
+			if c_next.WriteCloser == nil {
+				c_next.WriteCloser = c.WriteCloser
+			}
+			if c_next.ErrWriter == nil {
+				c_next.ErrWriter = c.ErrWriter
+			}
+
+			return next.execute(ctx)
+		})
 	}
 
 	m := mode.From(ctx)

@@ -1,7 +1,12 @@
 package xli_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/lesomnus/xli"
@@ -486,4 +491,70 @@ func TestFrameMode(t *testing.T) {
 		mode.Help | mode.Pass,
 		mode.Help,
 	}, ms)
+}
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (nopWriteCloser) Close() error {
+	return nil
+}
+
+func TestFrameIos(t *testing.T) {
+	t.Run("use standard one if nil", func(t *testing.T) {
+		ok := false
+		c := &xli.Command{
+			Action: func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+				ok = true
+				require.Same(t, cmd.ReadCloser, os.Stdin)
+				require.Same(t, cmd.WriteCloser, os.Stdout)
+				require.Same(t, cmd.ErrWriter, os.Stderr)
+				return next(ctx)
+			},
+		}
+
+		err := c.Run(context.TODO(), nil)
+		require.NoError(t, err)
+		require.True(t, ok)
+	})
+	t.Run("inherit", func(t *testing.T) {
+		i := bytes.NewReader([]byte("royale\nwith\ncheese"))
+		o := &bytes.Buffer{}
+		e := &bytes.Buffer{}
+
+		c := &xli.Command{
+			Commands: xli.Commands{
+				&xli.Command{
+					Name: "foo",
+					Action: func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+						for i := 0; ; i++ {
+							var v string
+							if _, err := cmd.Scanln(&v); err != nil {
+								if errors.Is(err, io.EOF) {
+									break
+								}
+								return err
+							}
+							if i%2 == 0 {
+								cmd.Println(v)
+							} else {
+								fmt.Fprintln(cmd.ErrWriter, v)
+							}
+						}
+						return next(ctx)
+					},
+				},
+			},
+
+			ReadCloser:  io.NopCloser(i),
+			WriteCloser: &nopWriteCloser{Writer: o},
+			ErrWriter:   &nopWriteCloser{Writer: e},
+		}
+
+		err := c.Run(context.TODO(), []string{"foo"})
+		require.NoError(t, err)
+		require.Equal(t, "royale\ncheese\n", o.String())
+		require.Equal(t, "with\n", e.String())
+	})
 }
