@@ -27,7 +27,7 @@ type Command struct {
 	Args     arg.Args
 	Commands Commands
 
-	Action Action
+	Handler Handler
 
 	io.ReadCloser
 	io.WriteCloser

@@ -5,8 +5,6 @@ import (
 	"fmt"
 )
 
-type Action[T any] func(ctx context.Context, v T) error
-
 type Parser[T any] interface {
 	Parse(ctx context.Context, rest []string) (T, int, error)
 	String() string
@@ -19,8 +17,8 @@ type Base[T any, P Parser[T]] struct {
 	Synop string
 	Usage fmt.Stringer
 
-	Value  *T
-	Action Action[T]
+	Value   *T
+	Handler Handler[T]
 
 	Optional bool
 
@@ -76,8 +74,8 @@ func (a *Base[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
 	} else {
 		*a.Value = v
 	}
-	if a.Action != nil {
-		if err := a.Action(ctx, v); err != nil {
+	if a.Handler != nil {
+		if err := a.Handler.Handle(ctx, v); err != nil {
 			return n, err
 		}
 	}

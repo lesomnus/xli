@@ -23,7 +23,7 @@ func NewCmdCompletion() *Command {
 func newCmdZshCompletion() *Command {
 	return &Command{
 		Name: "zsh",
-		Action: OnRun(func(ctx context.Context, cmd *Command, next Next) error {
+		Handler: OnRun(func(ctx context.Context, cmd *Command, next Next) error {
 			b, err := completions.ReadFile("completions/zsh")
 			if err != nil {
 				panic(err)

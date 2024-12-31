@@ -224,13 +224,13 @@ func (f *frame) prepare(ctx context.Context) error {
 // Unlike prepare, it executes next frame also.
 func (f *frame) execute(ctx context.Context) error {
 	c := f.c_curr
-	if c.Action == nil {
-		c.Action = noop
+	if c.Handler == nil {
+		c.Handler = noop
 	}
 
 	if next := f.next; next != nil {
 		next.c_curr.parent = c
-		return c.Action(ctx, c, func(ctx context.Context) error {
+		return c.Handler.Handle(ctx, c, func(ctx context.Context) error {
 			c_next := next.c_curr
 			if c_next.ReadCloser == nil {
 				c_next.ReadCloser = c.ReadCloser
@@ -248,7 +248,7 @@ func (f *frame) execute(ctx context.Context) error {
 
 	m := mode.From(ctx)
 	ctx = mode.Into(ctx, m.NoPass())
-	return c.Action(ctx, c, func(ctx context.Context) error {
+	return c.Handler.Handle(ctx, c, func(ctx context.Context) error {
 		if f.is_help {
 			return c.PrintHelp(c)
 		}

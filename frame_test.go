@@ -453,11 +453,11 @@ func TestFrameParseComposite(t *testing.T) {
 
 func TestFrameMode(t *testing.T) {
 	ms := []mode.Mode{}
-	append_mode := func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+	append_mode := xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 		m := mode.From(ctx)
 		ms = append(ms, m)
 		return next(ctx)
-	}
+	})
 
 	c := &xli.Command{
 		Commands: xli.Commands{
@@ -465,14 +465,14 @@ func TestFrameMode(t *testing.T) {
 				Name: "foo",
 				Commands: xli.Commands{
 					&xli.Command{
-						Name:   "bar",
-						Action: append_mode,
+						Name:    "bar",
+						Handler: append_mode,
 					},
 				},
-				Action: append_mode,
+				Handler: append_mode,
 			},
 		},
-		Action: append_mode,
+		Handler: append_mode,
 	}
 
 	err := c.Run(context.TODO(), []string{"foo", "bar"})
@@ -505,13 +505,13 @@ func TestFrameIos(t *testing.T) {
 	t.Run("use standard one if nil", func(t *testing.T) {
 		ok := false
 		c := &xli.Command{
-			Action: func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+			Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 				ok = true
 				require.Same(t, cmd.ReadCloser, os.Stdin)
 				require.Same(t, cmd.WriteCloser, os.Stdout)
 				require.Same(t, cmd.ErrWriter, os.Stderr)
 				return next(ctx)
-			},
+			}),
 		}
 
 		err := c.Run(context.TODO(), nil)
@@ -527,7 +527,7 @@ func TestFrameIos(t *testing.T) {
 			Commands: xli.Commands{
 				&xli.Command{
 					Name: "foo",
-					Action: func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+					Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 						for i := 0; ; i++ {
 							var v string
 							if _, err := cmd.Scanln(&v); err != nil {
@@ -543,7 +543,7 @@ func TestFrameIos(t *testing.T) {
 							}
 						}
 						return next(ctx)
-					},
+					}),
 				},
 			},
 

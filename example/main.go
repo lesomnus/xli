@@ -31,7 +31,7 @@ func main() {
 						Brief: "String to display",
 					},
 				},
-				Action: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+				Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 					arg.Visit(cmd, "STRING", func(vs []string) {
 						cmd.Println(strings.Join(vs, " "))
 					})
