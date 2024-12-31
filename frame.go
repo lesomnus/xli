@@ -13,6 +13,7 @@ import (
 )
 
 type frame struct {
+	prev *frame
 	next *frame
 
 	c_curr *Command
@@ -55,14 +56,14 @@ func parseFrameAll(cmd *Command, args_rest []string) (*frame, error) {
 	}
 	for f := root; f.c_next != nil; f = f.next {
 		f_next, err := parseFrame(f.c_next, f.rest)
+		f_next.prev = f
+		f.next = f_next
 		if err != nil {
 			return root.next, err
 		}
 		if f_next == nil {
 			break
 		}
-
-		f.next = f_next
 	}
 
 	return root.next, nil
@@ -88,7 +89,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 		t := lex.Lex(args_rest[i])
 		switch v := t.(type) {
 		case *lex.Err:
-			return nil, v
+			return f, v
 
 		case lex.EndOfCommand:
 			f.rest = []string{}
@@ -97,16 +98,16 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 
 		case lex.Flag:
 			if len(f.args) > 0 {
-				return nil, fmt.Errorf("flags are must be set at the behind of the arguments: %s", v)
+				return f, fmt.Errorf("flags are must be set at the behind of the arguments: %s", v)
 			}
 			if n := v.Name(); n == "help" || n == "h" {
 				f.is_help = true
 				return f, nil
 			}
 
-			if f := cmd.Flags.Get(v.Name()); f == nil {
-				return nil, &FlagError{v, ErrUnknownFlag}
-			} else if _, ok := f.(*flg.Switch); ok {
+			if w := cmd.Flags.Get(v.Name()); w == nil {
+				return f, &FlagError{v, ErrUnknownFlag}
+			} else if _, ok := w.(*flg.Switch); ok {
 				// Flag is a switch
 				if _, ok := v.Arg(); !ok {
 					v = v.WithArg("true")
@@ -116,16 +117,16 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				i++
 				if i == len(args_rest) {
 					// There are no more args.
-					return nil, &FlagError{v, ErrNoFlagValue}
+					return f, &FlagError{v, ErrNoFlagValue}
 				}
 
 				switch w := lex.Lex(args_rest[i]).(type) {
 				case *lex.Err:
-					return nil, fmt.Errorf("%s: %w", v, w)
+					return f, fmt.Errorf("%s: %w", v, w)
 				case lex.EndOfCommand:
-					return nil, &FlagError{v, ErrNoFlagValue}
+					return f, &FlagError{v, ErrNoFlagValue}
 				case lex.Flag:
-					return nil, &FlagError{v, ErrNoFlagValue}
+					return f, &FlagError{v, ErrNoFlagValue}
 				case lex.Arg:
 					v = v.WithArg(w)
 				default:
@@ -141,12 +142,12 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				continue
 			}
 			if len(cmd.Commands) == 0 {
-				return nil, &ArgError{v, ErrTooManyArgs}
+				return f, &ArgError{v, ErrTooManyArgs}
 			}
 
 			f.c_next = cmd.Commands.Get(v.Raw())
 			if f.c_next == nil {
-				return nil, &ArgError{v, ErrUnknownCmd}
+				return f, &ArgError{v, ErrUnknownCmd}
 			}
 
 			// Subcommand is found so stop parsing.
@@ -155,6 +156,14 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 
 		default:
 			panic("unknown lex item")
+		}
+	}
+
+	if i := len(f.args); i < len(cmd.Args) {
+		a := cmd.Args[i]
+		if !a.IsOptional() {
+			name := fmt.Sprintf("%q", a.Info().Name)
+			return f, &ArgError{lex.Arg(name), ErrNeedArgs}
 		}
 	}
 
@@ -190,7 +199,8 @@ func (f *frame) prepare(ctx context.Context) error {
 			if _, ok := h.(*arg.Remains); ok {
 				break
 			}
-			return fmt.Errorf("argument not given: %q", h.Info().Name)
+
+			panic(fmt.Sprintf("parse failed: argument not given: %q", h.Info().Name))
 		}
 
 		// Parser can consume multiple arguments.
@@ -207,7 +217,7 @@ func (f *frame) prepare(ctx context.Context) error {
 	if len(c.Args) > 0 {
 		if h, ok := c.Args[len(c.Args)-1].(*arg.Remains); ok {
 			if !h.IsOptional() && len(f.remain) == 0 {
-				return fmt.Errorf("argument not given: %q", h.Info().Name)
+				panic(fmt.Sprintf("parse failed: argument not given: %q", h.Info().Name))
 			}
 
 			_, err := h.Prase(ctx, f.remain)
@@ -224,13 +234,13 @@ func (f *frame) prepare(ctx context.Context) error {
 // Unlike prepare, it executes next frame also.
 func (f *frame) execute(ctx context.Context) error {
 	c := f.c_curr
-	if c.Action == nil {
-		c.Action = noop
+	if c.Handler == nil {
+		c.Handler = noop
 	}
 
 	if next := f.next; next != nil {
 		next.c_curr.parent = c
-		return c.Action(ctx, c, func(ctx context.Context) error {
+		return c.Handler.Handle(ctx, c, func(ctx context.Context) error {
 			c_next := next.c_curr
 			if c_next.ReadCloser == nil {
 				c_next.ReadCloser = c.ReadCloser
@@ -248,7 +258,7 @@ func (f *frame) execute(ctx context.Context) error {
 
 	m := mode.From(ctx)
 	ctx = mode.Into(ctx, m.NoPass())
-	return c.Action(ctx, c, func(ctx context.Context) error {
+	return c.Handler.Handle(ctx, c, func(ctx context.Context) error {
 		if f.is_help {
 			return c.PrintHelp(c)
 		}

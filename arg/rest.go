@@ -3,6 +3,8 @@ package arg
 import (
 	"context"
 	"fmt"
+
+	"github.com/lesomnus/xli/mode"
 )
 
 type RestStrings = Rest[string, StringParser]
@@ -45,8 +47,8 @@ type Rest[T any, P Parser[T]] struct {
 	Synop string
 	Usage fmt.Stringer
 
-	Value  []T
-	Action func(ctx context.Context, v []T) error
+	Value   []T
+	Handler Handler[[]T]
 
 	Parser RestParser[T, P]
 }
@@ -83,18 +85,23 @@ func (a *Rest[T, P]) IsMany() bool {
 }
 
 func (a *Rest[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
+	if m := mode.From(ctx); m == mode.Tab {
+		a.handle(ctx, nil)
+		return 0, nil
+	}
+
 	vs, n, err := a.Parser.Prase(ctx, rest)
 	if n == 0 || err != nil {
 		return n, err
 	}
 
 	a.Value = vs
+	return n, a.handle(ctx, vs)
+}
 
-	if a.Action != nil {
-		err := a.Action(ctx, vs)
-		if err != nil {
-			return n, err
-		}
+func (a *Rest[T, P]) handle(ctx context.Context, v []T) error {
+	if h := a.Handler; h != nil {
+		return h.Handle(ctx, v)
 	}
-	return n, nil
+	return nil
 }

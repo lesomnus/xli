@@ -3,6 +3,7 @@ package xli
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
+	"github.com/lesomnus/xli/lex"
 	"github.com/lesomnus/xli/mode"
+	"github.com/lesomnus/xli/tab"
 )
 
 type Command struct {
@@ -27,7 +30,7 @@ type Command struct {
 	Args     arg.Args
 	Commands Commands
 
-	Action Action
+	Handler Handler
 
 	io.ReadCloser
 	io.WriteCloser
@@ -98,19 +101,36 @@ func (c *Command) Scanln(vs ...any) (int, error) {
 	return fmt.Fscanln(c.ReadCloser, vs...)
 }
 
-// Run parses the `args` and executes the `c.Action`.
+// Run parses the `args` and executes the `c.Handler`.
 // It runs subcommand after all arguments are parsed if found one.
 // Any `Flag`s or `Arg`s including the one in the subcommands returns error, it stops running and returns the error.
 // It will not executes the subcommand if "--help" or "-h" is found in the execution command.
-// Action has responsible to execute subcommand's action.
-// This function does not guarantees execution of subcommand's action.
+// Handler has responsible to execute subcommand's handler.
+// This function does not guarantees execution of subcommand's handler.
 func (c *Command) Run(ctx context.Context, args []string) error {
-	if l := len(args); l > 2 && args[l-3] == completion_tag {
-		curr := args[l-2] // Word where the cursor is.
-		buff := args[l-1] // len(curr) characters on left of the cursor.
-		args = NormalizeCompletionArgs(args[:l-3], curr, buff)
+	if l := len(args); l > 2 {
+		tag := args[l-3]
+		if sh, ok := strings.CutPrefix(tag, completion_tag_prefix); ok {
+			curr := args[l-2] // Word where the cursor is.
+			buff := args[l-1] // len(curr) characters on left of the cursor.
 
-		return c.runCompletion(ctx, args)
+			w := c.WriteCloser
+			if w == nil {
+				w = os.Stdout
+			}
+
+			var t tab.Tab
+			switch sh {
+			case "zsh":
+				t = tab.NewZshTab(w)
+			default:
+				return errors.New("unknown shell of completion")
+			}
+
+			ctx = tab.Into(ctx, t)
+			args = NormalizeCompletionArgs(args[:l-3], curr, buff)
+			return c.runCompletion(ctx, args)
+		}
 	}
 
 	f_root, err := parseFrameAll(c, args)
@@ -150,30 +170,44 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 		c.ErrWriter = os.Stderr
 	}
 
-	// Actions are invoked sequentially.
+	// Handlers are invoked sequentially.
 	return f_root.execute(ctx)
 }
 
 // args must be normalized one by `NormalizeCompletionArgs`.
 func (c *Command) runCompletion(ctx context.Context, args []string) error {
-	f, err := parseFrameAll(c, args)
-	if err != nil {
-		return nil
-	}
-	if f != nil {
-		c = f.Last().c_curr
+	tab := tab.From(ctx)
+	if tab == nil {
+		panic("tab must exist")
 	}
 
+	f_root, parse_err := parseFrameAll(c, args)
+	f_last := f_root.Last()
+
+	need_val := false
+	need_arg := false
+	if parse_err != nil {
+		need_val = errors.Is(parse_err, ErrNoFlagValue)
+		need_arg = errors.Is(parse_err, ErrNeedArgs)
+		if !(need_val || need_arg) {
+			return parse_err
+		}
+	}
+
+	c = f_last.c_curr
+	need_arg = need_arg || slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
+		return a.IsOptional()
+	})
+
 	switch {
+	case need_val || need_arg:
+		break
+
 	case len(args) == 0:
 		fallthrough
 	case !strings.HasPrefix(args[len(args)-1], "--"):
-		if len(c.Args) > 0 {
-			break
-		}
-
 		for _, v := range c.Commands {
-			fmt.Printf("%s:%s\n", v.Name, v.Brief)
+			tab.ValueD(v.Name, v.Brief)
 		}
 		return nil
 
@@ -184,12 +218,51 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		// last == "--"
 		for _, u := range c.Flags {
 			v := u.Info()
-			fmt.Printf("--%s:%s\n", v.Name, v.Brief)
+			tab.ValueD(fmt.Sprintf("--%s", v.Name), v.Brief)
 		}
 		return nil
+
+	default:
+		// Some args are given.
+		// Required args are given if the command needs some.
+		// The command has flags and value of one of the flags needed to be completed.
+		need_val = true
 	}
 
-	// TODO: run
+	if f_root != f_last {
+		// Detach last frame.
+		f_last.prev.next = nil
+		f_last.prev = nil
+
+		ctx = mode.Into(ctx, mode.Tab|mode.Pass)
+		for f := range f_root.Iter() {
+			if err := f.prepare(ctx); err != nil {
+				// TODO: should I ignore some parse error?
+				return nil
+			}
+		}
+		if err := f_root.execute(ctx); err != nil {
+			return nil
+		}
+	}
+
+	ctx = mode.Into(ctx, mode.Tab)
+	if need_val {
+		a := args[len(args)-1]
+		n := lex.Flag(a).Name()
+		if v := c.Flags.Get(n); v != nil {
+			v.Handle(ctx, "")
+		}
+	} else if need_arg {
+		i := len(f_last.args)
+		if l := len(c.Args); i >= l {
+			i = l - 1
+		}
+		v := c.Args[i]
+		v.Prase(ctx, nil)
+	} else {
+		panic("some completion not considered")
+	}
 
 	return nil
 }

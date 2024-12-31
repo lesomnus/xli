@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAction(t *testing.T) {
-	append_cmd := func(vs *[]string, v string) xli.Action {
+func TestHandler(t *testing.T) {
+	append_cmd := func(vs *[]string, v string) xli.HandlerFunc {
 		return func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			*vs = append(*vs, v)
 			return next(ctx)
@@ -20,14 +20,14 @@ func TestAction(t *testing.T) {
 			Commands: xli.Commands{
 				&xli.Command{
 					Name: "foo",
-					Action: xli.Chain(
+					Handler: xli.Chain(
 						xli.OnRunPass(append_cmd(vs, "foo-pass")),
 						xli.OnHelp(append_cmd(vs, "foo-help")),
 						xli.OnRun(append_cmd(vs, "foo-run")),
 					),
 				},
 			},
-			Action: xli.Chain(
+			Handler: xli.Chain(
 				xli.OnRunPass(append_cmd(vs, "root-pass")),
 				xli.OnHelp(append_cmd(vs, "root-help")),
 				xli.OnRun(append_cmd(vs, "root-run")),

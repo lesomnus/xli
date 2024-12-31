@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const completion_tag = "$$xli_completion"
+const completion_tag_prefix = "$$xli_completion_"
 
 //go:embed completions
 var completions embed.FS
@@ -23,7 +23,7 @@ func NewCmdCompletion() *Command {
 func newCmdZshCompletion() *Command {
 	return &Command{
 		Name: "zsh",
-		Action: OnRun(func(ctx context.Context, cmd *Command, next Next) error {
+		Handler: OnRun(func(ctx context.Context, cmd *Command, next Next) error {
 			b, err := completions.ReadFile("completions/zsh")
 			if err != nil {
 				panic(err)
@@ -58,7 +58,8 @@ func newCmdZshCompletion() *Command {
 //	[..., "--"]
 //
 //	// Suggest values for the flag.
-//	[..., "--foo="] // known flag, no value
+//	[..., "--flag"]
+//	[..., "--flag="]
 //
 // `curr` is empty if the cursor is in the next arg position like:
 //

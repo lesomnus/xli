@@ -12,26 +12,26 @@ import (
 )
 
 func TestCommandExecutionOrder(t *testing.T) {
-	append_cmd := func(vs *[]string, v string, err error) xli.Action {
-		return func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+	append_cmd := func(vs *[]string, v string, err error) xli.Handler {
+		return xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			(*vs) = append((*vs), v)
 			if err := next(ctx); err != nil {
 				return err
 			}
 			return err
-		}
+		})
 	}
-	append_flg := func(vs *[]string, v string, err error) flg.Action[string] {
-		return func(ctx context.Context, _ string) error {
+	append_flg := func(vs *[]string, v string, err error) flg.Handler[string] {
+		return flg.Handle(func(ctx context.Context, _ string) error {
 			(*vs) = append((*vs), v)
 			return err
-		}
+		})
 	}
-	append_arg := func(vs *[]string, v string, err error) arg.Action[string] {
-		return func(ctx context.Context, _ string) error {
+	append_arg := func(vs *[]string, v string, err error) arg.Handler[string] {
+		return arg.Handle(func(ctx context.Context, _ string) error {
 			(*vs) = append((*vs), v)
 			return err
-		}
+		})
 	}
 
 	t.Run("empty", func(t *testing.T) {
@@ -44,8 +44,8 @@ func TestCommandExecutionOrder(t *testing.T) {
 		vs := []string{}
 		c := &xli.Command{
 			Flags: flg.Flags{
-				&flg.String{Name: "foo", Action: append_flg(&vs, "foo", nil)},
-				&flg.String{Name: "bar", Action: append_flg(&vs, "bar", nil)},
+				&flg.String{Name: "foo", Handler: append_flg(&vs, "foo", nil)},
+				&flg.String{Name: "bar", Handler: append_flg(&vs, "bar", nil)},
 			},
 		}
 
@@ -57,8 +57,8 @@ func TestCommandExecutionOrder(t *testing.T) {
 		vs := []string{}
 		c := &xli.Command{
 			Args: arg.Args{
-				&arg.String{Name: "FOO", Action: append_arg(&vs, "foo", nil)},
-				&arg.String{Name: "BAR", Action: append_arg(&vs, "bar", nil)},
+				&arg.String{Name: "FOO", Handler: append_arg(&vs, "foo", nil)},
+				&arg.String{Name: "BAR", Handler: append_arg(&vs, "bar", nil)},
 			},
 		}
 
@@ -74,12 +74,12 @@ func TestCommandExecutionOrder(t *testing.T) {
 					Name: "foo",
 					Commands: xli.Commands{
 						&xli.Command{
-							Name:   "bar",
-							Action: append_cmd(&vs, "bar", errors.New("bar-err")),
+							Name:    "bar",
+							Handler: append_cmd(&vs, "bar", errors.New("bar-err")),
 						},
 						&xli.Command{
-							Name:   "baz",
-							Action: append_cmd(&vs, "baz", errors.New("baz-err")),
+							Name:    "baz",
+							Handler: append_cmd(&vs, "baz", errors.New("baz-err")),
 						},
 					},
 				},
@@ -97,20 +97,20 @@ func TestCommandExecutionOrder(t *testing.T) {
 				&xli.Command{
 					Name: "foo",
 					Flags: flg.Flags{
-						&flg.String{Name: "foo", Action: append_flg(&vs, "f-foo", nil)},
-						&flg.String{Name: "bar", Action: append_flg(&vs, "f-bar", nil)},
+						&flg.String{Name: "foo", Handler: append_flg(&vs, "f-foo", nil)},
+						&flg.String{Name: "bar", Handler: append_flg(&vs, "f-bar", nil)},
 					},
 					Args: arg.Args{
-						&arg.String{Name: "FOO", Action: append_arg(&vs, "a-foo", nil)},
-						&arg.String{Name: "BAR", Action: append_arg(&vs, "a-bar", nil)},
+						&arg.String{Name: "FOO", Handler: append_arg(&vs, "a-foo", nil)},
+						&arg.String{Name: "BAR", Handler: append_arg(&vs, "a-bar", nil)},
 					},
 					Commands: xli.Commands{
 						&xli.Command{
-							Name:   "bar",
-							Action: append_cmd(&vs, "bar", errors.New("bar-err")),
+							Name:    "bar",
+							Handler: append_cmd(&vs, "bar", errors.New("bar-err")),
 						},
 					},
-					Action: append_cmd(&vs, "foo", nil),
+					Handler: append_cmd(&vs, "foo", nil),
 				},
 			},
 		}
@@ -127,11 +127,11 @@ func TestCommandExecutionOrder(t *testing.T) {
 					Name: "foo",
 					Commands: xli.Commands{
 						&xli.Command{
-							Name:   "bar",
-							Action: append_cmd(&vs, "bar", nil),
+							Name:    "bar",
+							Handler: append_cmd(&vs, "bar", nil),
 						},
 					},
-					Action: append_cmd(&vs, "foo", nil),
+					Handler: append_cmd(&vs, "foo", nil),
 				},
 			},
 		}

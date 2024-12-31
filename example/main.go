@@ -9,6 +9,7 @@ import (
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
+	"github.com/lesomnus/xli/tab"
 )
 
 func main() {
@@ -29,9 +30,14 @@ func main() {
 					&arg.RestStrings{
 						Name:  "STRING",
 						Brief: "String to display",
+						Handler: arg.OnTap[[]string](func(ctx context.Context, tab tab.Tab) {
+							tab.Value("royale")
+							tab.Value("with")
+							tab.Value("cheese")
+						}),
 					},
 				},
-				Action: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+				Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 					arg.Visit(cmd, "STRING", func(vs []string) {
 						cmd.Println(strings.Join(vs, " "))
 					})
@@ -42,7 +48,14 @@ func main() {
 				Name:  "foo",
 				Brief: "cmd-foo-brief",
 				Flags: flg.Flags{
-					&flg.String{Name: "baz"},
+					&flg.String{
+						Name: "baz",
+						Handler: arg.OnTap[string](func(ctx context.Context, tab tab.Tab) {
+							tab.Value("royale")
+							tab.Value("with")
+							tab.Value("cheese")
+						}),
+					},
 				},
 				Args: arg.Args{
 					&arg.String{Name: "BAZ"},
