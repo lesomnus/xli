@@ -44,12 +44,18 @@ func main() {
 					return next(ctx)
 				}),
 			},
-			&xli.Command{},
 			&xli.Command{
 				Name:  "foo",
 				Brief: "cmd-foo-brief",
 				Flags: flg.Flags{
-					&flg.String{Name: "baz"},
+					&flg.String{
+						Name: "baz",
+						Handler: arg.OnTap[string](func(ctx context.Context, tab tab.Tab) {
+							tab.Value("royale")
+							tab.Value("with")
+							tab.Value("cheese")
+						}),
+					},
 				},
 				Args: arg.Args{
 					&arg.String{Name: "BAZ"},

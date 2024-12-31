@@ -58,7 +58,8 @@ func newCmdZshCompletion() *Command {
 //	[..., "--"]
 //
 //	// Suggest values for the flag.
-//	[..., "--foo="] // known flag, no value
+//	[..., "--flag"]
+//	[..., "--flag="]
 //
 // `curr` is empty if the cursor is in the next arg position like:
 //

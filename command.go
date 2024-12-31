@@ -184,25 +184,28 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	f_root, parse_err := parseFrameAll(c, args)
 	f_last := f_root.Last()
 
-	need_flag_value := false
-	need_args := errors.Is(parse_err, ErrNeedArgs)
-	if !need_args && parse_err != nil {
-		return parse_err
+	need_val := false
+	need_arg := false
+	if parse_err != nil {
+		need_val = errors.Is(parse_err, ErrNoFlagValue)
+		need_arg = errors.Is(parse_err, ErrNeedArgs)
+		if !(need_val || need_arg) {
+			return parse_err
+		}
 	}
 
 	c = f_last.c_curr
-	need_args = need_args || slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
+	need_arg = need_arg || slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
 		return a.IsOptional()
 	})
 
 	switch {
+	case need_val || need_arg:
+		break
+
 	case len(args) == 0:
 		fallthrough
 	case !strings.HasPrefix(args[len(args)-1], "--"):
-		if need_args {
-			break
-		}
-
 		for _, v := range c.Commands {
 			tab.ValueD(v.Name, v.Brief)
 		}
@@ -223,7 +226,7 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		// Some args are given.
 		// Required args are given if the command needs some.
 		// The command has flags and value of one of the flags needed to be completed.
-		need_flag_value = true
+		need_val = true
 	}
 
 	if f_root != f_last {
@@ -244,12 +247,13 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	}
 
 	ctx = mode.Into(ctx, mode.Tab)
-	if need_flag_value {
-		n := lex.Flag(args[len(args)-1]).Name()
+	if need_val {
+		a := args[len(args)-1]
+		n := lex.Flag(a).Name()
 		if v := c.Flags.Get(n); v != nil {
 			v.Handle(ctx, "")
 		}
-	} else if need_args {
+	} else if need_arg {
 		i := len(f_last.args)
 		if l := len(c.Args); i >= l {
 			i = l - 1

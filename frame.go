@@ -56,15 +56,14 @@ func parseFrameAll(cmd *Command, args_rest []string) (*frame, error) {
 	}
 	for f := root; f.c_next != nil; f = f.next {
 		f_next, err := parseFrame(f.c_next, f.rest)
+		f_next.prev = f
+		f.next = f_next
 		if err != nil {
 			return root.next, err
 		}
 		if f_next == nil {
 			break
 		}
-
-		f.next = f_next
-		f_next.prev = f
 	}
 
 	return root.next, nil
