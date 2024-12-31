@@ -165,3 +165,11 @@ func (f Flag) WithArg(a Arg) Flag {
 
 	return Flag(fmt.Sprintf("%s=%s", string(f)[:j], string(a)))
 }
+
+func (f Flag) WithoutArg() Flag {
+	_, j := f.indexes()
+	if j < 0 {
+		return f
+	}
+	return f[:j-1]
+}

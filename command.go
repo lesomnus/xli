@@ -105,29 +105,22 @@ func (c *Command) Scanln(vs ...any) (int, error) {
 // Action has responsible to execute subcommand's action.
 // This function does not guarantees execution of subcommand's action.
 func (c *Command) Run(ctx context.Context, args []string) error {
-	f_root, err := parseFrame(c, args)
+	if l := len(args); l > 2 && args[l-3] == completion_tag {
+		curr := args[l-2] // Word where the cursor is.
+		buff := args[l-1] // len(curr) characters on left of the cursor.
+		args = NormalizeCompletionArgs(args[:l-3], curr, buff)
+
+		return c.runCompletion(ctx, args)
+	}
+
+	f_root, err := parseFrameAll(c, args)
 	if err != nil {
 		return err
 	}
 
-	// Collects flags, args, and subcommands to be executed are without paring.
-	// Collected information are stored in the `frame` for each command.
-	// Root frame, `f_root`, holds `c`.
-	for f := f_root; f.c_next != nil; f = f.next {
-		f_next, err := parseFrame(f.c_next, f.rest)
-		if err != nil {
-			return err
-		}
-		if f_next == nil {
-			break
-		}
-
-		f.next = f_next
-	}
-
 	// Parses flags and args according to the collected information.
 	// Parsed flags and args should be stored in each Arg and Flag.
-	for f := f_root; f != nil; f = f.next {
+	for f := range f_root.Iter() {
 		if err := f.prepare(ctx); err != nil {
 			return err
 		}
@@ -159,6 +152,46 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 
 	// Actions are invoked sequentially.
 	return f_root.execute(ctx)
+}
+
+// args must be normalized one by `NormalizeCompletionArgs`.
+func (c *Command) runCompletion(ctx context.Context, args []string) error {
+	f, err := parseFrameAll(c, args)
+	if err != nil {
+		return nil
+	}
+	if f != nil {
+		c = f.Last().c_curr
+	}
+
+	switch {
+	case len(args) == 0:
+		fallthrough
+	case !strings.HasPrefix(args[len(args)-1], "--"):
+		if len(c.Args) > 0 {
+			break
+		}
+
+		for _, v := range c.Commands {
+			fmt.Printf("%s:%s\n", v.Name, v.Brief)
+		}
+		return nil
+
+	case len(c.Flags) == 0:
+		return nil
+
+	case !strings.HasSuffix(args[len(args)-1], "="):
+		// last == "--"
+		for _, u := range c.Flags {
+			v := u.Info()
+			fmt.Printf("--%s:%s\n", v.Name, v.Brief)
+		}
+		return nil
+	}
+
+	// TODO: run
+
+	return nil
 }
 
 //go:embed help.go.tpl

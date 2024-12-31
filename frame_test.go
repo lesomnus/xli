@@ -101,7 +101,7 @@ func TestFrameParseFlags(t *testing.T) {
 	t.Run("flag with no value but flag", func(t *testing.T) {
 		c := new_cmd()
 		err := c.Run(context.TODO(), []string{"--foo", "--bar", "baz"})
-		require.ErrorContains(t, err, "--foo: no value is given but was flag: --bar")
+		require.ErrorContains(t, err, "--foo: no value is given")
 	})
 	t.Run("invalid flag syntax", func(t *testing.T) {
 		c := new_cmd()
@@ -161,7 +161,7 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(context.TODO(), []string{"foo", "bar", "baz", "qux"})
-		require.ErrorContains(t, err, `too many arguments: "baz"`)
+		require.ErrorContains(t, err, `baz: too many arguments`)
 	})
 	t.Run("less args", func(t *testing.T) {
 		c := &xli.Command{

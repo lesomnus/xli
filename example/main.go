@@ -13,7 +13,7 @@ import (
 
 func main() {
 	c := &xli.Command{
-		Name:  "root",
+		Name:  "example",
 		Brief: "root-brief",
 		Synop: "Long description will be printed here",
 		Flags: flg.Flags{
@@ -48,6 +48,7 @@ func main() {
 					&arg.String{Name: "BAZ"},
 				},
 			},
+			xli.NewCmdCompletion(),
 		}.WithCategory("fruits",
 			&xli.Command{
 				Name:    "apple",

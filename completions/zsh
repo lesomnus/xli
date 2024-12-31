@@ -1,0 +1,22 @@
+#compdef %[1]s
+compdef _%[1]s %[1]s
+
+# This is a generated code by "github.com/lesomnus/xli".
+
+_%[1]s() {
+	local -a opts
+	local curr=${words[CURRENT]:Q}
+
+	if [[ -z ${curr} ]]; then
+		opts=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion" "" "")}")
+	else
+		opts=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion" "${curr}" "${LBUFFER[-${#curr},-1]}")}")
+	fi
+
+	_describe 'values' opts
+}
+
+# don't run the completion function when being source-ed or eval-ed
+if [ "$funcstack[1]" = "_%[1]s" ]; then
+    _%[1]s
+fi

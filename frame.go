@@ -3,6 +3,7 @@ package xli
 import (
 	"context"
 	"fmt"
+	"iter"
 	"slices"
 
 	"github.com/lesomnus/xli/arg"
@@ -23,6 +24,48 @@ type frame struct {
 	remain []string // remain args after end of command
 
 	is_help bool
+}
+
+func (f *frame) Iter() iter.Seq[*frame] {
+	return func(yield func(*frame) bool) {
+		for ; f != nil; f = f.next {
+			if !yield(f) {
+				return
+			}
+		}
+	}
+}
+
+func (f *frame) Last() *frame {
+	for {
+		if f.next == nil {
+			return f
+		}
+		f = f.next
+	}
+}
+
+// Collects flags, args, and subcommands to be executed are without paring.
+// Collected information are stored in the `frame` for each command.
+// Root frame, `f_root`, holds `c`.
+func parseFrameAll(cmd *Command, args_rest []string) (*frame, error) {
+	root := &frame{
+		c_next: cmd,
+		rest:   args_rest,
+	}
+	for f := root; f.c_next != nil; f = f.next {
+		f_next, err := parseFrame(f.c_next, f.rest)
+		if err != nil {
+			return root.next, err
+		}
+		if f_next == nil {
+			break
+		}
+
+		f.next = f_next
+	}
+
+	return root.next, nil
 }
 
 // Parses flags, args, and subcommand for given cmd.
@@ -62,7 +105,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 			}
 
 			if f := cmd.Flags.Get(v.Name()); f == nil {
-				return nil, fmt.Errorf("unknown flag: %s", v)
+				return nil, &FlagError{v, ErrUnknownFlag}
 			} else if _, ok := f.(*flg.Switch); ok {
 				// Flag is a switch
 				if _, ok := v.Arg(); !ok {
@@ -73,16 +116,16 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				i++
 				if i == len(args_rest) {
 					// There are no more args.
-					return nil, fmt.Errorf("%s: no value is given", v)
+					return nil, &FlagError{v, ErrNoFlagValue}
 				}
 
 				switch w := lex.Lex(args_rest[i]).(type) {
 				case *lex.Err:
 					return nil, fmt.Errorf("%s: %w", v, w)
 				case lex.EndOfCommand:
-					return nil, fmt.Errorf("%s: no value is given", v)
+					return nil, &FlagError{v, ErrNoFlagValue}
 				case lex.Flag:
-					return nil, fmt.Errorf("%s: no value is given but was flag: %s", v, w)
+					return nil, &FlagError{v, ErrNoFlagValue}
 				case lex.Arg:
 					v = v.WithArg(w)
 				default:
@@ -98,12 +141,12 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				continue
 			}
 			if len(cmd.Commands) == 0 {
-				return nil, fmt.Errorf("too many arguments: %s", v)
+				return nil, &ArgError{v, ErrTooManyArgs}
 			}
 
 			f.c_next = cmd.Commands.Get(v.Raw())
 			if f.c_next == nil {
-				return nil, fmt.Errorf("unknown subcommand: %s", v)
+				return nil, &ArgError{v, ErrUnknownCmd}
 			}
 
 			// Subcommand is found so stop parsing.
