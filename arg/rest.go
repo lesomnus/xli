@@ -45,8 +45,8 @@ type Rest[T any, P Parser[T]] struct {
 	Synop string
 	Usage fmt.Stringer
 
-	Value  []T
-	Action func(ctx context.Context, v []T) error
+	Value   []T
+	Handler Handler[[]T]
 
 	Parser RestParser[T, P]
 }
@@ -90,8 +90,8 @@ func (a *Rest[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
 
 	a.Value = vs
 
-	if a.Action != nil {
-		err := a.Action(ctx, vs)
+	if h := a.Handler; h != nil {
+		err := h.Handle(ctx, vs)
 		if err != nil {
 			return n, err
 		}

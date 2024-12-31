@@ -3,6 +3,7 @@ package xli
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/mode"
+	"github.com/lesomnus/xli/tab"
 )
 
 type Command struct {
@@ -98,19 +100,36 @@ func (c *Command) Scanln(vs ...any) (int, error) {
 	return fmt.Fscanln(c.ReadCloser, vs...)
 }
 
-// Run parses the `args` and executes the `c.Action`.
+// Run parses the `args` and executes the `c.Handler`.
 // It runs subcommand after all arguments are parsed if found one.
 // Any `Flag`s or `Arg`s including the one in the subcommands returns error, it stops running and returns the error.
 // It will not executes the subcommand if "--help" or "-h" is found in the execution command.
-// Action has responsible to execute subcommand's action.
-// This function does not guarantees execution of subcommand's action.
+// Handler has responsible to execute subcommand's handler.
+// This function does not guarantees execution of subcommand's handler.
 func (c *Command) Run(ctx context.Context, args []string) error {
-	if l := len(args); l > 2 && args[l-3] == completion_tag {
-		curr := args[l-2] // Word where the cursor is.
-		buff := args[l-1] // len(curr) characters on left of the cursor.
-		args = NormalizeCompletionArgs(args[:l-3], curr, buff)
+	if l := len(args); l > 2 {
+		tag := args[l-3]
+		if sh, ok := strings.CutPrefix(tag, completion_tag_prefix); ok {
+			curr := args[l-2] // Word where the cursor is.
+			buff := args[l-1] // len(curr) characters on left of the cursor.
 
-		return c.runCompletion(ctx, args)
+			w := c.WriteCloser
+			if w == nil {
+				w = os.Stdout
+			}
+
+			var t tab.Tab
+			switch sh {
+			case "zsh":
+				t = tab.NewZshTab(w)
+			default:
+				return errors.New("unknown shell of completion")
+			}
+
+			ctx = tab.Into(ctx, t)
+			args = NormalizeCompletionArgs(args[:l-3], curr, buff)
+			return c.runCompletion(ctx, args)
+		}
 	}
 
 	f_root, err := parseFrameAll(c, args)
@@ -150,12 +169,17 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 		c.ErrWriter = os.Stderr
 	}
 
-	// Actions are invoked sequentially.
+	// Handlers are invoked sequentially.
 	return f_root.execute(ctx)
 }
 
 // args must be normalized one by `NormalizeCompletionArgs`.
 func (c *Command) runCompletion(ctx context.Context, args []string) error {
+	tab := tab.From(ctx)
+	if tab == nil {
+		panic("tab must exist")
+	}
+
 	f, err := parseFrameAll(c, args)
 	if err != nil {
 		return nil
@@ -173,7 +197,7 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		}
 
 		for _, v := range c.Commands {
-			fmt.Printf("%s:%s\n", v.Name, v.Brief)
+			tab.Value(v.Name, v.Brief)
 		}
 		return nil
 
@@ -184,7 +208,7 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		// last == "--"
 		for _, u := range c.Flags {
 			v := u.Info()
-			fmt.Printf("--%s:%s\n", v.Name, v.Brief)
+			tab.Value(fmt.Sprintf("--%s", v.Name), v.Brief)
 		}
 		return nil
 	}

@@ -12,7 +12,7 @@ const (
 
 	Pass = 0b000_1 // There are more commands to be executed.
 	Help = 0b001_0 // Command is executed to print help message.
-	Tap  = 0b010_0 // Command is executed to get completions.
+	Tab  = 0b010_0 // Command is executed to get completions.
 	Run  = 0b100_0 // Command is executed to do something.
 
 	Kind = 0b111_0

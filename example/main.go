@@ -38,6 +38,7 @@ func main() {
 					return next(ctx)
 				}),
 			},
+			&xli.Command{},
 			&xli.Command{
 				Name:  "foo",
 				Brief: "cmd-foo-brief",

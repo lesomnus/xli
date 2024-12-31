@@ -8,9 +8,9 @@ _%[1]s() {
 	local curr=${words[CURRENT]:Q}
 
 	if [[ -z ${curr} ]]; then
-		opts=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion" "" "")}")
+		opts=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion_zsh" "" "")}")
 	else
-		opts=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion" "${curr}" "${LBUFFER[-${#curr},-1]}")}")
+		opts=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion_zsh" "${curr}" "${LBUFFER[-${#curr},-1]}")}")
 	fi
 
 	_describe 'values' opts

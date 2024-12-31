@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const completion_tag = "$$xli_completion"
+const completion_tag_prefix = "$$xli_completion_"
 
 //go:embed completions
 var completions embed.FS

@@ -52,8 +52,8 @@ func OnExact[T any](m mode.Mode, f HandlerFunc[T]) Handler[T] {
 }
 
 func OnHelp[T any](f HandlerFunc[T]) Handler[T]     { return OnExact(mode.Help, f) }
-func OnTap[T any](f HandlerFunc[T]) Handler[T]      { return OnExact(mode.Tap, f) }
+func OnTap[T any](f HandlerFunc[T]) Handler[T]      { return OnExact(mode.Tab, f) }
 func OnRun[T any](f HandlerFunc[T]) Handler[T]      { return OnExact(mode.Run, f) }
 func OnHelpPass[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Help|mode.Pass, f) }
-func OnTapPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Tap|mode.Pass, f) }
+func OnTapPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Tab|mode.Pass, f) }
 func OnRunPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Run|mode.Pass, f) }
