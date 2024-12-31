@@ -9,6 +9,7 @@ import (
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
+	"github.com/lesomnus/xli/tab"
 )
 
 func main() {
@@ -29,6 +30,11 @@ func main() {
 					&arg.RestStrings{
 						Name:  "STRING",
 						Brief: "String to display",
+						Handler: arg.OnTap[[]string](func(ctx context.Context, tab tab.Tab) {
+							tab.Value("royale")
+							tab.Value("with")
+							tab.Value("cheese")
+						}),
 					},
 				},
 				Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {

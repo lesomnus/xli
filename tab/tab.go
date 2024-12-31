@@ -3,7 +3,8 @@ package tab
 import "context"
 
 type Tab interface {
-	Value(v string, desc string)
+	Value(v string)
+	ValueD(v string, desc string)
 }
 
 type ctxKey struct{}

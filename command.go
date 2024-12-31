@@ -13,6 +13,7 @@ import (
 
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
+	"github.com/lesomnus/xli/lex"
 	"github.com/lesomnus/xli/mode"
 	"github.com/lesomnus/xli/tab"
 )
@@ -180,24 +181,30 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		panic("tab must exist")
 	}
 
-	f, err := parseFrameAll(c, args)
-	if err != nil {
-		return nil
+	f_root, parse_err := parseFrameAll(c, args)
+	f_last := f_root.Last()
+
+	need_flag_value := false
+	need_args := errors.Is(parse_err, ErrNeedArgs)
+	if !need_args && parse_err != nil {
+		return parse_err
 	}
-	if f != nil {
-		c = f.Last().c_curr
-	}
+
+	c = f_last.c_curr
+	need_args = need_args || slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
+		return a.IsOptional()
+	})
 
 	switch {
 	case len(args) == 0:
 		fallthrough
 	case !strings.HasPrefix(args[len(args)-1], "--"):
-		if len(c.Args) > 0 {
+		if need_args {
 			break
 		}
 
 		for _, v := range c.Commands {
-			tab.Value(v.Name, v.Brief)
+			tab.ValueD(v.Name, v.Brief)
 		}
 		return nil
 
@@ -208,12 +215,50 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		// last == "--"
 		for _, u := range c.Flags {
 			v := u.Info()
-			tab.Value(fmt.Sprintf("--%s", v.Name), v.Brief)
+			tab.ValueD(fmt.Sprintf("--%s", v.Name), v.Brief)
 		}
 		return nil
+
+	default:
+		// Some args are given.
+		// Required args are given if the command needs some.
+		// The command has flags and value of one of the flags needed to be completed.
+		need_flag_value = true
 	}
 
-	// TODO: run
+	if f_root != f_last {
+		// Detach last frame.
+		f_last.prev.next = nil
+		f_last.prev = nil
+
+		ctx = mode.Into(ctx, mode.Tab|mode.Pass)
+		for f := range f_root.Iter() {
+			if err := f.prepare(ctx); err != nil {
+				// TODO: should I ignore some parse error?
+				return nil
+			}
+		}
+		if err := f_root.execute(ctx); err != nil {
+			return nil
+		}
+	}
+
+	ctx = mode.Into(ctx, mode.Tab)
+	if need_flag_value {
+		n := lex.Flag(args[len(args)-1]).Name()
+		if v := c.Flags.Get(n); v != nil {
+			v.Handle(ctx, "")
+		}
+	} else if need_args {
+		i := len(f_last.args)
+		if l := len(c.Args); i >= l {
+			i = l - 1
+		}
+		v := c.Args[i]
+		v.Prase(ctx, nil)
+	} else {
+		panic("some completion not considered")
+	}
 
 	return nil
 }

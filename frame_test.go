@@ -172,7 +172,7 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(context.TODO(), []string{"foo"})
-		require.ErrorContains(t, err, `argument not given: "BAR"`)
+		require.ErrorContains(t, err, `"BAR": required argument not given`)
 	})
 	t.Run("optional", func(t *testing.T) {
 		c := &xli.Command{

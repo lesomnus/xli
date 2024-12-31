@@ -3,6 +3,8 @@ package flg
 import (
 	"context"
 	"fmt"
+
+	"github.com/lesomnus/xli/mode"
 )
 
 type Parser[T any] interface {
@@ -39,28 +41,6 @@ func (f *Base[T, P]) Info() *Info {
 	}
 }
 
-func (f *Base[T, P]) Handle(ctx context.Context, v string) error {
-	w, err := f.Parser.Parse(v)
-	if err != nil {
-		return err
-	}
-
-	f.count++
-	if f.Value == nil {
-		f.Value = &w
-	} else {
-		*f.Value = w
-	}
-	if h := f.Handler; h != nil {
-		return h.Handle(ctx, w)
-	}
-	return nil
-}
-
-func (f *Base[T, P]) Count() int {
-	return f.count
-}
-
 func (f *Base[T, P]) Default() (string, bool) {
 	if f.Value == nil {
 		return "", false
@@ -75,4 +55,36 @@ func (f *Base[T, P]) Get() (T, bool) {
 		return z, false
 	}
 	return *f.Value, true
+}
+
+func (f *Base[T, P]) Handle(ctx context.Context, u string) error {
+	if m := mode.From(ctx); m == mode.Tab {
+		var z T
+		f.handle(ctx, z)
+		return nil
+	}
+
+	v, err := f.Parser.Parse(u)
+	if err != nil {
+		return err
+	}
+
+	f.count++
+	if f.Value == nil {
+		f.Value = &v
+	} else {
+		*f.Value = v
+	}
+	return f.handle(ctx, v)
+}
+
+func (f *Base[T, P]) Count() int {
+	return f.count
+}
+
+func (a *Base[T, P]) handle(ctx context.Context, v T) error {
+	if h := a.Handler; h != nil {
+		return h.Handle(ctx, v)
+	}
+	return nil
 }

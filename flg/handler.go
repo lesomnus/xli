@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/lesomnus/xli/mode"
+	"github.com/lesomnus/xli/tab"
 )
 
 type HandlerFunc[T any] func(ctx context.Context, v T) error
@@ -22,7 +23,7 @@ func (h handler[T]) Handle(ctx context.Context, v T) error {
 	return h(ctx, v)
 }
 
-func Chain[T any](hs ...Handler[T]) Handler[T] {
+func Wrap[T any](hs ...Handler[T]) Handler[T] {
 	return handler[T](func(ctx context.Context, v T) error {
 		for _, h := range hs {
 			if err := h.Handle(ctx, v); err != nil {
@@ -52,8 +53,20 @@ func OnExact[T any](m mode.Mode, f HandlerFunc[T]) Handler[T] {
 }
 
 func OnHelp[T any](f HandlerFunc[T]) Handler[T]     { return OnExact(mode.Help, f) }
-func OnTap[T any](f HandlerFunc[T]) Handler[T]      { return OnExact(mode.Tab, f) }
 func OnRun[T any](f HandlerFunc[T]) Handler[T]      { return OnExact(mode.Run, f) }
 func OnHelpPass[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Help|mode.Pass, f) }
 func OnTapPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Tab|mode.Pass, f) }
 func OnRunPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Run|mode.Pass, f) }
+
+type TabHandlerFunc[T any] func(ctx context.Context, tab tab.Tab) error
+
+func OnTap[T any](f TabHandlerFunc[T]) Handler[T] {
+	return OnExact(mode.Tab, func(ctx context.Context, v T) error {
+		t := tab.From(ctx)
+		if t == nil {
+			return nil
+		}
+
+		return f(ctx, t)
+	})
+}

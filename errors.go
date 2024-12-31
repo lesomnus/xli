@@ -12,6 +12,7 @@ var (
 	ErrNoFlagValue = errors.New("no value is given")
 	ErrUnknownCmd  = errors.New("unknown subcommand")
 	ErrTooManyArgs = errors.New("too many arguments")
+	ErrNeedArgs    = errors.New("required argument not given")
 )
 
 type FlagError struct {

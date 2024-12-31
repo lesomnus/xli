@@ -3,6 +3,8 @@ package arg
 import (
 	"context"
 	"fmt"
+
+	"github.com/lesomnus/xli/mode"
 )
 
 type Parser[T any] interface {
@@ -64,6 +66,12 @@ func (a *Base[T, P]) IsMany() bool {
 }
 
 func (a *Base[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
+	if m := mode.From(ctx); m == mode.Tab {
+		var z T
+		a.handle(ctx, z)
+		return 0, nil
+	}
+
 	v, n, err := a.Parser.Parse(ctx, rest)
 	if n == 0 || err != nil {
 		return n, err
@@ -74,10 +82,12 @@ func (a *Base[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
 	} else {
 		*a.Value = v
 	}
-	if a.Handler != nil {
-		if err := a.Handler.Handle(ctx, v); err != nil {
-			return n, err
-		}
+	return n, a.handle(ctx, v)
+}
+
+func (a *Base[T, P]) handle(ctx context.Context, v T) error {
+	if h := a.Handler; h != nil {
+		return h.Handle(ctx, v)
 	}
-	return n, nil
+	return nil
 }
