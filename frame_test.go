@@ -177,6 +177,93 @@ func TestFrameParseArgs(t *testing.T) {
 	t.Run("optional", func(t *testing.T) {
 		c := &xli.Command{
 			Args: arg.Args{
+				&arg.String{Name: "BAR", Optional: true},
+			},
+		}
+
+		err := c.Run(context.TODO(), nil)
+		require.NoError(t, err)
+
+		bar := c.Args.Get("BAR").(*arg.String).Value
+		require.Nil(t, bar)
+	})
+	t.Run("multiple optional", func(t *testing.T) {
+		// TODO: test BAZ is parsed when if BAR parses 0 arguments.
+		c := &xli.Command{
+			Args: arg.Args{
+				&arg.String{Name: "BAR", Optional: true},
+				&arg.String{Name: "BAZ", Optional: true},
+				&arg.String{Name: "QUX", Optional: true},
+			},
+		}
+
+		err := c.Run(context.TODO(), nil)
+		require.NoError(t, err)
+
+		bar := c.Args.Get("BAR").(*arg.String).Value
+		require.Nil(t, bar)
+		baz := c.Args.Get("BAZ").(*arg.String).Value
+		require.Nil(t, baz)
+		qux := c.Args.Get("QUX").(*arg.String).Value
+		require.Nil(t, qux)
+	})
+	t.Run("optional with optional remains with no args", func(t *testing.T) {
+		c := &xli.Command{
+			Args: arg.Args{
+				&arg.String{Name: "BAR", Optional: true},
+				&arg.Remains{Name: "BAZ", Optional: true},
+			},
+		}
+
+		err := c.Run(context.TODO(), nil)
+		require.NoError(t, err)
+
+		bar := c.Args.Get("BAR").(*arg.String).Value
+		require.Nil(t, bar)
+		baz := c.Args.Get("BAZ").(*arg.Remains).Value
+		require.Nil(t, baz)
+	})
+	t.Run("optional with optional remains with arg and remain args", func(t *testing.T) {
+		c := &xli.Command{
+			Args: arg.Args{
+				&arg.String{Name: "BAR", Optional: true},
+				&arg.Remains{Name: "BAZ", Optional: true},
+			},
+		}
+
+		err := c.Run(context.TODO(), []string{"bar", "--", "baz", "qux"})
+		require.NoError(t, err)
+
+		bar := c.Args.Get("BAR").(*arg.String).Value
+		require.NotNil(t, bar)
+		require.Equal(t, "bar", *bar)
+
+		baz := c.Args.Get("BAZ").(*arg.Remains).Value
+		require.NotNil(t, baz)
+		require.NotNil(t, *baz)
+		require.Equal(t, []string{"baz", "qux"}, *baz)
+	})
+	t.Run("optional with optional remains with remain args", func(t *testing.T) {
+		c := &xli.Command{
+			Args: arg.Args{
+				&arg.String{Name: "BAR", Optional: true},
+				&arg.Remains{Name: "BAZ", Optional: true},
+			},
+		}
+
+		err := c.Run(context.TODO(), []string{"--", "baz", "qux"})
+		require.NoError(t, err)
+
+		bar := c.Args.Get("BAR").(*arg.String).Value
+		require.Nil(t, bar)
+		baz := c.Args.Get("BAZ").(*arg.Remains).Value
+		require.NotNil(t, baz)
+		require.NotNil(t, *baz)
+		require.Equal(t, []string{"baz", "qux"}, *baz)
+	})
+	t.Run("optional after required", func(t *testing.T) {
+		c := &xli.Command{
+			Args: arg.Args{
 				&arg.String{Name: "FOO"},
 				&arg.String{Name: "BAR", Optional: true},
 			},

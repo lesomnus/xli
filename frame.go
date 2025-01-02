@@ -216,13 +216,13 @@ func (f *frame) prepare(ctx context.Context) error {
 	}
 	if len(c.Args) > 0 {
 		if h, ok := c.Args[len(c.Args)-1].(*arg.Remains); ok {
-			if !h.IsOptional() && len(f.remain) == 0 {
+			if len(f.remain) > 0 {
+				_, err := h.Prase(ctx, f.remain)
+				if err != nil {
+					return fmt.Errorf("invalid argument: %q: %w", f.remain, err)
+				}
+			} else if !h.IsOptional() {
 				panic(fmt.Sprintf("parse failed: argument not given: %q", h.Info().Name))
-			}
-
-			_, err := h.Prase(ctx, f.remain)
-			if err != nil {
-				return fmt.Errorf("invalid argument: %q: %w", f.remain, err)
 			}
 		}
 	}
