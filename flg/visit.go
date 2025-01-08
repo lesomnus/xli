@@ -1,5 +1,7 @@
 package flg
 
+import "fmt"
+
 type Holder interface {
 	GetFlags() Flags
 }
@@ -31,4 +33,18 @@ func VisitP[T any](h Holder, name string, dst *T) bool {
 	return Visit(h, name, func(v T) {
 		*dst = v
 	})
+}
+
+func Get[T any](h Holder, name string) (v T, ok bool) {
+	ok = VisitP(h, name, &v)
+	return
+}
+
+func MustGet[T any](h Holder, name string) T {
+	v, ok := Get[T](h, name)
+	if !ok {
+		panic(fmt.Sprintf("%q: arg not parsed", name))
+	}
+
+	return v
 }
