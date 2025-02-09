@@ -42,11 +42,14 @@ type NestedHolder[T Holder] interface {
 }
 
 func Lookup[T any, U NestedHolder[U]](h NestedHolder[U], name string, visitor func(v T)) bool {
-	for h.HasParent() {
+	for {
 		if Visit(h, name, visitor) {
 			return true
 		}
 
+		if !h.HasParent() {
+			break
+		}
 		h = h.Parent()
 	}
 
