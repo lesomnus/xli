@@ -70,7 +70,21 @@ func Get[T any](h Holder, name string) (v T, ok bool) {
 func MustGet[T any](h Holder, name string) T {
 	v, ok := Get[T](h, name)
 	if !ok {
-		panic(fmt.Sprintf("%q: arg not parsed", name))
+		panic(fmt.Sprintf("%q: flg not parsed", name))
+	}
+
+	return v
+}
+
+func Find[T any, U NestedHolder[U]](h NestedHolder[U], name string) (v T, ok bool) {
+	ok = LookupP(h, name, &v)
+	return
+}
+
+func MustFind[T any, U NestedHolder[U]](h NestedHolder[U], name string) T {
+	v, ok := Find[T, U](h, name)
+	if !ok {
+		panic(fmt.Sprintf("%q: flg not parsed", name))
 	}
 
 	return v
