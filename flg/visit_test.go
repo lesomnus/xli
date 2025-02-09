@@ -63,3 +63,94 @@ func TestVisitP(t *testing.T) {
 		require.False(t, ok)
 	})
 }
+
+func TestLookupP(t *testing.T) {
+	make_cmd := func(f xli.HandlerFunc) *xli.Command {
+		return &xli.Command{
+			Flags: flg.Flags{
+				&flg.String{Name: "val"},
+			},
+			Commands: xli.Commands{
+				&xli.Command{
+					Name: "a",
+					Flags: flg.Flags{
+						&flg.String{Name: "val"},
+					},
+					Commands: xli.Commands{
+						&xli.Command{
+							Name: "b",
+							Flags: flg.Flags{
+								&flg.String{Name: "val"},
+							},
+							Handler: xli.Handle(f),
+						},
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("exist in current", func(t *testing.T) {
+		ok := false
+		v := ""
+		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+			ok = flg.Lookup(cmd, "val", func(w string) { v = w })
+			return nil
+		})
+
+		err := c.Run(context.TODO(), []string{"a", "b", "--val=foo"})
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "foo", v)
+	})
+	t.Run("exist in parent", func(t *testing.T) {
+		ok := false
+		v := ""
+		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+			ok = flg.Lookup(cmd, "val", func(w string) { v = w })
+			return nil
+		})
+
+		err := c.Run(context.TODO(), []string{"a", "--val=bar", "b"})
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "bar", v)
+	})
+	t.Run("exist in ancestor", func(t *testing.T) {
+		ok := false
+		v := ""
+		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+			ok = flg.Lookup(cmd, "val", func(w string) { v = w })
+			return nil
+		})
+
+		err := c.Run(context.TODO(), []string{"--val=baz", "a", "b"})
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "baz", v)
+	})
+	t.Run("nearest one", func(t *testing.T) {
+		ok := false
+		v := ""
+		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+			ok = flg.Lookup(cmd, "val", func(w string) { v = w })
+			return nil
+		})
+
+		err := c.Run(context.TODO(), []string{"--val=baz", "a", "b", "--val=foo"})
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "foo", v)
+	})
+	t.Run("not exist", func(t *testing.T) {
+		ok := false
+		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+			ok = flg.Lookup(cmd, "val", func(w string) {})
+			return nil
+		})
+
+		err := c.Run(context.TODO(), []string{"a", "b"})
+		require.NoError(t, err)
+		require.False(t, ok)
+	})
+}

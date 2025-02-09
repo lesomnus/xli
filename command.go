@@ -46,6 +46,10 @@ func (c *Command) String() string {
 	return strings.Join(vs, ",")
 }
 
+func (c *Command) HasParent() bool {
+	return c.parent != nil
+}
+
 func (c *Command) Parent() *Command {
 	return c.parent
 }
