@@ -40,11 +40,17 @@ func (f *frame) Prev() frm.Frame {
 	if f == nil {
 		return nil
 	}
+	if f.prev == nil {
+		return nil
+	}
 	return f.prev
 }
 
 func (f *frame) Next() frm.Frame {
 	if f == nil {
+		return nil
+	}
+	if f.next == nil {
 		return nil
 	}
 	return f.next
