@@ -39,6 +39,18 @@ type Command struct {
 	parent *Command
 }
 
+func (c *Command) GetName() string {
+	return c.Name
+}
+
+func (c *Command) GetFlags() flg.Flags {
+	return c.Flags
+}
+
+func (c *Command) GetArgs() arg.Args {
+	return c.Args
+}
+
 func (c *Command) String() string {
 	vs := make([]string, 1, len(c.Aliases)+1)
 	vs[0] = c.Name
@@ -71,14 +83,6 @@ func (c *Command) Root() *Command {
 		p = p.parent
 	}
 	return p
-}
-
-func (c *Command) GetFlags() flg.Flags {
-	return c.Flags
-}
-
-func (c *Command) GetArgs() arg.Args {
-	return c.Args
 }
 
 func (c *Command) Print(vs ...any) (int, error) {

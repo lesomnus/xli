@@ -12,6 +12,7 @@ import (
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
+	"github.com/lesomnus/xli/frm"
 	"github.com/lesomnus/xli/mode"
 	"github.com/stretchr/testify/require"
 )
@@ -586,6 +587,45 @@ type nopWriteCloser struct {
 
 func (nopWriteCloser) Close() error {
 	return nil
+}
+
+func TestFrameAccess(t *testing.T) {
+	trace := []string{}
+	handler := xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+		f := frm.From(ctx)
+		require.NotNil(t, f.Cmd())
+
+		name := f.Cmd().GetName()
+		trace = append(trace, name)
+
+		return next(ctx)
+	})
+
+	c := &xli.Command{
+		Name: "foo",
+		Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+			f := frm.From(ctx)
+			require.True(t, frm.HasSequence(f, "foo", "bar", "baz"))
+
+			return handler.Handle(ctx, cmd, next)
+		}),
+		Commands: xli.Commands{
+			&xli.Command{
+				Name:    "bar",
+				Handler: handler,
+				Commands: xli.Commands{
+					&xli.Command{
+						Name:    "baz",
+						Handler: handler,
+					},
+				},
+			},
+		},
+	}
+
+	err := c.Run(context.TODO(), []string{"bar", "baz"})
+	require.NoError(t, err)
+	require.Equal(t, trace, []string{"foo", "bar", "baz"})
 }
 
 func TestFrameIos(t *testing.T) {

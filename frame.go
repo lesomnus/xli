@@ -8,8 +8,10 @@ import (
 
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
+	"github.com/lesomnus/xli/frm"
 	"github.com/lesomnus/xli/lex"
 	"github.com/lesomnus/xli/mode"
+	"github.com/lesomnus/xli/xmd"
 )
 
 type frame struct {
@@ -25,6 +27,27 @@ type frame struct {
 	remain []string // remain args after end of command
 
 	is_help bool
+}
+
+func (f *frame) Cmd() xmd.Command {
+	if f == nil {
+		return nil
+	}
+	return f.c_curr
+}
+
+func (f *frame) Prev() frm.Frame {
+	if f == nil {
+		return nil
+	}
+	return f.prev
+}
+
+func (f *frame) Next() frm.Frame {
+	if f == nil {
+		return nil
+	}
+	return f.next
 }
 
 func (f *frame) Iter() iter.Seq[*frame] {
@@ -237,6 +260,8 @@ func (f *frame) execute(ctx context.Context) error {
 	if c.Handler == nil {
 		c.Handler = noop
 	}
+
+	ctx = frm.Into(ctx, f)
 
 	if next := f.next; next != nil {
 		next.c_curr.parent = c
