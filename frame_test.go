@@ -605,7 +605,7 @@ func TestFrameAccess(t *testing.T) {
 		Name: "foo",
 		Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			f := frm.From(ctx)
-			require.True(t, frm.HasSequence(f, "foo", "bar", "baz"))
+			require.True(t, frm.HasSeq(f, "foo", "bar", "baz"))
 
 			return handler.Handle(ctx, cmd, next)
 		}),

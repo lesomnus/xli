@@ -27,7 +27,7 @@ func Into(ctx context.Context, v Frame) context.Context {
 	return context.WithValue(ctx, ctxKey{}, v)
 }
 
-func HasSequence(f Frame, names ...string) bool {
+func HasSeq(f Frame, names ...string) bool {
 	for _, v := range names {
 		c := f.Cmd()
 		if c == nil || c.GetName() != v {
