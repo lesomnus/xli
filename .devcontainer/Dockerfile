@@ -1,4 +1,4 @@
-FROM ghcr.io/lesomnus/dev-golang:1.23
+FROM ghcr.io/lesomnus/dev-golang:1.24
 
 
 USER hypnos
