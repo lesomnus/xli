@@ -2,12 +2,12 @@ package xli
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
 // Countdown calls `until` and invokes `tick` every second until `until` is finished.
 // Returns true if `until` is finished; otherwise, returns false.
+// Note that `tick` is invoked with `d` at first.
 func Countdown(ctx context.Context, d time.Duration, until func(), tick func(remain time.Duration) bool) bool {
 	done := make(chan struct{})
 
@@ -20,6 +20,7 @@ func Countdown(ctx context.Context, d time.Duration, until func(), tick func(rem
 		until()
 	}()
 
+	tick(d)
 	for {
 		select {
 		case <-done:
@@ -28,7 +29,6 @@ func Countdown(ctx context.Context, d time.Duration, until func(), tick func(rem
 		case <-ctx.Done():
 			return false
 		case <-ticker.C:
-			fmt.Printf("time.Until(end): %v\n", time.Until(end))
 			dt := time.Until(end).Round(time.Second)
 			if dt <= 0 {
 				return false
