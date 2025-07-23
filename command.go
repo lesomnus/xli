@@ -149,6 +149,9 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 	// Parses flags and args according to the collected information.
 	// Parsed flags and args should be stored in each Arg and Flag.
 	for f := range f_root.Iter() {
+		if f.is_help {
+			break
+		}
 		if err := f.prepare(ctx); err != nil {
 			return err
 		}

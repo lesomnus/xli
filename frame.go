@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iter"
 	"slices"
+	"unicode/utf8"
 
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
@@ -134,7 +135,15 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				return f, nil
 			}
 
-			if w := cmd.Flags.Get(v.Name()); w == nil {
+			var w flg.Flag
+			if v.IsShort() {
+				r, _ := utf8.DecodeRuneInString(v.Name())
+				w = cmd.Flags.GetByAlias(r)
+			} else {
+				w = cmd.Flags.Get(v.Name())
+			}
+
+			if w == nil {
 				return f, &FlagError{v, ErrUnknownFlag}
 			} else if _, ok := w.(*flg.Switch); ok {
 				// Flag is a switch
@@ -205,9 +214,16 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 func (f *frame) prepare(ctx context.Context) error {
 	c := f.c_curr
 	for _, v := range f.flags {
-		h := c.Flags.Get(v.Name())
+		var h flg.Flag
+		if v.IsShort() {
+			r, _ := utf8.DecodeRuneInString(v.Name())
+			h = c.Flags.GetByAlias(r)
+		} else {
+			h = c.Flags.Get(v.Name())
+		}
+
 		if h == nil {
-			return fmt.Errorf("unknown flag: %s", h)
+			return fmt.Errorf("%s: %w", v.Name(), ErrUnknownFlag)
 		}
 
 		a, ok := v.Arg()

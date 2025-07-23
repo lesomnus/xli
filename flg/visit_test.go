@@ -12,7 +12,10 @@ import (
 func TestVisit(t *testing.T) {
 	c := &xli.Command{
 		Flags: flg.Flags{
-			&flg.String{Name: "foo"},
+			&flg.String{
+				Name:  "foo",
+				Alias: 'f',
+			},
 			&flg.String{Name: "qux"},
 		},
 	}
@@ -20,6 +23,15 @@ func TestVisit(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("given", func(t *testing.T) {
+		v := ""
+		ok := flg.Visit(c, "foo", func(w string) { v = w })
+		require.True(t, ok)
+		require.Equal(t, "baz", v)
+	})
+	t.Run("aliased", func(t *testing.T) {
+		err := c.Run(context.TODO(), []string{"--foo=bar", "-f", "baz"})
+		require.NoError(t, err)
+
 		v := ""
 		ok := flg.Visit(c, "foo", func(w string) { v = w })
 		require.True(t, ok)

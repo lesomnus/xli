@@ -44,6 +44,16 @@ func (fs Flags) Get(name string) Flag {
 	return nil
 }
 
+func (fs Flags) GetByAlias(c rune) Flag {
+	for _, f := range fs {
+		if f.Info().Alias == c {
+			return f
+		}
+	}
+
+	return nil
+}
+
 func (fs Flags) ByCategory() []Flags {
 	i := map[string]int{}
 	vs := []Flags{}

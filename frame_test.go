@@ -164,6 +164,17 @@ func TestFrameParseArgs(t *testing.T) {
 		err := c.Run(context.TODO(), []string{"foo", "bar", "baz", "qux"})
 		require.ErrorContains(t, err, `baz: too many arguments`)
 	})
+	t.Run("extra args with --help", func(t *testing.T) {
+		c := &xli.Command{
+			Args: arg.Args{
+				&arg.String{Name: "FOO"},
+				&arg.String{Name: "BAR"},
+			},
+		}
+
+		err := c.Run(context.TODO(), []string{"--help", "foo", "bar", "baz", "qux"})
+		require.NoError(t, err)
+	})
 	t.Run("less args", func(t *testing.T) {
 		c := &xli.Command{
 			Args: arg.Args{
@@ -174,6 +185,17 @@ func TestFrameParseArgs(t *testing.T) {
 
 		err := c.Run(context.TODO(), []string{"foo"})
 		require.ErrorContains(t, err, `"BAR": required argument not given`)
+	})
+	t.Run("less args with --help", func(t *testing.T) {
+		c := &xli.Command{
+			Args: arg.Args{
+				&arg.String{Name: "FOO"},
+				&arg.String{Name: "BAR"},
+			},
+		}
+
+		err := c.Run(context.TODO(), []string{"--help", "foo"})
+		require.NoError(t, err)
 	})
 	t.Run("optional", func(t *testing.T) {
 		c := &xli.Command{
