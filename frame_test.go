@@ -28,7 +28,7 @@ func TestFrameParseSwitches(t *testing.T) {
 
 	t.Run("switch on", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), []string{"--foo"})
+		err := c.Run(t.Context(), []string{"--foo"})
 		require.NoError(t, err)
 
 		v := c.Flags.Get("foo").(*flg.Switch)
@@ -37,7 +37,7 @@ func TestFrameParseSwitches(t *testing.T) {
 	})
 	t.Run("switch off", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), nil)
+		err := c.Run(t.Context(), nil)
 		require.NoError(t, err)
 
 		v := c.Flags.Get("foo").(*flg.Switch)
@@ -48,7 +48,7 @@ func TestFrameParseSwitches(t *testing.T) {
 	})
 	t.Run("switch with true", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), []string{"--foo=true"})
+		err := c.Run(t.Context(), []string{"--foo=true"})
 		require.NoError(t, err)
 
 		v := c.Flags.Get("foo").(*flg.Switch)
@@ -57,7 +57,7 @@ func TestFrameParseSwitches(t *testing.T) {
 	})
 	t.Run("switch with false", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), []string{"--foo=false"})
+		err := c.Run(t.Context(), []string{"--foo=false"})
 		require.NoError(t, err)
 
 		v := c.Flags.Get("foo").(*flg.Switch)
@@ -78,7 +78,7 @@ func TestFrameParseFlags(t *testing.T) {
 
 	t.Run("flag with value", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), []string{"--foo", "bar"})
+		err := c.Run(t.Context(), []string{"--foo", "bar"})
 		require.NoError(t, err)
 
 		v := c.Flags.Get("foo").(*flg.String)
@@ -87,7 +87,7 @@ func TestFrameParseFlags(t *testing.T) {
 	})
 	t.Run("flag with value in single arg", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), []string{"--foo=bar"})
+		err := c.Run(t.Context(), []string{"--foo=bar"})
 		require.NoError(t, err)
 
 		v := c.Flags.Get("foo").(*flg.String)
@@ -96,17 +96,17 @@ func TestFrameParseFlags(t *testing.T) {
 	})
 	t.Run("flag with no value", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), []string{"--foo"})
+		err := c.Run(t.Context(), []string{"--foo"})
 		require.ErrorContains(t, err, "--foo: no value is given")
 	})
 	t.Run("flag with no value but flag", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), []string{"--foo", "--bar", "baz"})
+		err := c.Run(t.Context(), []string{"--foo", "--bar", "baz"})
 		require.ErrorContains(t, err, "--foo: no value is given")
 	})
 	t.Run("invalid flag syntax", func(t *testing.T) {
 		c := new_cmd()
-		err := c.Run(context.TODO(), []string{
+		err := c.Run(t.Context(), []string{
 			"---foo=a",
 			"--bar=b",
 		})
@@ -122,7 +122,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo"})
+		err := c.Run(t.Context(), []string{"foo"})
 		require.NoError(t, err)
 
 		v := c.Args.Get("FOO").(*arg.String)
@@ -138,7 +138,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo", "bar", "baz"})
+		err := c.Run(t.Context(), []string{"foo", "bar", "baz"})
 		require.NoError(t, err)
 
 		foo := c.Args.Get("FOO").(*arg.String)
@@ -161,7 +161,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo", "bar", "baz", "qux"})
+		err := c.Run(t.Context(), []string{"foo", "bar", "baz", "qux"})
 		require.ErrorContains(t, err, `baz: too many arguments`)
 	})
 	t.Run("extra args with --help", func(t *testing.T) {
@@ -172,7 +172,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"--help", "foo", "bar", "baz", "qux"})
+		err := c.Run(t.Context(), []string{"--help", "foo", "bar", "baz", "qux"})
 		require.NoError(t, err)
 	})
 	t.Run("less args", func(t *testing.T) {
@@ -183,7 +183,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo"})
+		err := c.Run(t.Context(), []string{"foo"})
 		require.ErrorContains(t, err, `"BAR": required argument not given`)
 	})
 	t.Run("less args with --help", func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"--help", "foo"})
+		err := c.Run(t.Context(), []string{"--help", "foo"})
 		require.NoError(t, err)
 	})
 	t.Run("optional", func(t *testing.T) {
@@ -204,7 +204,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), nil)
+		err := c.Run(t.Context(), nil)
 		require.NoError(t, err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
@@ -220,7 +220,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), nil)
+		err := c.Run(t.Context(), nil)
 		require.NoError(t, err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
@@ -238,7 +238,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), nil)
+		err := c.Run(t.Context(), nil)
 		require.NoError(t, err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
@@ -254,7 +254,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"bar", "--", "baz", "qux"})
+		err := c.Run(t.Context(), []string{"bar", "--", "baz", "qux"})
 		require.NoError(t, err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
@@ -274,7 +274,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"--", "baz", "qux"})
+		err := c.Run(t.Context(), []string{"--", "baz", "qux"})
 		require.NoError(t, err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
@@ -292,7 +292,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo"})
+		err := c.Run(t.Context(), []string{"foo"})
 		require.NoError(t, err)
 		require.Equal(t, "foo", *c.Args.Get("FOO").(*arg.String).Value)
 
@@ -307,7 +307,7 @@ func TestFrameParseArgs(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo", "bar", "baz", "qux"})
+		err := c.Run(t.Context(), []string{"foo", "bar", "baz", "qux"})
 		require.NoError(t, err)
 		require.Equal(t, "foo", *c.Args.Get("FOO").(*arg.String).Value)
 
@@ -324,7 +324,7 @@ func TestFramePraseEndOfCommands(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"--", "foo", "bar", "baz"})
+		err := c.Run(t.Context(), []string{"--", "foo", "bar", "baz"})
 		require.NoError(t, err)
 		require.Equal(t, []string{"foo", "bar", "baz"}, *c.Args.Get("FOO").(*arg.Remains).Value)
 	})
@@ -341,7 +341,7 @@ func TestFramePraseEndOfCommands(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{
+		err := c.Run(t.Context(), []string{
 			"--foo", "foo",
 			"--bar", "bar",
 			"foo", "bar",
@@ -363,7 +363,7 @@ func TestFrameParseComposite(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{
+		err := c.Run(t.Context(), []string{
 			"--foo",
 			"--baz=a",
 			"--bar=false",
@@ -399,7 +399,7 @@ func TestFrameParseComposite(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{
+		err := c.Run(t.Context(), []string{
 			"--foo",
 			"--bar=a",
 			"baz",
@@ -435,7 +435,7 @@ func TestFrameParseComposite(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{
+		err := c.Run(t.Context(), []string{
 			"--foo", "a",
 			"baz",
 			"--bar", "b",
@@ -456,7 +456,7 @@ func TestFrameParseComposite(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{
+		err := c.Run(t.Context(), []string{
 			"--foo=a",
 			"baz",
 			"--bar=b",
@@ -503,7 +503,7 @@ func TestFrameParseComposite(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{
+		err := c.Run(t.Context(), []string{
 			"--switch", "--flag=flag", "foo", "bar",
 			"foo", "--switch_1", "--flag_1=flag_1", "foo_1", "bar_1",
 			"bar", "--switch_a", "--flag_a=flag_a", "foo_a", "bar_a",
@@ -551,7 +551,7 @@ func TestFrameParseComposite(t *testing.T) {
 				},
 			},
 		}
-		err := c.Run(context.TODO(), []string{
+		err := c.Run(t.Context(), []string{
 			"--foo=foo", "--bar", "bar", "foo", "bar",
 			"foo", "--foo=foo", "--bar", "bar", "foo", "bar",
 			"--", "baz1", "baz2", "baz3",
@@ -585,7 +585,7 @@ func TestFrameMode(t *testing.T) {
 		Handler: append_mode,
 	}
 
-	err := c.Run(context.TODO(), []string{"foo", "bar"})
+	err := c.Run(t.Context(), []string{"foo", "bar"})
 	require.NoError(t, err)
 	require.Equal(t, []mode.Mode{
 		mode.Run | mode.Pass,
@@ -594,7 +594,7 @@ func TestFrameMode(t *testing.T) {
 	}, ms)
 
 	ms = []mode.Mode{}
-	err = c.Run(context.TODO(), []string{"foo", "bar", "--help"})
+	err = c.Run(t.Context(), []string{"foo", "bar", "--help"})
 	require.NoError(t, err)
 	require.Equal(t, []mode.Mode{
 		mode.Help | mode.Pass,
@@ -645,7 +645,7 @@ func TestFrameAccess(t *testing.T) {
 		},
 	}
 
-	err := c.Run(context.TODO(), []string{"bar", "baz"})
+	err := c.Run(t.Context(), []string{"bar", "baz"})
 	require.NoError(t, err)
 	require.Equal(t, trace, []string{"foo", "bar", "baz"})
 }
@@ -663,7 +663,7 @@ func TestFrameIos(t *testing.T) {
 			}),
 		}
 
-		err := c.Run(context.TODO(), nil)
+		err := c.Run(t.Context(), nil)
 		require.NoError(t, err)
 		require.True(t, ok)
 	})
@@ -701,7 +701,7 @@ func TestFrameIos(t *testing.T) {
 			ErrWriter:   &nopWriteCloser{Writer: e},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo"})
+		err := c.Run(t.Context(), []string{"foo"})
 		require.NoError(t, err)
 		require.Equal(t, "royale\ncheese\n", o.String())
 		require.Equal(t, "with\n", e.String())

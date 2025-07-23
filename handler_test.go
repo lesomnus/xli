@@ -39,7 +39,7 @@ func TestHandler(t *testing.T) {
 		vs := []string{}
 		c := new_c(&vs)
 
-		err := c.Run(context.TODO(), nil)
+		err := c.Run(t.Context(), nil)
 		require.NoError(t, err)
 		require.Equal(t, []string{"root-run"}, vs)
 	})
@@ -47,7 +47,7 @@ func TestHandler(t *testing.T) {
 		vs := []string{}
 		c := new_c(&vs)
 
-		err := c.Run(context.TODO(), []string{"--help"})
+		err := c.Run(t.Context(), []string{"--help"})
 		require.NoError(t, err)
 		require.Equal(t, []string{"root-help"}, vs)
 	})
@@ -55,7 +55,7 @@ func TestHandler(t *testing.T) {
 		vs := []string{}
 		c := new_c(&vs)
 
-		err := c.Run(context.TODO(), []string{"foo"})
+		err := c.Run(t.Context(), []string{"foo"})
 		require.NoError(t, err)
 		require.Equal(t, []string{"root-pass", "foo-run"}, vs)
 	})
@@ -63,7 +63,7 @@ func TestHandler(t *testing.T) {
 		vs := []string{}
 		c := new_c(&vs)
 
-		err := c.Run(context.TODO(), []string{"foo", "--help"})
+		err := c.Run(t.Context(), []string{"foo", "--help"})
 		require.NoError(t, err)
 		require.Equal(t, []string{"foo-help"}, vs)
 	})

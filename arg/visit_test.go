@@ -1,7 +1,6 @@
 package arg_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/lesomnus/xli"
@@ -16,7 +15,7 @@ func TestVisit(t *testing.T) {
 			&arg.Int{Name: "BAR", Optional: true},
 		},
 	}
-	err := c.Run(context.TODO(), []string{"foo"})
+	err := c.Run(t.Context(), []string{"foo"})
 	require.NoError(t, err)
 
 	t.Run("given", func(t *testing.T) {
@@ -49,7 +48,7 @@ func TestVisitP(t *testing.T) {
 			&arg.String{Name: "FOO"},
 		},
 	}
-	err := c.Run(context.TODO(), []string{"foo"})
+	err := c.Run(t.Context(), []string{"foo"})
 	require.NoError(t, err)
 
 	t.Run("given", func(t *testing.T) {

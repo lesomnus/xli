@@ -19,7 +19,7 @@ func TestVisit(t *testing.T) {
 			&flg.String{Name: "qux"},
 		},
 	}
-	err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
+	err := c.Run(t.Context(), []string{"--foo=bar", "--foo", "baz"})
 	require.NoError(t, err)
 
 	t.Run("given", func(t *testing.T) {
@@ -29,7 +29,7 @@ func TestVisit(t *testing.T) {
 		require.Equal(t, "baz", v)
 	})
 	t.Run("aliased", func(t *testing.T) {
-		err := c.Run(context.TODO(), []string{"--foo=bar", "-f", "baz"})
+		err := c.Run(t.Context(), []string{"--foo=bar", "-f", "baz"})
 		require.NoError(t, err)
 
 		v := ""
@@ -61,7 +61,7 @@ func TestVisitP(t *testing.T) {
 			&flg.String{Name: "foo"},
 		},
 	}
-	err := c.Run(context.TODO(), []string{"--foo=bar", "--foo", "baz"})
+	err := c.Run(t.Context(), []string{"--foo=bar", "--foo", "baz"})
 	require.NoError(t, err)
 
 	t.Run("given", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestLookupP(t *testing.T) {
 			return nil
 		})
 
-		err := c.Run(context.TODO(), []string{"a", "b", "--val=foo"})
+		err := c.Run(t.Context(), []string{"a", "b", "--val=foo"})
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "foo", v)
@@ -123,7 +123,7 @@ func TestLookupP(t *testing.T) {
 			return nil
 		})
 
-		err := c.Run(context.TODO(), []string{"a", "--val=bar", "b"})
+		err := c.Run(t.Context(), []string{"a", "--val=bar", "b"})
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "bar", v)
@@ -136,7 +136,7 @@ func TestLookupP(t *testing.T) {
 			return nil
 		})
 
-		err := c.Run(context.TODO(), []string{"--val=baz", "a", "b"})
+		err := c.Run(t.Context(), []string{"--val=baz", "a", "b"})
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "baz", v)
@@ -149,7 +149,7 @@ func TestLookupP(t *testing.T) {
 			return nil
 		})
 
-		err := c.Run(context.TODO(), []string{"--val=baz", "a", "b", "--val=foo"})
+		err := c.Run(t.Context(), []string{"--val=baz", "a", "b", "--val=foo"})
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "foo", v)
@@ -161,7 +161,7 @@ func TestLookupP(t *testing.T) {
 			return nil
 		})
 
-		err := c.Run(context.TODO(), []string{"a", "b"})
+		err := c.Run(t.Context(), []string{"a", "b"})
 		require.NoError(t, err)
 		require.False(t, ok)
 	})

@@ -37,7 +37,7 @@ func TestCommandExecutionOrder(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		c := &xli.Command{}
 
-		err := c.Run(context.TODO(), nil)
+		err := c.Run(t.Context(), nil)
 		require.NoError(t, err)
 	})
 	t.Run("flags", func(t *testing.T) {
@@ -49,7 +49,7 @@ func TestCommandExecutionOrder(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"--foo=a", "--bar=b"})
+		err := c.Run(t.Context(), []string{"--foo=a", "--bar=b"})
 		require.NoError(t, err)
 		require.Equal(t, []string{"foo", "bar"}, vs)
 	})
@@ -62,7 +62,7 @@ func TestCommandExecutionOrder(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"a", "b"})
+		err := c.Run(t.Context(), []string{"a", "b"})
 		require.NoError(t, err)
 		require.Equal(t, []string{"foo", "bar"}, vs)
 	})
@@ -86,7 +86,7 @@ func TestCommandExecutionOrder(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo", "bar"})
+		err := c.Run(t.Context(), []string{"foo", "bar"})
 		require.ErrorContains(t, err, "bar-err")
 		require.Equal(t, []string{"bar"}, vs)
 	})
@@ -115,7 +115,7 @@ func TestCommandExecutionOrder(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo", "--foo=a", "--bar=b", "c", "d", "bar"})
+		err := c.Run(t.Context(), []string{"foo", "--foo=a", "--bar=b", "c", "d", "bar"})
 		require.ErrorContains(t, err, "bar-err")
 		require.Equal(t, []string{"f-foo", "f-bar", "a-foo", "a-bar", "foo", "bar"}, vs)
 	})
@@ -136,7 +136,7 @@ func TestCommandExecutionOrder(t *testing.T) {
 			},
 		}
 
-		err := c.Run(context.TODO(), []string{"foo", "--help", "bar"})
+		err := c.Run(t.Context(), []string{"foo", "--help", "bar"})
 		require.NoError(t, err)
 		require.Equal(t, []string{"foo"}, vs)
 	})

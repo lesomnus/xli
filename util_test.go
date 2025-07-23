@@ -42,14 +42,14 @@ func TestRequireSubcommand(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		c, trace := make_cmd()
 
-		err := c.Run(context.TODO(), []string{"bar"})
+		err := c.Run(t.Context(), []string{"bar"})
 		require.NoError(t, err)
 		require.Equal(t, *trace, []string{"foo", "bar"})
 	})
 	t.Run("no subcommand", func(t *testing.T) {
 		c, trace := make_cmd()
 
-		err := c.Run(context.TODO(), nil)
+		err := c.Run(t.Context(), nil)
 		require.ErrorContains(t, err, "required")
 		require.Equal(t, *trace, []string{"foo"})
 	})
