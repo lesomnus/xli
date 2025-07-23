@@ -603,14 +603,6 @@ func TestFrameMode(t *testing.T) {
 	}, ms)
 }
 
-type nopWriteCloser struct {
-	io.Writer
-}
-
-func (nopWriteCloser) Close() error {
-	return nil
-}
-
 func TestFrameAccess(t *testing.T) {
 	trace := []string{}
 	handler := xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
@@ -657,7 +649,7 @@ func TestFrameIos(t *testing.T) {
 			Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 				ok = true
 				require.Same(t, cmd.ReadCloser, os.Stdin)
-				require.Same(t, cmd.WriteCloser, os.Stdout)
+				require.Same(t, cmd.Writer, os.Stdout)
 				require.Same(t, cmd.ErrWriter, os.Stderr)
 				return next(ctx)
 			}),
@@ -696,9 +688,9 @@ func TestFrameIos(t *testing.T) {
 				},
 			},
 
-			ReadCloser:  io.NopCloser(i),
-			WriteCloser: &nopWriteCloser{Writer: o},
-			ErrWriter:   &nopWriteCloser{Writer: e},
+			ReadCloser: io.NopCloser(i),
+			Writer:     o,
+			ErrWriter:  e,
 		}
 
 		err := c.Run(t.Context(), []string{"foo"})

@@ -292,8 +292,8 @@ func (f *frame) execute(ctx context.Context) error {
 			if c_next.ReadCloser == nil {
 				c_next.ReadCloser = c.ReadCloser
 			}
-			if c_next.WriteCloser == nil {
-				c_next.WriteCloser = c.WriteCloser
+			if c_next.Writer == nil {
+				c_next.Writer = c.Writer
 			}
 			if c_next.ErrWriter == nil {
 				c_next.ErrWriter = c.ErrWriter
