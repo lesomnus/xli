@@ -32,8 +32,8 @@ type Command struct {
 	Handler Handler
 
 	io.ReadCloser
-	io.WriteCloser
-	ErrWriter io.WriteCloser
+	io.Writer
+	ErrWriter io.Writer
 
 	parent *Command
 
@@ -107,15 +107,15 @@ func (c *Command) Root() *Command {
 }
 
 func (c *Command) Print(vs ...any) (int, error) {
-	return fmt.Fprint(c.WriteCloser, vs...)
+	return fmt.Fprint(c.Writer, vs...)
 }
 
 func (c *Command) Printf(format string, vs ...any) (int, error) {
-	return fmt.Fprintf(c.WriteCloser, format, vs...)
+	return fmt.Fprintf(c.Writer, format, vs...)
 }
 
 func (c *Command) Println(vs ...any) (int, error) {
-	return fmt.Fprintln(c.WriteCloser, vs...)
+	return fmt.Fprintln(c.Writer, vs...)
 }
 
 func (c *Command) Scan(vs ...any) (int, error) {
@@ -143,7 +143,7 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 			curr := args[l-2] // Word where the cursor is.
 			buff := args[l-1] // len(curr) characters on left of the cursor.
 
-			w := c.WriteCloser
+			w := c.Writer
 			if w == nil {
 				w = os.Stdout
 			}
@@ -195,8 +195,8 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 	if c.ReadCloser == nil {
 		c.ReadCloser = os.Stdin
 	}
-	if c.WriteCloser == nil {
-		c.WriteCloser = os.Stdout
+	if c.Writer == nil {
+		c.Writer = os.Stdout
 	}
 	if c.ErrWriter == nil {
 		c.ErrWriter = os.Stderr

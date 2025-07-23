@@ -1,9 +1,7 @@
-package main
+package cmd
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"strings"
 
 	"github.com/lesomnus/xli"
@@ -12,8 +10,8 @@ import (
 	"github.com/lesomnus/xli/tab"
 )
 
-func main() {
-	c := xli.New(&xli.Command{
+func NewExampleCompletionCmd() *xli.Command {
+	return xli.New(&xli.Command{
 		Name:  "example",
 		Brief: "root-brief",
 		Synop: "Long description will be printed here",
@@ -80,8 +78,4 @@ func main() {
 			},
 		)
 	}))
-
-	if err := c.Run(context.TODO(), os.Args[1:]); err != nil {
-		fmt.Printf("err: %v\n", err)
-	}
 }
