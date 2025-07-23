@@ -19,8 +19,8 @@ Usage:
 			{{ .Info.Usage.String -}}
 		{{ end -}}
 	{{ end -}}
-	{{ if len $.Flags    | ne 0 }}[options] {{ end -}}
-	{{ if len $.Commands | ne 0 }}[command]{{ end -}}
+	{{ if len $.Flags       | ne 0 }}[options] {{ end -}}
+	{{ if len $.GetCommands | ne 0 }}[command]{{ end -}}
 	{{ range . -}}
 		{{ if len .Args | ne 0 -}}
 			{{ printf "\n" -}}
@@ -34,9 +34,9 @@ Usage:
 	{{ end -}}
 {{ end -}}
 
-{{ if len $.Commands | ne 0 }}
+{{ if len $.GetCommands | ne 0 }}
 
-Commands:{{ range $.Commands.ByCategory -}}
+Commands:{{ range $.GetCommands.ByCategory -}}
 		{{ $category := (index . 0).Category -}}
 		{{ if len $category | ne 0 -}}
 			{{ printf "\n  %s:" $category -}}

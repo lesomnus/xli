@@ -78,17 +78,19 @@ func TestVisitP(t *testing.T) {
 
 func TestLookupP(t *testing.T) {
 	make_cmd := func(f xli.HandlerFunc) *xli.Command {
-		return &xli.Command{
+		return xli.New(&xli.Command{
 			Flags: flg.Flags{
 				&flg.String{Name: "val"},
 			},
-			Commands: xli.Commands{
-				&xli.Command{
+		}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
+				xli.New(&xli.Command{
 					Name: "a",
 					Flags: flg.Flags{
 						&flg.String{Name: "val"},
 					},
-					Commands: xli.Commands{
+				}, xli.WithSubcommands(func() xli.Commands {
+					return xli.Commands{
 						&xli.Command{
 							Name: "b",
 							Flags: flg.Flags{
@@ -96,10 +98,10 @@ func TestLookupP(t *testing.T) {
 							},
 							Handler: xli.Handle(f),
 						},
-					},
-				},
-			},
-		}
+					}
+				})),
+			}
+		}))
 	}
 
 	t.Run("exist in current", func(t *testing.T) {

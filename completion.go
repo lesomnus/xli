@@ -12,12 +12,13 @@ const completion_tag_prefix = "$$xli_completion_"
 var completions embed.FS
 
 func NewCmdCompletion() *Command {
-	return &Command{
+	return New(&Command{
 		Name: "completion",
-		Commands: Commands{
+	}, WithSubcommands(func() Commands {
+		return Commands{
 			newCmdZshCompletion(),
-		},
-	}
+		}
+	}))
 }
 
 func newCmdZshCompletion() *Command {

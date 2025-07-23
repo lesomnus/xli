@@ -16,8 +16,14 @@ func TestHandler(t *testing.T) {
 		}
 	}
 	new_c := func(vs *[]string) *xli.Command {
-		return &xli.Command{
-			Commands: xli.Commands{
+		return xli.New(&xli.Command{
+			Handler: xli.Chain(
+				xli.OnRunPass(append_cmd(vs, "root-pass")),
+				xli.OnHelp(append_cmd(vs, "root-help")),
+				xli.OnRun(append_cmd(vs, "root-run")),
+			),
+		}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
 				&xli.Command{
 					Name: "foo",
 					Handler: xli.Chain(
@@ -26,13 +32,8 @@ func TestHandler(t *testing.T) {
 						xli.OnRun(append_cmd(vs, "foo-run")),
 					),
 				},
-			},
-			Handler: xli.Chain(
-				xli.OnRunPass(append_cmd(vs, "root-pass")),
-				xli.OnHelp(append_cmd(vs, "root-help")),
-				xli.OnRun(append_cmd(vs, "root-run")),
-			),
-		}
+			}
+		}))
 	}
 
 	t.Run("run root command", func(t *testing.T) {

@@ -26,9 +26,8 @@ type Command struct {
 	Synop    string
 	Usage    Stringer
 
-	Flags    flg.Flags
-	Args     arg.Args
-	Commands Commands
+	Flags flg.Flags
+	Args  arg.Args
 
 	Handler Handler
 
@@ -37,6 +36,16 @@ type Command struct {
 	ErrWriter io.WriteCloser
 
 	parent *Command
+
+	get_subcommands func() Commands
+	subcommands     Commands
+}
+
+func New(c *Command, opts ...CommandOption) *Command {
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 func (c *Command) GetName() string {
@@ -64,6 +73,18 @@ func (c *Command) HasParent() bool {
 
 func (c *Command) Parent() *Command {
 	return c.parent
+}
+
+func (c *Command) GetCommands() Commands {
+	if c.subcommands != nil {
+		return c.subcommands
+	}
+	if c.get_subcommands == nil {
+		return nil
+	}
+
+	c.subcommands = c.get_subcommands()
+	return c.subcommands
 }
 
 func (c *Command) Tree() []*Command {
@@ -217,7 +238,7 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	case len(args) == 0:
 		fallthrough
 	case !strings.HasPrefix(args[len(args)-1], "--"):
-		for _, v := range c.Commands {
+		for _, v := range c.GetCommands() {
 			tab.ValueD(v.Name, v.Brief)
 		}
 		return nil

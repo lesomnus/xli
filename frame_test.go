@@ -466,7 +466,7 @@ func TestFrameParseComposite(t *testing.T) {
 		require.ErrorContains(t, err, `--bar="b"`)
 	})
 	t.Run("subcommand with switches, flags, and args", func(t *testing.T) {
-		c := &xli.Command{
+		c := xli.New(&xli.Command{
 			Flags: flg.Flags{
 				&flg.Switch{Name: "switch"},
 				&flg.String{Name: "flag"},
@@ -475,8 +475,9 @@ func TestFrameParseComposite(t *testing.T) {
 				&arg.String{Name: "FOO"},
 				&arg.String{Name: "BAR"},
 			},
-			Commands: []*xli.Command{
-				{
+		}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
+				xli.New(&xli.Command{
 					Name: "foo",
 					Flags: flg.Flags{
 						&flg.Switch{Name: "switch_1"},
@@ -486,7 +487,8 @@ func TestFrameParseComposite(t *testing.T) {
 						&arg.String{Name: "FOO_1"},
 						&arg.String{Name: "BAR_1"},
 					},
-					Commands: []*xli.Command{
+				}, xli.WithSubcommands(func() xli.Commands {
+					return xli.Commands{
 						{
 							Name: "bar",
 							Flags: flg.Flags{
@@ -498,10 +500,10 @@ func TestFrameParseComposite(t *testing.T) {
 								&arg.String{Name: "BAR_a"},
 							},
 						},
-					},
-				},
-			},
-		}
+					}
+				})),
+			}
+		}))
 
 		err := c.Run(t.Context(), []string{
 			"--switch", "--flag=flag", "foo", "bar",
@@ -514,20 +516,20 @@ func TestFrameParseComposite(t *testing.T) {
 		require.Equal(t, "foo", *c.Args.Get("FOO").(*arg.String).Value)
 		require.Equal(t, "bar", *c.Args.Get("BAR").(*arg.String).Value)
 
-		foo := c.Commands.Get("foo")
+		foo := c.GetCommands().Get("foo")
 		require.Equal(t, true, *foo.Flags.Get("switch_1").(*flg.Switch).Value)
 		require.Equal(t, "flag_1", *foo.Flags.Get("flag_1").(*flg.String).Value)
 		require.Equal(t, "foo_1", *foo.Args.Get("FOO_1").(*arg.String).Value)
 		require.Equal(t, "bar_1", *foo.Args.Get("BAR_1").(*arg.String).Value)
 
-		bar := foo.Commands.Get("bar")
+		bar := foo.GetCommands().Get("bar")
 		require.Equal(t, true, *bar.Flags.Get("switch_a").(*flg.Switch).Value)
 		require.Equal(t, "flag_a", *bar.Flags.Get("flag_a").(*flg.String).Value)
 		require.Equal(t, "foo_a", *bar.Args.Get("FOO_a").(*arg.String).Value)
 		require.Equal(t, "bar_a", *bar.Args.Get("BAR_a").(*arg.String).Value)
 	})
 	t.Run("remains after flags, args, and subcommand", func(t *testing.T) {
-		c := &xli.Command{
+		c := xli.New(&xli.Command{
 			Flags: flg.Flags{
 				&flg.String{Name: "foo"},
 				&flg.String{Name: "bar"},
@@ -536,8 +538,9 @@ func TestFrameParseComposite(t *testing.T) {
 				&arg.String{Name: "FOO"},
 				&arg.String{Name: "BAR"},
 			},
-			Commands: xli.Commands{
-				&xli.Command{
+		}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
+				{
 					Name: "foo",
 					Flags: flg.Flags{
 						&flg.String{Name: "foo"},
@@ -549,15 +552,15 @@ func TestFrameParseComposite(t *testing.T) {
 						&arg.Remains{Name: "BAZ"},
 					},
 				},
-			},
-		}
+			}
+		}))
 		err := c.Run(t.Context(), []string{
 			"--foo=foo", "--bar", "bar", "foo", "bar",
 			"foo", "--foo=foo", "--bar", "bar", "foo", "bar",
 			"--", "baz1", "baz2", "baz3",
 		})
 		require.NoError(t, err)
-		require.Equal(t, []string{"baz1", "baz2", "baz3"}, *c.Commands.Get("foo").Args.Get("BAZ").(*arg.Remains).Value)
+		require.Equal(t, []string{"baz1", "baz2", "baz3"}, *c.GetCommands().Get("foo").Args.Get("BAZ").(*arg.Remains).Value)
 	})
 }
 
@@ -569,21 +572,23 @@ func TestFrameMode(t *testing.T) {
 		return next(ctx)
 	})
 
-	c := &xli.Command{
-		Commands: xli.Commands{
-			&xli.Command{
-				Name: "foo",
-				Commands: xli.Commands{
+	c := xli.New(&xli.Command{
+		Handler: append_mode,
+	}, xli.WithSubcommands(func() xli.Commands {
+		return xli.Commands{
+			xli.New(&xli.Command{
+				Name:    "foo",
+				Handler: append_mode,
+			}, xli.WithSubcommands(func() xli.Commands {
+				return xli.Commands{
 					&xli.Command{
 						Name:    "bar",
 						Handler: append_mode,
 					},
-				},
-				Handler: append_mode,
-			},
-		},
-		Handler: append_mode,
-	}
+				}
+			})),
+		}
+	}))
 
 	err := c.Run(t.Context(), []string{"foo", "bar"})
 	require.NoError(t, err)
@@ -623,7 +628,7 @@ func TestFrameAccess(t *testing.T) {
 		return next(ctx)
 	})
 
-	c := &xli.Command{
+	c := xli.New(&xli.Command{
 		Name: "foo",
 		Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			f := frm.From(ctx)
@@ -631,19 +636,21 @@ func TestFrameAccess(t *testing.T) {
 
 			return handler.Handle(ctx, cmd, next)
 		}),
-		Commands: xli.Commands{
-			&xli.Command{
+	}, xli.WithSubcommands(func() xli.Commands {
+		return xli.Commands{
+			xli.New(&xli.Command{
 				Name:    "bar",
 				Handler: handler,
-				Commands: xli.Commands{
+			}, xli.WithSubcommands(func() xli.Commands {
+				return xli.Commands{
 					&xli.Command{
 						Name:    "baz",
 						Handler: handler,
 					},
-				},
-			},
-		},
-	}
+				}
+			})),
+		}
+	}))
 
 	err := c.Run(t.Context(), []string{"bar", "baz"})
 	require.NoError(t, err)
@@ -672,9 +679,13 @@ func TestFrameIos(t *testing.T) {
 		o := &bytes.Buffer{}
 		e := &bytes.Buffer{}
 
-		c := &xli.Command{
-			Commands: xli.Commands{
-				&xli.Command{
+		c := xli.New(&xli.Command{
+			ReadCloser:  io.NopCloser(i),
+			WriteCloser: &nopWriteCloser{Writer: o},
+			ErrWriter:   &nopWriteCloser{Writer: e},
+		}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
+				{
 					Name: "foo",
 					Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 						for i := 0; ; i++ {
@@ -694,12 +705,8 @@ func TestFrameIos(t *testing.T) {
 						return next(ctx)
 					}),
 				},
-			},
-
-			ReadCloser:  io.NopCloser(i),
-			WriteCloser: &nopWriteCloser{Writer: o},
-			ErrWriter:   &nopWriteCloser{Writer: e},
-		}
+			}
+		}))
 
 		err := c.Run(t.Context(), []string{"foo"})
 		require.NoError(t, err)

@@ -68,11 +68,12 @@ func TestCommandExecutionOrder(t *testing.T) {
 	})
 	t.Run("subcommands", func(t *testing.T) {
 		vs := []string{}
-		c := &xli.Command{
-			Commands: xli.Commands{
-				&xli.Command{
+		c := xli.New(&xli.Command{}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
+				xli.New(&xli.Command{
 					Name: "foo",
-					Commands: xli.Commands{
+				}, xli.WithSubcommands(func() xli.Commands {
+					return xli.Commands{
 						&xli.Command{
 							Name:    "bar",
 							Handler: append_cmd(&vs, "bar", errors.New("bar-err")),
@@ -81,10 +82,10 @@ func TestCommandExecutionOrder(t *testing.T) {
 							Name:    "baz",
 							Handler: append_cmd(&vs, "baz", errors.New("baz-err")),
 						},
-					},
-				},
-			},
-		}
+					}
+				})),
+			}
+		}))
 
 		err := c.Run(t.Context(), []string{"foo", "bar"})
 		require.ErrorContains(t, err, "bar-err")
@@ -92,9 +93,9 @@ func TestCommandExecutionOrder(t *testing.T) {
 	})
 	t.Run("composite", func(t *testing.T) {
 		vs := []string{}
-		c := &xli.Command{
-			Commands: xli.Commands{
-				&xli.Command{
+		c := xli.New(&xli.Command{}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
+				xli.New(&xli.Command{
 					Name: "foo",
 					Flags: flg.Flags{
 						&flg.String{Name: "foo", Handler: append_flg(&vs, "f-foo", nil)},
@@ -104,16 +105,17 @@ func TestCommandExecutionOrder(t *testing.T) {
 						&arg.String{Name: "FOO", Handler: append_arg(&vs, "a-foo", nil)},
 						&arg.String{Name: "BAR", Handler: append_arg(&vs, "a-bar", nil)},
 					},
-					Commands: xli.Commands{
+					Handler: append_cmd(&vs, "foo", nil),
+				}, xli.WithSubcommands(func() xli.Commands {
+					return xli.Commands{
 						&xli.Command{
 							Name:    "bar",
 							Handler: append_cmd(&vs, "bar", errors.New("bar-err")),
 						},
-					},
-					Handler: append_cmd(&vs, "foo", nil),
-				},
-			},
-		}
+					}
+				})),
+			}
+		}))
 
 		err := c.Run(t.Context(), []string{"foo", "--foo=a", "--bar=b", "c", "d", "bar"})
 		require.ErrorContains(t, err, "bar-err")
@@ -121,20 +123,21 @@ func TestCommandExecutionOrder(t *testing.T) {
 	})
 	t.Run("help before subcommand", func(t *testing.T) {
 		vs := []string{}
-		c := &xli.Command{
-			Commands: xli.Commands{
-				&xli.Command{
-					Name: "foo",
-					Commands: xli.Commands{
+		c := xli.New(&xli.Command{}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
+				xli.New(&xli.Command{
+					Name:    "foo",
+					Handler: append_cmd(&vs, "foo", nil),
+				}, xli.WithSubcommands(func() xli.Commands {
+					return xli.Commands{
 						&xli.Command{
 							Name:    "bar",
 							Handler: append_cmd(&vs, "bar", nil),
 						},
-					},
-					Handler: append_cmd(&vs, "foo", nil),
-				},
-			},
-		}
+					}
+				})),
+			}
+		}))
 
 		err := c.Run(t.Context(), []string{"foo", "--help", "bar"})
 		require.NoError(t, err)

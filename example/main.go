@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	c := &xli.Command{
+	c := xli.New(&xli.Command{
 		Name:  "example",
 		Brief: "root-brief",
 		Synop: "Long description will be printed here",
@@ -22,7 +22,8 @@ func main() {
 			&flg.String{Name: "bar", Brief: "bar-brief", Alias: 'b'},
 			&flg.Uint32{Name: "size", Brief: "size-brief", Alias: 's'},
 		},
-		Commands: xli.Commands{
+	}, xli.WithSubcommands(func() xli.Commands {
+		return xli.Commands{
 			&xli.Command{
 				Name:  "echo",
 				Brief: "display a line of text",
@@ -77,8 +78,8 @@ func main() {
 				Name:  "kiwi",
 				Brief: "looks green",
 			},
-		),
-	}
+		)
+	}))
 
 	if err := c.Run(context.TODO(), os.Args[1:]); err != nil {
 		fmt.Printf("err: %v\n", err)

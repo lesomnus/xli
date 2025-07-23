@@ -106,7 +106,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 	is_opt := slices.ContainsFunc(cmd.Args, func(a arg.Arg) bool {
 		return a.IsOptional()
 	})
-	if is_opt && len(cmd.Commands) > 0 {
+	if is_opt && len(cmd.GetCommands()) > 0 {
 		panic(fmt.Sprintf("%s: command cannot have optional argument if it has subcommands", cmd.String()))
 	}
 
@@ -179,11 +179,11 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				f.args = append(f.args, v.Raw())
 				continue
 			}
-			if len(cmd.Commands) == 0 {
+			if len(cmd.GetCommands()) == 0 {
 				return f, &ArgError{v, ErrTooManyArgs}
 			}
 
-			f.c_next = cmd.Commands.Get(v.Raw())
+			f.c_next = cmd.GetCommands().Get(v.Raw())
 			if f.c_next == nil {
 				return f, &ArgError{v, ErrUnknownCmd}
 			}

@@ -22,19 +22,20 @@ func TestRequireSubcommand(t *testing.T) {
 			return next(ctx)
 		})
 
-		c := &xli.Command{
+		c := xli.New(&xli.Command{
 			Name: "foo",
 			Handler: xli.Chain(
 				handler,
 				xli.RequireSubcommand(),
 			),
-			Commands: xli.Commands{
+		}, xli.WithSubcommands(func() xli.Commands {
+			return xli.Commands{
 				&xli.Command{
 					Name:    "bar",
 					Handler: handler,
 				},
-			},
-		}
+			}
+		}))
 
 		return c, &trace
 	}
