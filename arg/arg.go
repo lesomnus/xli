@@ -11,11 +11,14 @@ type Info struct {
 	Brief string
 	Synop string
 	Usage fmt.Stringer
+
+	Handle          func(ctx context.Context)
+	TODO_Completion func(ctx context.Context)
 }
 
 type Arg interface {
 	Info() *Info
-	Prase(ctx context.Context, rest []string) (int, error)
+	Parse(rest []string) (int, error)
 
 	IsOptional() bool
 	IsMany() bool

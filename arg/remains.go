@@ -1,7 +1,6 @@
 package arg
 
 import (
-	"context"
 	"fmt"
 )
 
@@ -9,7 +8,7 @@ type Remains = Base[[]string, RemainsParser]
 
 type RemainsParser struct{}
 
-func (RemainsParser) Parse(ctx context.Context, rest []string) ([]string, int, error) {
+func (RemainsParser) Parse(rest []string) ([]string, int, error) {
 	if rest[0] != "--" {
 		return nil, 0, fmt.Errorf(`it must start with "--"`)
 	}

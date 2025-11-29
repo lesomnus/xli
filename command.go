@@ -185,7 +185,7 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 	return f_root.execute(ctx)
 }
 
-// args must be normalized one by `NormalizeCompletionArgs`.
+// args must be a normalized one by `NormalizeCompletionArgs`.
 func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	tab := tab.From(ctx)
 	if tab == nil {
@@ -270,7 +270,9 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 			i = l - 1
 		}
 		v := c.Args[i]
-		v.Prase(ctx, nil)
+		if f := v.Info().TODO_Completion; f != nil {
+			f(ctx)
+		}
 	} else {
 		panic("some completion not considered")
 	}

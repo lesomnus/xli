@@ -249,12 +249,15 @@ func (f *frame) prepare(ctx context.Context) error {
 		}
 
 		// Parser can consume multiple arguments.
-		n, err := h.Prase(ctx, f.args[i:])
+		n, err := h.Parse(f.args[i:])
 		if i+n > len(f.args) {
 			panic(fmt.Sprintf(`argument parser reported that it parsed more arguments than were given: "%s" parse %v`, h.Info().Name, f.args[i:]))
 		}
 		if err != nil {
 			return fmt.Errorf("invalid argument: %q: %w", f.args[i], err)
+		}
+		if h_ := h.Info().Handle; h_ != nil {
+			h_(ctx)
 		}
 
 		i += n
@@ -262,9 +265,12 @@ func (f *frame) prepare(ctx context.Context) error {
 	if len(c.Args) > 0 {
 		if h, ok := c.Args[len(c.Args)-1].(*arg.Remains); ok {
 			if len(f.remain) > 0 {
-				_, err := h.Prase(ctx, f.remain)
+				_, err := h.Parse(f.remain)
 				if err != nil {
 					return fmt.Errorf("invalid argument: %q: %w", f.remain, err)
+				}
+				if h_ := h.Info().Handle; h_ != nil {
+					h_(ctx)
 				}
 			} else if !h.IsOptional() {
 				panic(fmt.Sprintf("parse failed: argument not given: %q", h.Info().Name))

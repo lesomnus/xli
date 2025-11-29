@@ -316,7 +316,7 @@ func TestFrameParseArgs(t *testing.T) {
 	})
 }
 
-func TestFramePraseEndOfCommands(t *testing.T) {
+func TestFrameParseEndOfCommands(t *testing.T) {
 	t.Run("remains", func(t *testing.T) {
 		c := &xli.Command{
 			Args: arg.Args{

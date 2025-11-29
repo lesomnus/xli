@@ -1,10 +1,7 @@
 package arg
 
 import (
-	"context"
 	"fmt"
-
-	"github.com/lesomnus/xli/mode"
 )
 
 type RestStrings = Rest[string, StringParser]
@@ -21,11 +18,11 @@ type RestParser[T any, P Parser[T]] struct {
 	Base P
 }
 
-func (p *RestParser[T, P]) Prase(ctx context.Context, rest []string) ([]T, int, error) {
+func (p *RestParser[T, P]) Parse(rest []string) ([]T, int, error) {
 	vs := []T{}
 	i := 0
 	for i < len(rest) {
-		v, n, err := p.Base.Parse(ctx, rest[i:])
+		v, n, err := p.Base.Parse(rest[i:])
 		i += n
 		if n == 0 || err != nil {
 			return nil, i, err
@@ -84,24 +81,12 @@ func (a *Rest[T, P]) IsMany() bool {
 	return true
 }
 
-func (a *Rest[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
-	if m := mode.From(ctx); m == mode.Tab {
-		a.handle(ctx, nil)
-		return 0, nil
-	}
-
-	vs, n, err := a.Parser.Prase(ctx, rest)
+func (a *Rest[T, P]) Parse(rest []string) (int, error) {
+	vs, n, err := a.Parser.Parse(rest)
 	if n == 0 || err != nil {
 		return n, err
 	}
 
 	a.Value = vs
-	return n, a.handle(ctx, vs)
-}
-
-func (a *Rest[T, P]) handle(ctx context.Context, v []T) error {
-	if h := a.Handler; h != nil {
-		return h.Handle(ctx, v)
-	}
-	return nil
+	return n, nil
 }

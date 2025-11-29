@@ -3,12 +3,10 @@ package arg
 import (
 	"context"
 	"fmt"
-
-	"github.com/lesomnus/xli/mode"
 )
 
 type Parser[T any] interface {
-	Parse(ctx context.Context, rest []string) (T, int, error)
+	Parse(rest []string) (T, int, error)
 	String() string
 }
 
@@ -46,6 +44,12 @@ func (a *Base[T, P]) Info() *Info {
 		Brief: a.Brief,
 		Synop: a.Synop,
 		Usage: usage,
+
+		Handle: func(ctx context.Context) {
+			if a.Handler != nil && a.Value != nil {
+				a.Handler.Handle(ctx, *a.Value)
+			}
+		},
 	}
 }
 
@@ -65,14 +69,8 @@ func (a *Base[T, P]) IsMany() bool {
 	return false
 }
 
-func (a *Base[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
-	if m := mode.From(ctx); m == mode.Tab {
-		var z T
-		a.handle(ctx, z)
-		return 0, nil
-	}
-
-	v, n, err := a.Parser.Parse(ctx, rest)
+func (a *Base[T, P]) Parse(rest []string) (int, error) {
+	v, n, err := a.Parser.Parse(rest)
 	if n == 0 || err != nil {
 		return n, err
 	}
@@ -82,12 +80,5 @@ func (a *Base[T, P]) Prase(ctx context.Context, rest []string) (int, error) {
 	} else {
 		*a.Value = v
 	}
-	return n, a.handle(ctx, v)
-}
-
-func (a *Base[T, P]) handle(ctx context.Context, v T) error {
-	if h := a.Handler; h != nil {
-		return h.Handle(ctx, v)
-	}
-	return nil
+	return n, nil
 }
