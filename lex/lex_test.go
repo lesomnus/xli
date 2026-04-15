@@ -3,109 +3,109 @@ package lex_test
 import (
 	"testing"
 
+	"github.com/lesomnus/xli/internal/x"
 	"github.com/lesomnus/xli/lex"
-	"github.com/stretchr/testify/require"
 )
 
 func TestLex(t *testing.T) {
-	t.Run("end of command", func(t *testing.T) {
+	t.Run("end of command", x.F(func(x x.X) {
 		u := lex.Lex("--")
-		require.IsType(t, lex.EndOfCommand(""), u)
-	})
-	t.Run("arg", func(t *testing.T) {
+		x.IsType(lex.EndOfCommand(""), u)
+	}))
+	t.Run("arg", x.F(func(x x.X) {
 		u := lex.Lex("bar")
-		require.IsType(t, lex.Arg(""), u)
+		x.IsType(lex.Arg(""), u)
 
 		v := u.(lex.Arg)
-		require.Equal(t, "bar", v.Raw())
-		require.Equal(t, `"bar"`, v.String())
-	})
-	t.Run("single dash is an arg", func(t *testing.T) {
+		x.Equal("bar", v.Raw())
+		x.Equal(`"bar"`, v.String())
+	}))
+	t.Run("single dash is an arg", x.F(func(x x.X) {
 		u := lex.Lex("-")
-		require.IsType(t, lex.Arg(""), u)
+		x.IsType(lex.Arg(""), u)
 
 		v := u.(lex.Arg)
-		require.Equal(t, "-", v.Raw())
-	})
-	t.Run("flag", func(t *testing.T) {
+		x.Equal("-", v.Raw())
+	}))
+	t.Run("flag", x.F(func(x x.X) {
 		u := lex.Lex("--foo")
-		require.IsType(t, lex.Flag(""), u)
+		x.IsType(lex.Flag(""), u)
 
 		v := u.(lex.Flag)
-		require.Equal(t, "--foo", v.Raw())
-		require.Equal(t, "--foo", v.String())
-		require.Equal(t, "foo", v.Name())
-		require.False(t, v.IsShort())
+		x.Equal("--foo", v.Raw())
+		x.Equal("--foo", v.String())
+		x.Equal("foo", v.Name())
+		x.False(v.IsShort())
 
 		_, ok := v.Arg()
-		require.False(t, ok)
-	})
-	t.Run("flag with value", func(t *testing.T) {
+		x.False(ok)
+	}))
+	t.Run("flag with value", x.F(func(x x.X) {
 		u := lex.Lex("--foo=bar")
-		require.IsType(t, lex.Flag(""), u)
+		x.IsType(lex.Flag(""), u)
 
 		v := u.(lex.Flag)
-		require.Equal(t, "--foo=bar", v.Raw())
-		require.Equal(t, `--foo="bar"`, v.String())
-		require.Equal(t, "foo", v.Name())
-		require.False(t, v.IsShort())
+		x.Equal("--foo=bar", v.Raw())
+		x.Equal(`--foo="bar"`, v.String())
+		x.Equal("foo", v.Name())
+		x.False(v.IsShort())
 
 		w, ok := v.Arg()
-		require.True(t, ok)
-		require.Equal(t, "bar", w.Raw())
-		require.Equal(t, `"bar"`, w.String())
-	})
-	t.Run("short flag", func(t *testing.T) {
+		x.True(ok)
+		x.Equal("bar", w.Raw())
+		x.Equal(`"bar"`, w.String())
+	}))
+	t.Run("short flag", x.F(func(x x.X) {
 		u := lex.Lex("-foo")
-		require.IsType(t, lex.Flag(""), u)
+		x.IsType(lex.Flag(""), u)
 
 		v := u.(lex.Flag)
-		require.Equal(t, "-foo", v.Raw())
-		require.Equal(t, `-foo`, v.String())
-		require.Equal(t, "foo", v.Name())
-		require.True(t, v.IsShort())
+		x.Equal("-foo", v.Raw())
+		x.Equal(`-foo`, v.String())
+		x.Equal("foo", v.Name())
+		x.True(v.IsShort())
 
 		_, ok := v.Arg()
-		require.False(t, ok)
-	})
-	t.Run("stacked flags", func(t *testing.T) {
+		x.False(ok)
+	}))
+	t.Run("stacked flags", x.F(func(x x.X) {
 		u := lex.Lex("-abc")
-		require.IsType(t, lex.Flag(""), u)
+		x.IsType(lex.Flag(""), u)
 
 		v := u.(lex.Flag)
-		require.True(t, v.IsStacked())
-	})
-	t.Run("stacked flags with value", func(t *testing.T) {
+		x.True(v.IsStacked())
+	}))
+	t.Run("stacked flags with value", x.F(func(x x.X) {
 		u := lex.Lex("-foo=bar")
-		require.IsType(t, lex.Flag(""), u)
+		x.IsType(lex.Flag(""), u)
 
 		v := u.(lex.Flag)
-		require.Equal(t, "-foo=bar", v.Raw())
-		require.Equal(t, `-foo="bar"`, v.String())
-		require.Equal(t, "foo", v.Name())
-		require.True(t, v.IsShort())
+		x.Equal("-foo=bar", v.Raw())
+		x.Equal(`-foo="bar"`, v.String())
+		x.Equal("foo", v.Name())
+		x.True(v.IsShort())
 
 		w, ok := v.Arg()
-		require.True(t, ok)
-		require.Equal(t, "bar", w.Raw())
-		require.Equal(t, `"bar"`, w.String())
-	})
-	t.Run("flag contains space", func(t *testing.T) {
+		x.True(ok)
+		x.Equal("bar", w.Raw())
+		x.Equal(`"bar"`, w.String())
+	}))
+	t.Run("flag contains space", x.F(func(x x.X) {
 		u := lex.Lex("--foo=bar baz")
-		require.IsType(t, lex.Flag(""), u)
+		x.IsType(lex.Flag(""), u)
 
 		v := u.(lex.Flag)
-		require.Equal(t, "--foo=bar baz", v.Raw())
-		require.Equal(t, `--foo="bar baz"`, v.String())
-		require.Equal(t, "foo", v.Name())
-		require.False(t, v.IsShort())
+		x.Equal("--foo=bar baz", v.Raw())
+		x.Equal(`--foo="bar baz"`, v.String())
+		x.Equal("foo", v.Name())
+		x.False(v.IsShort())
 
 		w, ok := v.Arg()
-		require.NotNil(t, ok)
-		require.Equal(t, "bar baz", w.Raw())
-		require.Equal(t, `"bar baz"`, w.String())
-	})
-	t.Run("too many dashes", func(t *testing.T) {
+		x.NotNil(ok)
+		x.Equal("bar baz", w.Raw())
+		x.Equal(`"bar baz"`, w.String())
+	}))
+	t.Run("too many dashes", x.F(func(x x.X) {
 		tcs := []string{
 			"---",
 			"----",
@@ -118,11 +118,11 @@ func TestLex(t *testing.T) {
 			t.Log("tc:", tc)
 
 			u := lex.Lex(tc)
-			require.IsType(t, &lex.Err{}, u)
+			x.IsType(&lex.Err{}, u)
 
 			v := u.(*lex.Err)
-			require.Equal(t, tc, v.Raw())
-			require.Contains(t, v.String(), "[!")
+			x.Equal(tc, v.Raw())
+			x.Contains(v.String(), "[!")
 		}
-	})
+	}))
 }

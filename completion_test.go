@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/lesomnus/xli"
-	"github.com/stretchr/testify/require"
+	"github.com/lesomnus/xli/internal/x"
 )
 
 func TestNormalizeCompletionArgs(t *testing.T) {
@@ -101,9 +101,9 @@ func TestNormalizeCompletionArgs(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		t.Run(tc.desc, func(t *testing.T) {
+		t.Run(tc.desc, x.F(func(x x.X) {
 			args := xli.NormalizeCompletionArgs(tc.args, tc.curr, tc.buff)
-			require.Equal(t, tc.expected, args)
-		})
+			x.Equal(tc.expected, args)
+		}))
 	}
 }

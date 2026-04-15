@@ -5,7 +5,7 @@ import (
 
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
-	"github.com/stretchr/testify/require"
+	"github.com/lesomnus/xli/internal/x"
 )
 
 func TestVisit(t *testing.T) {
@@ -15,31 +15,33 @@ func TestVisit(t *testing.T) {
 			&arg.Int{Name: "BAR", Optional: true},
 		},
 	}
-	err := c.Run(t.Context(), []string{"foo"})
-	require.NoError(t, err)
+	t.Run("smoke", x.F(func(x x.X) {
+		err := c.Run(t.Context(), []string{"foo"})
+		x.NoError(err)
+	}))
 
-	t.Run("given", func(t *testing.T) {
+	t.Run("given", x.F(func(x x.X) {
 		v := ""
 		ok := arg.Visit(c, "FOO", func(w string) { v = w })
-		require.True(t, ok)
-		require.Equal(t, "foo", v)
-	})
-	t.Run("not exists", func(t *testing.T) {
+		x.True(ok)
+		x.Equal("foo", v)
+	}))
+	t.Run("not exists", x.F(func(x x.X) {
 		v := ""
 		ok := arg.Visit(c, "QUX", func(w string) { v = w })
-		require.False(t, ok)
-		require.Empty(t, v)
-	})
-	t.Run("wrong type", func(t *testing.T) {
+		x.False(ok)
+		x.Empty(v)
+	}))
+	t.Run("wrong type", x.F(func(x x.X) {
 		ok := arg.Visit(c, "FOO", func(w int) {})
-		require.False(t, ok)
-	})
-	t.Run("not set", func(t *testing.T) {
+		x.False(ok)
+	}))
+	t.Run("not set", x.F(func(x x.X) {
 		v := 0
 		ok := arg.Visit(c, "BAR", func(w int) { v = w })
-		require.False(t, ok)
-		require.Empty(t, v)
-	})
+		x.False(ok)
+		x.Empty(v)
+	}))
 }
 
 func TestVisitP(t *testing.T) {
@@ -48,17 +50,19 @@ func TestVisitP(t *testing.T) {
 			&arg.String{Name: "FOO"},
 		},
 	}
-	err := c.Run(t.Context(), []string{"foo"})
-	require.NoError(t, err)
+	t.Run("smoke", x.F(func(x x.X) {
+		err := c.Run(t.Context(), []string{"foo"})
+		x.NoError(err)
+	}))
 
-	t.Run("given", func(t *testing.T) {
+	t.Run("given", x.F(func(x x.X) {
 		v := ""
 		ok := arg.VisitP(c, "FOO", &v)
-		require.True(t, ok)
-		require.Equal(t, "foo", v)
-	})
-	t.Run("dst is nil", func(t *testing.T) {
+		x.True(ok)
+		x.Equal("foo", v)
+	}))
+	t.Run("dst is nil", x.F(func(x x.X) {
 		ok := arg.VisitP[string](c, "FOO", nil)
-		require.False(t, ok)
-	})
+		x.False(ok)
+	}))
 }

@@ -6,7 +6,7 @@ import (
 
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/flg"
-	"github.com/stretchr/testify/require"
+	"github.com/lesomnus/xli/internal/x"
 )
 
 func TestVisit(t *testing.T) {
@@ -19,40 +19,42 @@ func TestVisit(t *testing.T) {
 			&flg.String{Name: "qux"},
 		},
 	}
-	err := c.Run(t.Context(), []string{"--foo=bar", "--foo", "baz"})
-	require.NoError(t, err)
+	t.Run("smoke", x.F(func(x x.X) {
+		err := c.Run(t.Context(), []string{"--foo=bar", "--foo", "baz"})
+		x.NoError(err)
+	}))
 
-	t.Run("given", func(t *testing.T) {
+	t.Run("given", x.F(func(x x.X) {
 		v := ""
 		ok := flg.Visit(c, "foo", func(w string) { v = w })
-		require.True(t, ok)
-		require.Equal(t, "baz", v)
-	})
-	t.Run("aliased", func(t *testing.T) {
+		x.True(ok)
+		x.Equal("baz", v)
+	}))
+	t.Run("aliased", x.F(func(x x.X) {
 		err := c.Run(t.Context(), []string{"--foo=bar", "-f", "baz"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		v := ""
 		ok := flg.Visit(c, "foo", func(w string) { v = w })
-		require.True(t, ok)
-		require.Equal(t, "baz", v)
-	})
-	t.Run("not exists", func(t *testing.T) {
+		x.True(ok)
+		x.Equal("baz", v)
+	}))
+	t.Run("not exists", x.F(func(x x.X) {
 		v := ""
 		ok := flg.Visit(c, "qux", func(w string) { v = w })
-		require.False(t, ok)
-		require.Empty(t, v)
-	})
-	t.Run("wrong type", func(t *testing.T) {
+		x.False(ok)
+		x.Empty(v)
+	}))
+	t.Run("wrong type", x.F(func(x x.X) {
 		ok := flg.Visit(c, "foo", func(w int) {})
-		require.False(t, ok)
-	})
-	t.Run("not set", func(t *testing.T) {
+		x.False(ok)
+	}))
+	t.Run("not set", x.F(func(x x.X) {
 		v := ""
 		ok := flg.Visit(c, "qux", func(w string) { v = w })
-		require.False(t, ok)
-		require.Empty(t, v)
-	})
+		x.False(ok)
+		x.Empty(v)
+	}))
 }
 
 func TestVisitP(t *testing.T) {
@@ -61,19 +63,21 @@ func TestVisitP(t *testing.T) {
 			&flg.String{Name: "foo"},
 		},
 	}
-	err := c.Run(t.Context(), []string{"--foo=bar", "--foo", "baz"})
-	require.NoError(t, err)
+	t.Run("smoke", x.F(func(x x.X) {
+		err := c.Run(t.Context(), []string{"--foo=bar", "--foo", "baz"})
+		x.NoError(err)
+	}))
 
-	t.Run("given", func(t *testing.T) {
+	t.Run("given", x.F(func(x x.X) {
 		v := ""
 		ok := flg.VisitP(c, "foo", &v)
-		require.True(t, ok)
-		require.Equal(t, "baz", v)
-	})
-	t.Run("dst is nil", func(t *testing.T) {
+		x.True(ok)
+		x.Equal("baz", v)
+	}))
+	t.Run("dst is nil", x.F(func(x x.X) {
 		ok := flg.VisitP[string](c, "foo", nil)
-		require.False(t, ok)
-	})
+		x.False(ok)
+	}))
 }
 
 func TestLookupP(t *testing.T) {
@@ -102,7 +106,7 @@ func TestLookupP(t *testing.T) {
 		}
 	}
 
-	t.Run("exist in current", func(t *testing.T) {
+	t.Run("exist in current", x.F(func(x x.X) {
 		ok := false
 		v := ""
 		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
@@ -111,11 +115,11 @@ func TestLookupP(t *testing.T) {
 		})
 
 		err := c.Run(t.Context(), []string{"a", "b", "--val=foo"})
-		require.NoError(t, err)
-		require.True(t, ok)
-		require.Equal(t, "foo", v)
-	})
-	t.Run("exist in parent", func(t *testing.T) {
+		x.NoError(err)
+		x.True(ok)
+		x.Equal("foo", v)
+	}))
+	t.Run("exist in parent", x.F(func(x x.X) {
 		ok := false
 		v := ""
 		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
@@ -124,11 +128,11 @@ func TestLookupP(t *testing.T) {
 		})
 
 		err := c.Run(t.Context(), []string{"a", "--val=bar", "b"})
-		require.NoError(t, err)
-		require.True(t, ok)
-		require.Equal(t, "bar", v)
-	})
-	t.Run("exist in ancestor", func(t *testing.T) {
+		x.NoError(err)
+		x.True(ok)
+		x.Equal("bar", v)
+	}))
+	t.Run("exist in ancestor", x.F(func(x x.X) {
 		ok := false
 		v := ""
 		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
@@ -137,11 +141,11 @@ func TestLookupP(t *testing.T) {
 		})
 
 		err := c.Run(t.Context(), []string{"--val=baz", "a", "b"})
-		require.NoError(t, err)
-		require.True(t, ok)
-		require.Equal(t, "baz", v)
-	})
-	t.Run("nearest one", func(t *testing.T) {
+		x.NoError(err)
+		x.True(ok)
+		x.Equal("baz", v)
+	}))
+	t.Run("nearest one", x.F(func(x x.X) {
 		ok := false
 		v := ""
 		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
@@ -150,11 +154,11 @@ func TestLookupP(t *testing.T) {
 		})
 
 		err := c.Run(t.Context(), []string{"--val=baz", "a", "b", "--val=foo"})
-		require.NoError(t, err)
-		require.True(t, ok)
-		require.Equal(t, "foo", v)
-	})
-	t.Run("not exist", func(t *testing.T) {
+		x.NoError(err)
+		x.True(ok)
+		x.Equal("foo", v)
+	}))
+	t.Run("not exist", x.F(func(x x.X) {
 		ok := false
 		c := make_cmd(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			ok = flg.Lookup(cmd, "val", func(w string) {})
@@ -162,7 +166,7 @@ func TestLookupP(t *testing.T) {
 		})
 
 		err := c.Run(t.Context(), []string{"a", "b"})
-		require.NoError(t, err)
-		require.False(t, ok)
-	})
+		x.NoError(err)
+		x.False(ok)
+	}))
 }

@@ -6,15 +6,15 @@ import (
 
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/frm"
-	"github.com/stretchr/testify/require"
+	"github.com/lesomnus/xli/internal/x"
 )
 
 func TestRequireSubcommand(t *testing.T) {
-	make_cmd := func() (*xli.Command, *[]string) {
+	make_cmd := func(x x.X) (*xli.Command, *[]string) {
 		trace := []string{}
 		handler := xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			f := frm.From(ctx)
-			require.NotNil(t, f.Cmd())
+			x.NotNil(f.Cmd())
 
 			name := f.Cmd().GetName()
 			trace = append(trace, name)
@@ -39,18 +39,18 @@ func TestRequireSubcommand(t *testing.T) {
 		return c, &trace
 	}
 
-	t.Run("ok", func(t *testing.T) {
-		c, trace := make_cmd()
+	t.Run("ok", x.F(func(x x.X) {
+		c, trace := make_cmd(x)
 
 		err := c.Run(t.Context(), []string{"bar"})
-		require.NoError(t, err)
-		require.Equal(t, *trace, []string{"foo", "bar"})
-	})
-	t.Run("no subcommand", func(t *testing.T) {
-		c, trace := make_cmd()
+		x.NoError(err)
+		x.Equal(*trace, []string{"foo", "bar"})
+	}))
+	t.Run("no subcommand", x.F(func(x x.X) {
+		c, trace := make_cmd(x)
 
 		err := c.Run(t.Context(), nil)
-		require.ErrorContains(t, err, "required")
-		require.Equal(t, *trace, []string{"foo"})
-	})
+		x.ErrorContains(err, "required")
+		x.Equal(*trace, []string{"foo"})
+	}))
 }

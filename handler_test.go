@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/lesomnus/xli"
-	"github.com/stretchr/testify/require"
+	"github.com/lesomnus/xli/internal/x"
 )
 
 func TestHandler(t *testing.T) {
@@ -35,36 +35,36 @@ func TestHandler(t *testing.T) {
 		}
 	}
 
-	t.Run("run root command", func(t *testing.T) {
+	t.Run("run root command", x.F(func(x x.X) {
 		vs := []string{}
 		c := new_c(&vs)
 
 		err := c.Run(t.Context(), nil)
-		require.NoError(t, err)
-		require.Equal(t, []string{"root-run"}, vs)
-	})
-	t.Run("help root command", func(t *testing.T) {
+		x.NoError(err)
+		x.Equal([]string{"root-run"}, vs)
+	}))
+	t.Run("help root command", x.F(func(x x.X) {
 		vs := []string{}
 		c := new_c(&vs)
 
 		err := c.Run(t.Context(), []string{"--help"})
-		require.NoError(t, err)
-		require.Equal(t, []string{"root-help"}, vs)
-	})
-	t.Run("run subcommand", func(t *testing.T) {
+		x.NoError(err)
+		x.Equal([]string{"root-help"}, vs)
+	}))
+	t.Run("run subcommand", x.F(func(x x.X) {
 		vs := []string{}
 		c := new_c(&vs)
 
 		err := c.Run(t.Context(), []string{"foo"})
-		require.NoError(t, err)
-		require.Equal(t, []string{"root-pass", "foo-run"}, vs)
-	})
-	t.Run("help subcommand", func(t *testing.T) {
+		x.NoError(err)
+		x.Equal([]string{"root-pass", "foo-run"}, vs)
+	}))
+	t.Run("help subcommand", x.F(func(x x.X) {
 		vs := []string{}
 		c := new_c(&vs)
 
 		err := c.Run(t.Context(), []string{"foo", "--help"})
-		require.NoError(t, err)
-		require.Equal(t, []string{"foo-help"}, vs)
-	})
+		x.NoError(err)
+		x.Equal([]string{"foo-help"}, vs)
+	}))
 }

@@ -13,8 +13,8 @@ import (
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/frm"
+	"github.com/lesomnus/xli/internal/x"
 	"github.com/lesomnus/xli/mode"
-	"github.com/stretchr/testify/require"
 )
 
 func TestFrameParseSwitches(t *testing.T) {
@@ -26,44 +26,44 @@ func TestFrameParseSwitches(t *testing.T) {
 		}
 	}
 
-	t.Run("switch on", func(t *testing.T) {
+	t.Run("switch on", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), []string{"--foo"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		v := c.Flags.Get("foo").(*flg.Switch)
-		require.NotNil(t, v)
-		require.Equal(t, true, *v.Value)
-	})
-	t.Run("switch off", func(t *testing.T) {
+		x.NotNil(v)
+		x.Equal(true, *v.Value)
+	}))
+	t.Run("switch off", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), nil)
-		require.NoError(t, err)
+		x.NoError(err)
 
 		v := c.Flags.Get("foo").(*flg.Switch)
-		require.NotNil(t, v)
+		x.NotNil(v)
 
 		// Note that value is nil since the flag is not given
-		require.Nil(t, v.Value)
-	})
-	t.Run("switch with true", func(t *testing.T) {
+		x.Nil(v.Value)
+	}))
+	t.Run("switch with true", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), []string{"--foo=true"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		v := c.Flags.Get("foo").(*flg.Switch)
-		require.NotNil(t, v)
-		require.Equal(t, true, *v.Value)
-	})
-	t.Run("switch with false", func(t *testing.T) {
+		x.NotNil(v)
+		x.Equal(true, *v.Value)
+	}))
+	t.Run("switch with false", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), []string{"--foo=false"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		v := c.Flags.Get("foo").(*flg.Switch)
-		require.NotNil(t, v)
-		require.Equal(t, false, *v.Value)
-	})
+		x.NotNil(v)
+		x.Equal(false, *v.Value)
+	}))
 }
 
 func TestFrameParseFlags(t *testing.T) {
@@ -76,46 +76,46 @@ func TestFrameParseFlags(t *testing.T) {
 		}
 	}
 
-	t.Run("flag with value", func(t *testing.T) {
+	t.Run("flag with value", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), []string{"--foo", "bar"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		v := c.Flags.Get("foo").(*flg.String)
-		require.NotNil(t, v)
-		require.Equal(t, "bar", *v.Value)
-	})
-	t.Run("flag with value in single arg", func(t *testing.T) {
+		x.NotNil(v)
+		x.Equal("bar", *v.Value)
+	}))
+	t.Run("flag with value in single arg", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), []string{"--foo=bar"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		v := c.Flags.Get("foo").(*flg.String)
-		require.NotNil(t, v)
-		require.Equal(t, "bar", *v.Value)
-	})
-	t.Run("flag with no value", func(t *testing.T) {
+		x.NotNil(v)
+		x.Equal("bar", *v.Value)
+	}))
+	t.Run("flag with no value", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), []string{"--foo"})
-		require.ErrorContains(t, err, "--foo: no value is given")
-	})
-	t.Run("flag with no value but flag", func(t *testing.T) {
+		x.ErrorContains(err, "--foo: no value is given")
+	}))
+	t.Run("flag with no value but flag", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), []string{"--foo", "--bar", "baz"})
-		require.ErrorContains(t, err, "--foo: no value is given")
-	})
-	t.Run("invalid flag syntax", func(t *testing.T) {
+		x.ErrorContains(err, "--foo: no value is given")
+	}))
+	t.Run("invalid flag syntax", x.F(func(x x.X) {
 		c := new_cmd()
 		err := c.Run(t.Context(), []string{
 			"---foo=a",
 			"--bar=b",
 		})
-		require.ErrorContains(t, err, "too many dashes: ---foo=a")
-	})
+		x.ErrorContains(err, "too many dashes: ---foo=a")
+	}))
 }
 
 func TestFrameParseArgs(t *testing.T) {
-	t.Run("arg", func(t *testing.T) {
+	t.Run("arg", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "FOO"},
@@ -123,13 +123,13 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		v := c.Args.Get("FOO").(*arg.String)
-		require.NotNil(t, v)
-		require.Equal(t, "foo", *v.Value)
-	})
-	t.Run("args", func(t *testing.T) {
+		x.NotNil(v)
+		x.Equal("foo", *v.Value)
+	}))
+	t.Run("args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "FOO"},
@@ -139,21 +139,21 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo", "bar", "baz"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		foo := c.Args.Get("FOO").(*arg.String)
-		require.NotNil(t, foo)
-		require.Equal(t, "foo", *foo.Value)
+		x.NotNil(foo)
+		x.Equal("foo", *foo.Value)
 
 		bar := c.Args.Get("BAR").(*arg.String)
-		require.NotNil(t, bar)
-		require.Equal(t, "bar", *bar.Value)
+		x.NotNil(bar)
+		x.Equal("bar", *bar.Value)
 
 		baz := c.Args.Get("BAZ").(*arg.String)
-		require.NotNil(t, baz)
-		require.Equal(t, "baz", *baz.Value)
-	})
-	t.Run("extra args", func(t *testing.T) {
+		x.NotNil(baz)
+		x.Equal("baz", *baz.Value)
+	}))
+	t.Run("extra args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "FOO"},
@@ -162,9 +162,9 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo", "bar", "baz", "qux"})
-		require.ErrorContains(t, err, `baz: too many arguments`)
-	})
-	t.Run("extra args with --help", func(t *testing.T) {
+		x.ErrorContains(err, `baz: too many arguments`)
+	}))
+	t.Run("extra args with --help", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "FOO"},
@@ -173,9 +173,9 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"--help", "foo", "bar", "baz", "qux"})
-		require.NoError(t, err)
-	})
-	t.Run("less args", func(t *testing.T) {
+		x.NoError(err)
+	}))
+	t.Run("less args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "FOO"},
@@ -184,9 +184,9 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo"})
-		require.ErrorContains(t, err, `"BAR": required argument not given`)
-	})
-	t.Run("less args with --help", func(t *testing.T) {
+		x.ErrorContains(err, `"BAR": required argument not given`)
+	}))
+	t.Run("less args with --help", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "FOO"},
@@ -195,9 +195,9 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"--help", "foo"})
-		require.NoError(t, err)
-	})
-	t.Run("optional", func(t *testing.T) {
+		x.NoError(err)
+	}))
+	t.Run("optional", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "BAR", Optional: true},
@@ -205,12 +205,12 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), nil)
-		require.NoError(t, err)
+		x.NoError(err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
-		require.Nil(t, bar)
-	})
-	t.Run("multiple optional", func(t *testing.T) {
+		x.Nil(bar)
+	}))
+	t.Run("multiple optional", x.F(func(x x.X) {
 		// TODO: test BAZ is parsed when if BAR parses 0 arguments.
 		c := &xli.Command{
 			Args: arg.Args{
@@ -221,16 +221,16 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), nil)
-		require.NoError(t, err)
+		x.NoError(err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
-		require.Nil(t, bar)
+		x.Nil(bar)
 		baz := c.Args.Get("BAZ").(*arg.String).Value
-		require.Nil(t, baz)
+		x.Nil(baz)
 		qux := c.Args.Get("QUX").(*arg.String).Value
-		require.Nil(t, qux)
-	})
-	t.Run("optional with optional remains with no args", func(t *testing.T) {
+		x.Nil(qux)
+	}))
+	t.Run("optional with optional remains with no args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "BAR", Optional: true},
@@ -239,14 +239,14 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), nil)
-		require.NoError(t, err)
+		x.NoError(err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
-		require.Nil(t, bar)
+		x.Nil(bar)
 		baz := c.Args.Get("BAZ").(*arg.Remains).Value
-		require.Nil(t, baz)
-	})
-	t.Run("optional with optional remains with arg and remain args", func(t *testing.T) {
+		x.Nil(baz)
+	}))
+	t.Run("optional with optional remains with arg and remain args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "BAR", Optional: true},
@@ -255,18 +255,18 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"bar", "--", "baz", "qux"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
-		require.NotNil(t, bar)
-		require.Equal(t, "bar", *bar)
+		x.NotNil(bar)
+		x.Equal("bar", *bar)
 
 		baz := c.Args.Get("BAZ").(*arg.Remains).Value
-		require.NotNil(t, baz)
-		require.NotNil(t, *baz)
-		require.Equal(t, []string{"baz", "qux"}, *baz)
-	})
-	t.Run("optional with optional remains with remain args", func(t *testing.T) {
+		x.NotNil(baz)
+		x.NotNil(*baz)
+		x.Equal([]string{"baz", "qux"}, *baz)
+	}))
+	t.Run("optional with optional remains with remain args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "BAR", Optional: true},
@@ -275,16 +275,16 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"--", "baz", "qux"})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
-		require.Nil(t, bar)
+		x.Nil(bar)
 		baz := c.Args.Get("BAZ").(*arg.Remains).Value
-		require.NotNil(t, baz)
-		require.NotNil(t, *baz)
-		require.Equal(t, []string{"baz", "qux"}, *baz)
-	})
-	t.Run("optional after required", func(t *testing.T) {
+		x.NotNil(baz)
+		x.NotNil(*baz)
+		x.Equal([]string{"baz", "qux"}, *baz)
+	}))
+	t.Run("optional after required", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "FOO"},
@@ -293,13 +293,13 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo"})
-		require.NoError(t, err)
-		require.Equal(t, "foo", *c.Args.Get("FOO").(*arg.String).Value)
+		x.NoError(err)
+		x.Equal("foo", *c.Args.Get("FOO").(*arg.String).Value)
 
 		bar := c.Args.Get("BAR").(*arg.String).Value
-		require.Nil(t, bar)
-	})
-	t.Run("consume many", func(t *testing.T) {
+		x.Nil(bar)
+	}))
+	t.Run("consume many", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.String{Name: "FOO"},
@@ -308,16 +308,16 @@ func TestFrameParseArgs(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo", "bar", "baz", "qux"})
-		require.NoError(t, err)
-		require.Equal(t, "foo", *c.Args.Get("FOO").(*arg.String).Value)
+		x.NoError(err)
+		x.Equal("foo", *c.Args.Get("FOO").(*arg.String).Value)
 
 		bar := c.Args.Get("BAR").(*arg.RestStrings).Value
-		require.Equal(t, []string{"bar", "baz", "qux"}, bar)
-	})
+		x.Equal([]string{"bar", "baz", "qux"}, bar)
+	}))
 }
 
 func TestFrameParseEndOfCommands(t *testing.T) {
-	t.Run("remains", func(t *testing.T) {
+	t.Run("remains", x.F(func(x x.X) {
 		c := &xli.Command{
 			Args: arg.Args{
 				&arg.Remains{Name: "FOO"},
@@ -325,10 +325,10 @@ func TestFrameParseEndOfCommands(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"--", "foo", "bar", "baz"})
-		require.NoError(t, err)
-		require.Equal(t, []string{"foo", "bar", "baz"}, *c.Args.Get("FOO").(*arg.Remains).Value)
-	})
-	t.Run("remains after flags and args", func(t *testing.T) {
+		x.NoError(err)
+		x.Equal([]string{"foo", "bar", "baz"}, *c.Args.Get("FOO").(*arg.Remains).Value)
+	}))
+	t.Run("remains after flags and args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Flags: flg.Flags{
 				&flg.String{Name: "foo"},
@@ -347,13 +347,13 @@ func TestFrameParseEndOfCommands(t *testing.T) {
 			"foo", "bar",
 			"--", "baz1", "baz2", "baz3",
 		})
-		require.NoError(t, err)
-		require.Equal(t, []string{"baz1", "baz2", "baz3"}, *c.Args.Get("BAZ").(*arg.Remains).Value)
-	})
+		x.NoError(err)
+		x.Equal([]string{"baz1", "baz2", "baz3"}, *c.Args.Get("BAZ").(*arg.Remains).Value)
+	}))
 }
 
 func TestFrameParseComposite(t *testing.T) {
-	t.Run("switches and flags", func(t *testing.T) {
+	t.Run("switches and flags", x.F(func(x x.X) {
 		c := &xli.Command{
 			Flags: flg.Flags{
 				&flg.Switch{Name: "foo"},
@@ -369,25 +369,25 @@ func TestFrameParseComposite(t *testing.T) {
 			"--bar=false",
 			"--qux=b",
 		})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		foo := c.Flags.Get("foo").(*flg.Switch)
-		require.NotNil(t, foo)
-		require.Equal(t, true, *foo.Value)
+		x.NotNil(foo)
+		x.Equal(true, *foo.Value)
 
 		bar := c.Flags.Get("bar").(*flg.Switch)
-		require.NotNil(t, bar)
-		require.Equal(t, false, *bar.Value)
+		x.NotNil(bar)
+		x.Equal(false, *bar.Value)
 
 		baz := c.Flags.Get("baz").(*flg.String)
-		require.NotNil(t, baz)
-		require.Equal(t, "a", *baz.Value)
+		x.NotNil(baz)
+		x.Equal("a", *baz.Value)
 
 		qux := c.Flags.Get("qux").(*flg.String)
-		require.NotNil(t, qux)
-		require.Equal(t, "b", *qux.Value)
-	})
-	t.Run("switches, flags, and args", func(t *testing.T) {
+		x.NotNil(qux)
+		x.Equal("b", *qux.Value)
+	}))
+	t.Run("switches, flags, and args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Flags: flg.Flags{
 				&flg.Switch{Name: "foo"},
@@ -405,25 +405,25 @@ func TestFrameParseComposite(t *testing.T) {
 			"baz",
 			"qux",
 		})
-		require.NoError(t, err)
+		x.NoError(err)
 
 		foo := c.Flags.Get("foo").(*flg.Switch)
-		require.NotNil(t, foo)
-		require.Equal(t, true, *foo.Value)
+		x.NotNil(foo)
+		x.Equal(true, *foo.Value)
 
 		bar := c.Flags.Get("bar").(*flg.String)
-		require.NotNil(t, bar)
-		require.Equal(t, "a", *bar.Value)
+		x.NotNil(bar)
+		x.Equal("a", *bar.Value)
 
 		baz := c.Args.Get("BAZ").(*arg.String)
-		require.NotNil(t, baz)
-		require.Equal(t, "baz", *baz.Value)
+		x.NotNil(baz)
+		x.Equal("baz", *baz.Value)
 
 		qux := c.Args.Get("QUX").(*arg.String)
-		require.NotNil(t, qux)
-		require.Equal(t, "qux", *qux.Value)
-	})
-	t.Run("flag in the middle of args", func(t *testing.T) {
+		x.NotNil(qux)
+		x.Equal("qux", *qux.Value)
+	}))
+	t.Run("flag in the middle of args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Flags: flg.Flags{
 				&flg.String{Name: "foo"},
@@ -441,10 +441,10 @@ func TestFrameParseComposite(t *testing.T) {
 			"--bar", "b",
 			"qux",
 		})
-		require.ErrorContains(t, err, "flags are must be set at the behind")
-		require.ErrorContains(t, err, "--bar")
-	})
-	t.Run("flag with value in single arg in the middle of args", func(t *testing.T) {
+		x.ErrorContains(err, "flags are must be set at the behind")
+		x.ErrorContains(err, "--bar")
+	}))
+	t.Run("flag with value in single arg in the middle of args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Flags: flg.Flags{
 				&flg.String{Name: "foo"},
@@ -462,10 +462,10 @@ func TestFrameParseComposite(t *testing.T) {
 			"--bar=b",
 			"qux",
 		})
-		require.ErrorContains(t, err, "flags are must be set at the behind")
-		require.ErrorContains(t, err, `--bar="b"`)
-	})
-	t.Run("subcommand with switches, flags, and args", func(t *testing.T) {
+		x.ErrorContains(err, "flags are must be set at the behind")
+		x.ErrorContains(err, `--bar="b"`)
+	}))
+	t.Run("subcommand with switches, flags, and args", x.F(func(x x.X) {
 		c := &xli.Command{
 			Flags: flg.Flags{
 				&flg.Switch{Name: "switch"},
@@ -508,25 +508,25 @@ func TestFrameParseComposite(t *testing.T) {
 			"foo", "--switch_1", "--flag_1=flag_1", "foo_1", "bar_1",
 			"bar", "--switch_a", "--flag_a=flag_a", "foo_a", "bar_a",
 		})
-		require.NoError(t, err)
-		require.Equal(t, true, *c.Flags.Get("switch").(*flg.Switch).Value)
-		require.Equal(t, "flag", *c.Flags.Get("flag").(*flg.String).Value)
-		require.Equal(t, "foo", *c.Args.Get("FOO").(*arg.String).Value)
-		require.Equal(t, "bar", *c.Args.Get("BAR").(*arg.String).Value)
+		x.NoError(err)
+		x.Equal(true, *c.Flags.Get("switch").(*flg.Switch).Value)
+		x.Equal("flag", *c.Flags.Get("flag").(*flg.String).Value)
+		x.Equal("foo", *c.Args.Get("FOO").(*arg.String).Value)
+		x.Equal("bar", *c.Args.Get("BAR").(*arg.String).Value)
 
 		foo := c.Commands.Get("foo")
-		require.Equal(t, true, *foo.Flags.Get("switch_1").(*flg.Switch).Value)
-		require.Equal(t, "flag_1", *foo.Flags.Get("flag_1").(*flg.String).Value)
-		require.Equal(t, "foo_1", *foo.Args.Get("FOO_1").(*arg.String).Value)
-		require.Equal(t, "bar_1", *foo.Args.Get("BAR_1").(*arg.String).Value)
+		x.Equal(true, *foo.Flags.Get("switch_1").(*flg.Switch).Value)
+		x.Equal("flag_1", *foo.Flags.Get("flag_1").(*flg.String).Value)
+		x.Equal("foo_1", *foo.Args.Get("FOO_1").(*arg.String).Value)
+		x.Equal("bar_1", *foo.Args.Get("BAR_1").(*arg.String).Value)
 
 		bar := foo.Commands.Get("bar")
-		require.Equal(t, true, *bar.Flags.Get("switch_a").(*flg.Switch).Value)
-		require.Equal(t, "flag_a", *bar.Flags.Get("flag_a").(*flg.String).Value)
-		require.Equal(t, "foo_a", *bar.Args.Get("FOO_a").(*arg.String).Value)
-		require.Equal(t, "bar_a", *bar.Args.Get("BAR_a").(*arg.String).Value)
-	})
-	t.Run("remains after flags, args, and subcommand", func(t *testing.T) {
+		x.Equal(true, *bar.Flags.Get("switch_a").(*flg.Switch).Value)
+		x.Equal("flag_a", *bar.Flags.Get("flag_a").(*flg.String).Value)
+		x.Equal("foo_a", *bar.Args.Get("FOO_a").(*arg.String).Value)
+		x.Equal("bar_a", *bar.Args.Get("BAR_a").(*arg.String).Value)
+	}))
+	t.Run("remains after flags, args, and subcommand", x.F(func(x x.X) {
 		c := &xli.Command{
 			Flags: flg.Flags{
 				&flg.String{Name: "foo"},
@@ -556,12 +556,14 @@ func TestFrameParseComposite(t *testing.T) {
 			"foo", "--foo=foo", "--bar", "bar", "foo", "bar",
 			"--", "baz1", "baz2", "baz3",
 		})
-		require.NoError(t, err)
-		require.Equal(t, []string{"baz1", "baz2", "baz3"}, *c.Commands.Get("foo").Args.Get("BAZ").(*arg.Remains).Value)
-	})
+		x.NoError(err)
+		x.Equal([]string{"baz1", "baz2", "baz3"}, *c.Commands.Get("foo").Args.Get("BAZ").(*arg.Remains).Value)
+	}))
 }
 
 func TestFrameMode(t *testing.T) {
+	x := x.New(t)
+
 	ms := []mode.Mode{}
 	append_mode := xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 		m := mode.From(ctx)
@@ -586,8 +588,8 @@ func TestFrameMode(t *testing.T) {
 	}
 
 	err := c.Run(t.Context(), []string{"foo", "bar"})
-	require.NoError(t, err)
-	require.Equal(t, []mode.Mode{
+	x.NoError(err)
+	x.Equal([]mode.Mode{
 		mode.Run | mode.Pass,
 		mode.Run | mode.Pass,
 		mode.Run,
@@ -595,8 +597,8 @@ func TestFrameMode(t *testing.T) {
 
 	ms = []mode.Mode{}
 	err = c.Run(t.Context(), []string{"foo", "bar", "--help"})
-	require.NoError(t, err)
-	require.Equal(t, []mode.Mode{
+	x.NoError(err)
+	x.Equal([]mode.Mode{
 		mode.Help | mode.Pass,
 		mode.Help | mode.Pass,
 		mode.Help,
@@ -604,10 +606,12 @@ func TestFrameMode(t *testing.T) {
 }
 
 func TestFrameAccess(t *testing.T) {
+	x := x.New(t)
+
 	trace := []string{}
 	handler := xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 		f := frm.From(ctx)
-		require.NotNil(t, f.Cmd())
+		x.NotNil(f.Cmd())
 
 		name := f.Cmd().GetName()
 		trace = append(trace, name)
@@ -619,7 +623,7 @@ func TestFrameAccess(t *testing.T) {
 		Name: "foo",
 		Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			f := frm.From(ctx)
-			require.True(t, frm.HasSeq(f, "foo", "bar", "baz"))
+			x.True(frm.HasSeq(f, "foo", "bar", "baz"))
 
 			return handler.Handle(ctx, cmd, next)
 		}),
@@ -638,28 +642,28 @@ func TestFrameAccess(t *testing.T) {
 	}
 
 	err := c.Run(t.Context(), []string{"bar", "baz"})
-	require.NoError(t, err)
-	require.Equal(t, trace, []string{"foo", "bar", "baz"})
+	x.NoError(err)
+	x.Equal(trace, []string{"foo", "bar", "baz"})
 }
 
 func TestFrameIos(t *testing.T) {
-	t.Run("use standard one if nil", func(t *testing.T) {
+	t.Run("use standard one if nil", x.F(func(x x.X) {
 		ok := false
 		c := &xli.Command{
 			Handler: xli.Handle(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 				ok = true
-				require.Same(t, cmd.ReadCloser, os.Stdin)
-				require.Same(t, cmd.Writer, os.Stdout)
-				require.Same(t, cmd.ErrWriter, os.Stderr)
+				x.Same(cmd.ReadCloser, os.Stdin)
+				x.Same(cmd.Writer, os.Stdout)
+				x.Same(cmd.ErrWriter, os.Stderr)
 				return next(ctx)
 			}),
 		}
 
 		err := c.Run(t.Context(), nil)
-		require.NoError(t, err)
-		require.True(t, ok)
-	})
-	t.Run("inherit", func(t *testing.T) {
+		x.NoError(err)
+		x.True(ok)
+	}))
+	t.Run("inherit", x.F(func(x x.X) {
 		i := bytes.NewReader([]byte("royale\nwith\ncheese"))
 		o := &bytes.Buffer{}
 		e := &bytes.Buffer{}
@@ -694,8 +698,8 @@ func TestFrameIos(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo"})
-		require.NoError(t, err)
-		require.Equal(t, "royale\ncheese\n", o.String())
-		require.Equal(t, "with\n", e.String())
-	})
+		x.NoError(err)
+		x.Equal("royale\ncheese\n", o.String())
+		x.Equal("with\n", e.String())
+	}))
 }

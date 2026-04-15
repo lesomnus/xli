@@ -4,22 +4,22 @@ import (
 	"testing"
 
 	"github.com/lesomnus/xli/arg"
-	"github.com/stretchr/testify/require"
+	"github.com/lesomnus/xli/internal/x"
 )
 
 func TestRest(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
+	t.Run("empty", x.F(func(x x.X) {
 		p := arg.RestStrings{}.Parser
 		vs, n, err := p.Parse([]string{})
-		require.NoError(t, err)
-		require.Zero(t, n)
-		require.Empty(t, vs)
-	})
-	t.Run("values", func(t *testing.T) {
+		x.NoError(err)
+		x.Zero(n)
+		x.Empty(vs)
+	}))
+	t.Run("values", x.F(func(x x.X) {
 		p := arg.RestStrings{}.Parser
 		vs, n, err := p.Parse([]string{"foo", "bar", "baz"})
-		require.NoError(t, err)
-		require.Equal(t, 3, n)
-		require.Equal(t, []string{"foo", "bar", "baz"}, vs)
-	})
+		x.NoError(err)
+		x.Equal(3, n)
+		x.Equal([]string{"foo", "bar", "baz"}, vs)
+	}))
 }

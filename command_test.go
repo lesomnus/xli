@@ -8,7 +8,7 @@ import (
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
-	"github.com/stretchr/testify/require"
+	"github.com/lesomnus/xli/internal/x"
 )
 
 func TestCommandExecutionOrder(t *testing.T) {
@@ -34,13 +34,13 @@ func TestCommandExecutionOrder(t *testing.T) {
 		})
 	}
 
-	t.Run("empty", func(t *testing.T) {
+	t.Run("empty", x.F(func(x x.X) {
 		c := &xli.Command{}
 
 		err := c.Run(t.Context(), nil)
-		require.NoError(t, err)
-	})
-	t.Run("flags", func(t *testing.T) {
+		x.NoError(err)
+	}))
+	t.Run("flags", x.F(func(x x.X) {
 		vs := []string{}
 		c := &xli.Command{
 			Flags: flg.Flags{
@@ -50,10 +50,10 @@ func TestCommandExecutionOrder(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"--foo=a", "--bar=b"})
-		require.NoError(t, err)
-		require.Equal(t, []string{"foo", "bar"}, vs)
-	})
-	t.Run("args", func(t *testing.T) {
+		x.NoError(err)
+		x.Equal([]string{"foo", "bar"}, vs)
+	}))
+	t.Run("args", x.F(func(x x.X) {
 		vs := []string{}
 		c := &xli.Command{
 			Args: arg.Args{
@@ -63,10 +63,10 @@ func TestCommandExecutionOrder(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"a", "b"})
-		require.NoError(t, err)
-		require.Equal(t, []string{"foo", "bar"}, vs)
-	})
-	t.Run("subcommands", func(t *testing.T) {
+		x.NoError(err)
+		x.Equal([]string{"foo", "bar"}, vs)
+	}))
+	t.Run("subcommands", x.F(func(x x.X) {
 		vs := []string{}
 		c := &xli.Command{
 			Commands: xli.Commands{
@@ -87,10 +87,10 @@ func TestCommandExecutionOrder(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo", "bar"})
-		require.ErrorContains(t, err, "bar-err")
-		require.Equal(t, []string{"bar"}, vs)
-	})
-	t.Run("composite", func(t *testing.T) {
+		x.ErrorContains(err, "bar-err")
+		x.Equal([]string{"bar"}, vs)
+	}))
+	t.Run("composite", x.F(func(x x.X) {
 		vs := []string{}
 		c := &xli.Command{
 			Commands: xli.Commands{
@@ -116,10 +116,10 @@ func TestCommandExecutionOrder(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo", "--foo=a", "--bar=b", "c", "d", "bar"})
-		require.ErrorContains(t, err, "bar-err")
-		require.Equal(t, []string{"f-foo", "f-bar", "a-foo", "a-bar", "foo", "bar"}, vs)
-	})
-	t.Run("help before subcommand", func(t *testing.T) {
+		x.ErrorContains(err, "bar-err")
+		x.Equal([]string{"f-foo", "f-bar", "a-foo", "a-bar", "foo", "bar"}, vs)
+	}))
+	t.Run("help before subcommand", x.F(func(x x.X) {
 		vs := []string{}
 		c := &xli.Command{
 			Commands: xli.Commands{
@@ -137,7 +137,7 @@ func TestCommandExecutionOrder(t *testing.T) {
 		}
 
 		err := c.Run(t.Context(), []string{"foo", "--help", "bar"})
-		require.NoError(t, err)
-		require.Equal(t, []string{"foo"}, vs)
-	})
+		x.NoError(err)
+		x.Equal([]string{"foo"}, vs)
+	}))
 }
