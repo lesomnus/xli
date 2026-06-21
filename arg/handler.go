@@ -55,12 +55,15 @@ func OnExact[T any](m mode.Mode, f HandlerFunc[T]) Handler[T] {
 func OnHelp[T any](f HandlerFunc[T]) Handler[T]     { return OnExact(mode.Help, f) }
 func OnRun[T any](f HandlerFunc[T]) Handler[T]      { return OnExact(mode.Run, f) }
 func OnHelpPass[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Help|mode.Pass, f) }
-func OnTapPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Tab|mode.Pass, f) }
+func OnTabPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Tab|mode.Pass, f) }
 func OnRunPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Run|mode.Pass, f) }
+
+// Deprecated: use OnTabPass. "Tap" was a typo for the Tab (completion) mode.
+func OnTapPass[T any](f HandlerFunc[T]) Handler[T] { return OnTabPass(f) }
 
 type TabHandlerFunc[T any] func(ctx context.Context, tab tab.Tab)
 
-func OnTap[T any](f TabHandlerFunc[T]) Handler[T] {
+func OnTab[T any](f TabHandlerFunc[T]) Handler[T] {
 	return OnExact(mode.Tab, func(ctx context.Context, v T) error {
 		t := tab.From(ctx)
 		if t != nil {
@@ -70,3 +73,6 @@ func OnTap[T any](f TabHandlerFunc[T]) Handler[T] {
 		return nil
 	})
 }
+
+// Deprecated: use OnTab. "Tap" was a typo for the Tab (completion) mode.
+func OnTap[T any](f TabHandlerFunc[T]) Handler[T] { return OnTab(f) }

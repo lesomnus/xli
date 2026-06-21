@@ -1,6 +1,7 @@
 package xli_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -25,5 +26,22 @@ func TestCountdown(t *testing.T) {
 			2 * time.Second,
 			1 * time.Second,
 		}, ts)
+	}))
+	t.Run("returns true when until finishes", x.F(func(x x.X) {
+		v := xli.Countdown(t.Context(), time.Hour, func() {}, func(remain time.Duration) bool {
+			return true
+		})
+		x.True(v)
+	}))
+	t.Run("returns false when context is cancelled", x.F(func(x x.X) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		block := make(chan struct{})
+		v := xli.Countdown(ctx, time.Hour, func() { <-block }, func(remain time.Duration) bool {
+			return true
+		})
+		x.False(v)
+		close(block)
 	}))
 }

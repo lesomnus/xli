@@ -145,8 +145,8 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 
 			if w == nil {
 				return f, &FlagError{v, ErrUnknownFlag}
-			} else if _, ok := w.(*flg.Switch); ok {
-				// Flag is a switch
+			} else if w.NoValue() {
+				// Flag is a switch and does not consume a value.
 				if _, ok := v.Arg(); !ok {
 					v = v.WithArg("true")
 				}
@@ -245,7 +245,7 @@ func (f *frame) prepare(ctx context.Context) error {
 				break
 			}
 
-			panic(fmt.Sprintf("parse failed: argument not given: %q", h.Info().Name))
+			return fmt.Errorf("%w: %q", ErrNeedArgs, h.Info().Name)
 		}
 
 		// Parser can consume multiple arguments.
@@ -273,7 +273,7 @@ func (f *frame) prepare(ctx context.Context) error {
 					h_(ctx)
 				}
 			} else if !h.IsOptional() {
-				panic(fmt.Sprintf("parse failed: argument not given: %q", h.Info().Name))
+				return fmt.Errorf("%w: %q", ErrNeedArgs, h.Info().Name)
 			}
 		}
 	}

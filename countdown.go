@@ -38,6 +38,4 @@ func Countdown(ctx context.Context, d time.Duration, until func(), tick func(rem
 			}
 		}
 	}
-
-	return false
 }

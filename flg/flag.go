@@ -30,6 +30,11 @@ type Flag interface {
 
 	Count() int
 	Default() (string, bool)
+
+	// NoValue reports whether the flag is a switch that does not consume a
+	// value (e.g. a boolean switch). Such flags default to "true" when given
+	// without an explicit value.
+	NoValue() bool
 }
 
 type Flags []Flag

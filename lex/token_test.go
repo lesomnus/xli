@@ -83,4 +83,38 @@ func TestFlagSpread(t *testing.T) {
 		x.Equal("--foo", vs[0].Raw())
 		x.Equal("foo", vs[0].Name())
 	}))
+	t.Run("single short flag keeps its dash", x.F(func(x x.X) {
+		v := lex.Flag("-b")
+		vs := v.Spread()
+		x.Len(vs, 1)
+		x.Equal("-b", vs[0].Raw())
+		x.Equal("b", vs[0].Name())
+	}))
+	t.Run("single short flag with value", x.F(func(x x.X) {
+		v := lex.Flag("-b=foo")
+		vs := v.Spread()
+		x.Len(vs, 1)
+		x.Equal("-b=foo", vs[0].Raw())
+		x.Equal("b", vs[0].Name())
+
+		w, ok := vs[0].Arg()
+		x.True(ok)
+		x.Equal("foo", w.Raw())
+	}))
+}
+
+func TestFlagDegenerate(t *testing.T) {
+	t.Run("all-dash flags have empty name and no arg", x.F(func(x x.X) {
+		for _, s := range []string{"-", "--"} {
+			v := lex.Flag(s)
+			x.Equal("", v.Name())
+
+			_, ok := v.Arg()
+			x.False(ok)
+
+			x.Equal(s, v.String())
+			x.Equal(s+"=foo", string(v.WithArg("foo")))
+			x.Equal([]lex.Flag{v}, v.Spread())
+		}
+	}))
 }

@@ -79,7 +79,7 @@ func (c *Command) Tree() []*Command {
 
 func (c *Command) Root() *Command {
 	p := c
-	for p != nil {
+	for p.parent != nil {
 		p = p.parent
 	}
 	return p

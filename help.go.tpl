@@ -16,7 +16,7 @@ Usage:
 	{{ range . -}}
 		{{ print .Name " " -}}
 		{{ range .Args -}}
-			{{ .Info.Usage.String -}}
+			{{ print .Info.Usage.String " " -}}
 		{{ end -}}
 	{{ end -}}
 	{{ if len $.Flags    | ne 0 }}[options] {{ end -}}

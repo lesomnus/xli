@@ -30,3 +30,7 @@ func (SwitchParser) ToString(v bool) string {
 func (SwitchParser) String() string {
 	return ""
 }
+
+func (SwitchParser) NoValue() bool {
+	return true
+}

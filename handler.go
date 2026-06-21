@@ -71,8 +71,14 @@ func OnExact(m mode.Mode, f HandlerFunc) Handler {
 }
 
 func OnHelp(f HandlerFunc) Handler     { return OnExact(mode.Help, f) }
-func OnTap(f HandlerFunc) Handler      { return OnExact(mode.Tab, f) }
+func OnTab(f HandlerFunc) Handler      { return OnExact(mode.Tab, f) }
 func OnRun(f HandlerFunc) Handler      { return OnExact(mode.Run, f) }
 func OnHelpPass(f HandlerFunc) Handler { return OnExact(mode.Help|mode.Pass, f) }
-func OnTapPass(f HandlerFunc) Handler  { return OnExact(mode.Tab|mode.Pass, f) }
+func OnTabPass(f HandlerFunc) Handler  { return OnExact(mode.Tab|mode.Pass, f) }
 func OnRunPass(f HandlerFunc) Handler  { return OnExact(mode.Run|mode.Pass, f) }
+
+// Deprecated: use OnTab. "Tap" was a typo for the Tab (completion) mode.
+func OnTap(f HandlerFunc) Handler { return OnTab(f) }
+
+// Deprecated: use OnTabPass. "Tap" was a typo for the Tab (completion) mode.
+func OnTapPass(f HandlerFunc) Handler { return OnTabPass(f) }

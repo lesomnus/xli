@@ -68,3 +68,32 @@ func TestHandler(t *testing.T) {
 		x.Equal([]string{"foo-help"}, vs)
 	}))
 }
+
+func TestOnTab(t *testing.T) {
+	t.Run("OnTab is not invoked in run mode", x.F(func(x x.X) {
+		fired := false
+		c := &xli.Command{
+			Handler: xli.OnTab(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+				fired = true
+				return next(ctx)
+			}),
+		}
+
+		err := c.Run(t.Context(), nil)
+		x.NoError(err)
+		x.False(fired)
+	}))
+	t.Run("deprecated OnTap aliases OnTab", x.F(func(x x.X) {
+		fired := false
+		c := &xli.Command{
+			Handler: xli.OnTap(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+				fired = true
+				return next(ctx)
+			}),
+		}
+
+		err := c.Run(t.Context(), nil)
+		x.NoError(err)
+		x.False(fired)
+	}))
+}

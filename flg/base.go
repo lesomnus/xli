@@ -82,6 +82,16 @@ func (f *Base[T, P]) Count() int {
 	return f.count
 }
 
+// NoValue reports whether the flag's parser is value-less (a switch).
+// A parser opts in by implementing `NoValue() bool`; otherwise the flag
+// is assumed to require a value.
+func (f *Base[T, P]) NoValue() bool {
+	if p, ok := any(f.Parser).(interface{ NoValue() bool }); ok {
+		return p.NoValue()
+	}
+	return false
+}
+
 func (a *Base[T, P]) handle(ctx context.Context, v T) error {
 	if h := a.Handler; h != nil {
 		return h.Handle(ctx, v)

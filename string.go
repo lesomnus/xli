@@ -8,7 +8,7 @@ type Stringer interface {
 
 type S string
 
-func (s S) String(ctx context.Context) string {
+func (s S) String(ctx context.Context, cmd *Command) string {
 	return string(s)
 }
 

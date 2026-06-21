@@ -69,6 +69,10 @@ type Flag string
 //	  i    j
 func (f Flag) indexes() (int, int) {
 	i := strings.IndexFunc(string(f), func(r rune) bool { return r != '-' })
+	if i < 0 {
+		// All dashes (e.g. "-", "--"); there is no name and no arg.
+		return len(f), -1
+	}
 	j := strings.IndexRune(string(f)[i:], '=')
 	if j < 0 {
 		return i, -1
@@ -122,8 +126,8 @@ func (f Flag) String() string {
 //	"--bar" -> ["--bar"]
 func (f Flag) Spread() []Flag {
 	i, j := f.indexes()
-	if i > 1 {
-		// Long one.
+	if i != 1 {
+		// Long flag (i == 2) or degenerate all-dash flag (i == len): nothing to spread.
 		return []Flag{f}
 	}
 
@@ -135,6 +139,10 @@ func (f Flag) Spread() []Flag {
 
 	v := string(f)
 	n := v[i:k]
+	if len(n) <= 1 {
+		// Single short flag such as "-b" or "-b=foo"; nothing to spread.
+		return []Flag{f}
+	}
 
 	x := i + 1
 	y := k - 1

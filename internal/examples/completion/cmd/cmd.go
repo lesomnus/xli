@@ -28,7 +28,7 @@ func NewExampleCompletionCmd() *xli.Command {
 					&arg.RestStrings{
 						Name:  "STRING",
 						Brief: "String to display",
-						Handler: arg.OnTap[[]string](func(ctx context.Context, tab tab.Tab) {
+						Handler: arg.OnTab[[]string](func(ctx context.Context, tab tab.Tab) {
 							tab.Value("royale")
 							tab.Value("with")
 							tab.Value("cheese")
@@ -48,7 +48,7 @@ func NewExampleCompletionCmd() *xli.Command {
 				Flags: flg.Flags{
 					&flg.String{
 						Name: "baz",
-						Handler: arg.OnTap[string](func(ctx context.Context, tab tab.Tab) {
+						Handler: arg.OnTab[string](func(ctx context.Context, tab tab.Tab) {
 							tab.Value("royale")
 							tab.Value("with")
 							tab.Value("cheese")

@@ -1,6 +1,7 @@
 package arg
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -65,6 +66,12 @@ func (a *Rest[T, P]) Info() *Info {
 		Brief: a.Brief,
 		Synop: a.Synop,
 		Usage: usage,
+
+		Handle: func(ctx context.Context) {
+			if a.Handler != nil && a.Value != nil {
+				a.Handler.Handle(ctx, a.Value)
+			}
+		},
 	}
 }
 
