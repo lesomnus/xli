@@ -47,6 +47,11 @@ type Rest[T any, P Parser[T]] struct {
 	Synop string
 	Usage fmt.Stringer
 
+	// Default is the value used when no values are provided. It is never
+	// modified by the framework; a nil Default means there is no default.
+	Default []T
+
+	// Value holds the values parsed from the command line.
 	Value   []T
 	Handler Handler[[]T]
 
@@ -62,7 +67,7 @@ func (a *Rest[T, P]) Info() *Info {
 	if usage == nil {
 		usage = a
 	}
-	return &Info{
+	info := &Info{
 		Name: a.Name,
 
 		Brief: a.Brief,
@@ -86,10 +91,23 @@ func (a *Rest[T, P]) Info() *Info {
 			}
 		},
 	}
+	if a.Default != nil {
+		info.Default = fmt.Sprintf("%v", a.Default)
+		info.HasDefault = true
+	}
+	return info
 }
 
 func (a *Rest[T, P]) Get() ([]T, bool) {
 	return a.Value, len(a.Value) > 0
+}
+
+// lookupDefault returns the configured default values, if any.
+func (a *Rest[T, P]) lookupDefault() ([]T, bool) {
+	if a.Default == nil {
+		return nil, false
+	}
+	return a.Default, true
 }
 
 func (a *Rest[T, P]) IsOptional() bool {

@@ -54,6 +54,20 @@ func TestPrintHelp(t *testing.T) {
 		x.Contains(b.String(), "(default: ")
 		x.Contains(b.String(), "(required)")
 	}))
+	t.Run("argument default is shown", x.F(func(x x.X) {
+		def := "out.txt"
+		c := &xli.Command{
+			Name: "write",
+			Args: arg.Args{
+				&arg.String{Name: "DST", Optional: true, Brief: "destination", Default: &def},
+			},
+		}
+
+		b := &strings.Builder{}
+		err := c.PrintHelp(b)
+		x.NoError(err)
+		x.Contains(b.String(), "(default: out.txt)")
+	}))
 	t.Run("synopsis is rendered as a description", x.F(func(x x.X) {
 		c := &xli.Command{
 			Name:  "app",

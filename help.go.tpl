@@ -28,7 +28,9 @@ Usage:
 
 		{{ range .Args -}}
 			{{ if len .Brief | ne 0 -}}
-				{{ printf "\n  %s:\n    %s\n" .Name .Brief -}}
+				{{ printf "\n  %s:\n    %s" .Name .Brief -}}
+				{{ if .Info.HasDefault }}{{ printf " (default: %s)" .Info.Default -}}{{ end -}}
+				{{ print "\n" -}}
 			{{ end -}}
 		{{ end -}}
 	{{ end -}}

@@ -41,10 +41,16 @@ func Get[T any](h Holder, name string) (v T, ok bool) {
 }
 
 func MustGet[T any](h Holder, name string) T {
-	v, ok := Get[T](h, name)
-	if !ok {
-		panic(fmt.Sprintf("%q: arg not parsed", name))
+	if v, ok := Get[T](h, name); ok {
+		return v
+	}
+	if a := h.GetArgs().Get(name); a != nil {
+		if d, ok := a.(interface{ lookupDefault() (T, bool) }); ok {
+			if v, ok := d.lookupDefault(); ok {
+				return v
+			}
+		}
 	}
 
-	return v
+	panic(fmt.Sprintf("%q: arg not set", name))
 }

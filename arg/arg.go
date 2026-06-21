@@ -12,6 +12,11 @@ type Info struct {
 	Synop string
 	Usage fmt.Stringer
 
+	// Default is the string form of the argument's default value, for help
+	// rendering. HasDefault is false when there is no default.
+	Default    string
+	HasDefault bool
+
 	Handle func(ctx context.Context)
 }
 
