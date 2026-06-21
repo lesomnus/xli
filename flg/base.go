@@ -21,7 +21,16 @@ type Base[T any, P Parser[T]] struct {
 	Synop string
 	Usage fmt.Stringer
 
-	Value   *T
+	// Default is the value used when the user does not provide the flag.
+	// It is set by the framework user and never modified by the framework.
+	// A nil Default means there is no default.
+	Default *T
+
+	// Value holds the value parsed from the command line; it is nil until
+	// the user provides the flag. Read it via Get/MustGet rather than
+	// directly.
+	Value *T
+
 	Handler Handler[T]
 
 	Parser P
@@ -34,7 +43,7 @@ type Base[T any, P Parser[T]] struct {
 }
 
 func (f *Base[T, P]) Info() *Info {
-	return &Info{
+	info := &Info{
 		Name:  f.Name,
 		Alias: f.Alias,
 
@@ -44,22 +53,31 @@ func (f *Base[T, P]) Info() *Info {
 		Usage:    f.Usage,
 		Required: f.Required,
 	}
-}
-
-func (f *Base[T, P]) Default() (string, bool) {
-	if f.Value == nil {
-		return "", false
+	if f.Default != nil {
+		info.Default = f.Parser.ToString(*f.Default)
+		info.HasDefault = true
 	}
-
-	return f.Parser.ToString(*f.Value), true
+	return info
 }
 
+// Get returns the value parsed from the command line and whether the user
+// provided the flag. It does not consider Default; use MustGet for the
+// effective value.
 func (f *Base[T, P]) Get() (T, bool) {
-	if f.Value == nil {
+	if f.count == 0 {
 		var z T
 		return z, false
 	}
 	return *f.Value, true
+}
+
+// lookupDefault returns the configured default value, if any.
+func (f *Base[T, P]) lookupDefault() (T, bool) {
+	if f.Default == nil {
+		var z T
+		return z, false
+	}
+	return *f.Default, true
 }
 
 func (f *Base[T, P]) Handle(ctx context.Context, u string) error {
@@ -75,11 +93,7 @@ func (f *Base[T, P]) Handle(ctx context.Context, u string) error {
 	}
 
 	f.count++
-	if f.Value == nil {
-		f.Value = &v
-	} else {
-		*f.Value = v
-	}
+	f.Value = &v
 	return f.handle(ctx, v)
 }
 

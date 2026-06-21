@@ -56,6 +56,8 @@ Options:{{ range $.Flags.ByCategory -}}
 		{{ end -}}
 		{{ range . -}}{{ with .Info -}}
 			{{ printf "\n    %-20s %s" .String .Brief -}}
+			{{ if .Required }}{{ print " (required)" -}}{{ end -}}
+			{{ if .HasDefault }}{{ printf " (default: %s)" .Default -}}{{ end -}}
 		{{ end -}}{{ end -}}
 	{{ end -}}
 {{ end -}}

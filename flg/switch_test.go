@@ -38,27 +38,31 @@ func TestNoValue(t *testing.T) {
 		x.False(f.NoValue())
 	}))
 	t.Run("switch without explicit value parses as true", x.F(func(x x.X) {
-		v := false
 		c := &xli.Command{
 			Flags: flg.Flags{
-				&flg.Switch{Name: "on", Value: &v},
+				&flg.Switch{Name: "on"},
 			},
 		}
 
 		err := c.Run(t.Context(), []string{"--on"})
 		x.NoError(err)
+
+		v, ok := flg.Get[bool](c, "on")
+		x.True(ok)
 		x.True(v)
 	}))
 	t.Run("custom no-value flag works as a switch", x.F(func(x x.X) {
-		v := false
 		c := &xli.Command{
 			Flags: flg.Flags{
-				&flg.Base[bool, yesParser]{Name: "y", Value: &v},
+				&flg.Base[bool, yesParser]{Name: "y"},
 			},
 		}
 
 		err := c.Run(t.Context(), []string{"--y"})
 		x.NoError(err)
+
+		v, ok := flg.Get[bool](c, "y")
+		x.True(ok)
 		x.True(v)
 	}))
 }

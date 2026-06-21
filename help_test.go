@@ -6,6 +6,7 @@ import (
 
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
+	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/internal/x"
 )
 
@@ -36,6 +37,22 @@ func TestPrintHelp(t *testing.T) {
 		err := c.PrintHelp(b)
 		x.NoError(err)
 		x.Contains(b.String(), "rm [TARGET]")
+	}))
+	t.Run("flag default and required are shown in options", x.F(func(x x.X) {
+		def := "8080"
+		c := &xli.Command{
+			Name: "srv",
+			Flags: flg.Flags{
+				&flg.String{Name: "port", Default: &def},
+				&flg.String{Name: "token", Required: true},
+			},
+		}
+
+		b := &strings.Builder{}
+		err := c.PrintHelp(b)
+		x.NoError(err)
+		x.Contains(b.String(), "(default: ")
+		x.Contains(b.String(), "(required)")
 	}))
 	t.Run("variadic argument is rendered with ellipsis", x.F(func(x x.X) {
 		c := &xli.Command{

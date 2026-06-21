@@ -71,12 +71,18 @@ func Get[T any](h Holder, name string) (v T, ok bool) {
 }
 
 func MustGet[T any](h Holder, name string) T {
-	v, ok := Get[T](h, name)
-	if !ok {
-		panic(fmt.Sprintf("%q: flg not parsed", name))
+	if v, ok := Get[T](h, name); ok {
+		return v
+	}
+	if f := h.GetFlags().Get(name); f != nil {
+		if d, ok := f.(interface{ lookupDefault() (T, bool) }); ok {
+			if v, ok := d.lookupDefault(); ok {
+				return v
+			}
+		}
 	}
 
-	return v
+	panic(fmt.Sprintf("%q: flg not set", name))
 }
 
 func Find[T any, U NestedHolder[U]](h NestedHolder[U], name string) (v T, ok bool) {
@@ -85,10 +91,22 @@ func Find[T any, U NestedHolder[U]](h NestedHolder[U], name string) (v T, ok boo
 }
 
 func MustFind[T any, U NestedHolder[U]](h NestedHolder[U], name string) T {
-	v, ok := Find[T, U](h, name)
-	if !ok {
-		panic(fmt.Sprintf("%q: flg not parsed", name))
+	if v, ok := Find[T, U](h, name); ok {
+		return v
+	}
+	for {
+		if f := h.GetFlags().Get(name); f != nil {
+			if d, ok := f.(interface{ lookupDefault() (T, bool) }); ok {
+				if v, ok := d.lookupDefault(); ok {
+					return v
+				}
+			}
+		}
+		if !h.HasParent() {
+			break
+		}
+		h = h.Parent()
 	}
 
-	return v
+	panic(fmt.Sprintf("%q: flg not set", name))
 }

@@ -15,6 +15,11 @@ type Info struct {
 	Synop    string
 	Usage    fmt.Stringer
 	Required bool
+
+	// Default is the string form of the flag's default value, for help
+	// rendering. HasDefault is false when the flag has no default.
+	Default    string
+	HasDefault bool
 }
 
 func (i *Info) String() string {
@@ -30,7 +35,6 @@ type Flag interface {
 	Handle(ctx context.Context, v string) error
 
 	Count() int
-	Default() (string, bool)
 
 	// NoValue reports whether the flag is a switch that does not consume a
 	// value (e.g. a boolean switch). Such flags default to "true" when given

@@ -44,7 +44,9 @@
 
 **전혀 안 쓰는 것 → 자유롭게 수정/이름변경 가능**: `OnTap`/`OnTapPass`, tab/completion API 전체, `xli.S`/`xli.D`/`xli.Stringer`, `lex.*` 직접 사용, `Command.Root()`.
 
-### 기본값(default) 의미론 — 확정 계약 (Phase 3 에서 구현, breaking 허용)
+### 기본값(default) 의미론 — ✅ 구현됨 (breaking)
+> 아래는 확정 계약이며 Phase 3 에서 구현 완료됨. (요약: `Default`=기본값/read-only, `Value`=파싱값/framework-write, `Get`=명시여부, `MustGet`=Value→Default→panic)
+
 
 현재 `flg.Base.Value *T` 한 필드가 "생성 시 기본값" 과 "파싱된 사용자 값" 두 의미를 겸한다. `Get()` 이 `Value != nil` 로 `ok` 를 판정하므로, 기본값을 지정한 순간 "사용자가 안 줘도 `ok=true`" 가 되어 의미가 어긋난다 (precedence/"명시 여부" 로직이 조용히 틀어짐). 계약이 애초에 불명확했으므로 **breaking 을 허용하고** 역할을 분리한다.
 
@@ -135,7 +137,8 @@ tab completion 엔진을 실제로 동작하게 고침.
 "진짜 CLI 프레임워크" 최소 기능. API 변경을 수반하므로 freeze 전에 끝낸다.
 - [x] ~~내장 `--version`/`-v`~~ → **제공하지 않기로 결정** (사용자가 직접 `version` 서브커맨드/플래그 추가; 다운스트림들도 이미 자체 구현)
 - [x] 필수 flag 선언 + 검증: `flg.Base.Required` + `flg.Info.Required`, Run 모드에서만 `ErrFlagRequired` 검증(--help/completion 은 면제) + 테스트
-- [ ] **기본값 의미론 정리** (확정 계약, breaking 허용 — 위 [기본값 의미론](#기본값default-의미론--확정-계약-phase-3-에서-구현-breaking-허용) 절 참조): `Default`/`Value` 필드 분리, `Get`=`count>0`, `MustGet`=`Value→Default→panic`, `Default()` 메서드 제거 후 `flg.Info.Default` 로 help 표시, arrakis 마이그레이션
+- [x] **기본값 의미론 정리** (확정 계약, breaking — 위 [기본값 의미론](#기본값default-의미론--확정-계약-phase-3-에서-구현-breaking-허용) 절 참조): `flg.Base` 에 `Default *T` 추가하고 `Value *T` 는 파싱값 전용으로 의미 변경, `Get`/`VisitP`/`Find`=`count>0`, `MustGet`/`MustFind`=`Value→Default→panic`, `Default()` 메서드 제거 → `flg.Info.Default`/`HasDefault`, help Options 에 `(default: …)`·`(required)` 표시 + 테스트
+  - **arrakis 마이그레이션 필요** (런타임 break): `&flg.String{Value:&default_port}` → `&flg.String{Default:&default_port}` (port/kind). `diff.go` 의 `&flg.Switch{Value:&t}` 코드 주입은 새 계약상 "사용자 입력" 으로 안 잡히므로 목적지 변수를 직접 세팅하거나 핸들러 경유로 변경 필요.
 - [x] 값 타입 추가: `Float32`/`Float64`/`Duration` (flg + arg) + 테스트 — 순수 additive
 - [ ] 값 타입 추가(잔여): repeatable/`[]string` (count 누적 — 기본값 계약과 함께 다룸)
 - [ ] custom help template 주입 훅 (`PrintHelp` 의 TODO) + 템플릿 1회 파싱 캐시
