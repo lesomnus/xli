@@ -81,6 +81,15 @@ Hi, World!
 $ greet --help
 ```
 
+## Documentation
+
+- [docs/commands.md](docs/commands.md) — the command tree, middleware handlers,
+  execution modes, strict positioning, and completion.
+- [docs/flags.md](docs/flags.md) — flag types, the default/parsed contract,
+  required flags, categories, and value completion.
+- [docs/arguments.md](docs/arguments.md) — positional/variadic arguments, the
+  default/parsed contract, and value completion.
+
 ## Concepts
 
 ### Handlers are middleware
@@ -117,7 +126,8 @@ mode so you only do work when it is relevant:
 | `OnTab` | producing shell completions |
 
 There are matching helpers in the `flg` and `arg` packages for flag/argument
-handlers (e.g. `flg.OnTab` to provide completion candidates for a flag value).
+handlers (e.g. `flg.OnTab` to provide completion candidates for a flag value,
+optionally grouped with `tab.Group`).
 
 ### Flags and arguments
 

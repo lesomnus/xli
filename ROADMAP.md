@@ -57,7 +57,7 @@
 - `MustGet` / `MustFind` → `Value(준 값) → Default → (둘 다 없으면) panic`. ("기본값 있으면 `MustGet`" 모델)
 - `Handle` 은 `Value` 에만 쓴다 → 기존 "기본값 변수 덮어쓰기" footgun 자동 해소.
 - help 의 기본값 표시는 `flg.Base.Default()` 메서드(현재 dead, 이름이 값 접근자와 혼동됨) 를 **제거**하고 `flg.Info.Default`(문자열) 로 옮긴다.
-- `arg` 패키지에도 동일 원리 적용 (arg 는 default 주입 관용구가 드물어 우선순위는 낮음).
+- `arg` 패키지에도 동일 원리 적용 ✅ (커밋 `b0796fa`): `arg.Base`/`arg.Rest` 에 `Default` 추가, `Value`=파싱값, `MustGet`=Value→Default→panic.
 
 **다운스트림 영향** (교차 확인 완료):
 - `port`/`kind` (arrakis, `MustGet`): ✅ 안전 — `MustGet` 이 `Default` 로 폴백.
@@ -128,7 +128,7 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] completion 경로 panic 제거: `tab` nil 가드 → no-op, "some completion not considered" 분기 제거 (completion 은 셸을 절대 crash 시키면 안 됨)
 - [x] B10: `NewCmdCompletion` 의 nil-deref 제거 — `Parent().Parent()` 대신 `Root()`(Phase 0 픽스) 사용, panic → error
 - [x] completion 통합 테스트 추가 (`completion_run_test.go`): 루트/중첩 서브커맨드, flag-name, long/short flag value, arg value, shadowing, 스크립트 생성
-- [ ] (Phase 4 freeze 결정으로 이관) `tab.Tab` 인터페이스 확장(grouping/directive/error) — 현재 2-메서드로 동작하며, 확장은 서드파티 Tab 구현을 깨므로 freeze 시점에 함께 결정
+- [x] `tab.Tab` 인터페이스 확장: `Group(name) Tab` 추가, ZshTab 와이어 포맷(`group\x1fentry`) + 스크립트 그룹별 `_describe`, 서브커맨드/플래그 category 그룹화 (zsh 5.9 실전 검증)
 - [ ] (post-1.0) bash/fish/powershell 셸 추가 — Tab 인터페이스 동결 이후
 
 **결과**: 이전엔 arg-value/short-flag value completion 이 **완전히 죽어있었음** → 이제 동작. 코어 커버리지 64.0→**82.8%**. `go test -race`/`vet` 클린, 다운스트림 회귀 통과(`TODO_Completion` 제거가 다운스트림에 영향 없음 확인).
@@ -142,7 +142,7 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] 값 타입 추가: `Float32`/`Float64`/`Duration` (flg + arg) + 테스트 — 순수 additive
 - [ ] 값 타입 추가(잔여): repeatable/`[]string` (count 누적 — 기본값 계약과 함께 다룸)
 - [x] 템플릿 1회 파싱 캐시 (`defaultHelpTemplate`, `template.Must`) — 매 호출 재파싱 제거
-- [ ] custom help template 주입 훅 → **Phase 4 로 이관** (`PrintHelp` 시그니처에 ctx 가 없어 주입면 결정 필요: Command 필드 vs context)
+- [x] ~~custom help template 주입 훅~~ → **만들지 않기로 결정** (사용자 결정; 기본 템플릿만 제공)
 - [x] `Synop`(long description) 렌더링: `Command.Synop` 을 help 의 `Description:` 섹션으로 출력 + 테스트 (arg/flg 의 Synop 렌더링은 Phase 4 결정)
 - [x] usage 자동 포맷 컨벤션 확정: 현행 `<req>`/`[opt]`/`[opt...]` 유지 (사용자 요청 "optional→`[ARG]`" 충족)
 - [ ] (nice-to-have, post-1.0) env-var 바인딩, enum/choice, 상호배타 그룹, repeatable/`[]string`
@@ -151,7 +151,7 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] (선행) `flg.Flags.WithCategory` 버그 픽스 — `Base.Category` 필드 + setter (이전엔 no-op)
 - [x] README 작성 (검증된 quick-start 예제 포함; 현재 2줄 → 본문)
 - [ ] 공개 API 최종 점검 (mode 상수 타입 통일 ✅, 죽은 export 제거 — `mode.Resolve`✅ / `arg.IsMany` 검토, 네이밍 일관성)
-- [ ] **freeze 결정** (사용자 판단 필요): `tab.Tab` 인터페이스 확장 여부, custom help template 주입면(Command 필드 vs ctx), `arg` 패키지에도 기본값 계약 적용 여부
+- [x] **freeze 결정 완료**: `tab.Tab` 확장(`Group`) 적용, custom help template 미제공 결정, `arg` 패키지 기본값 계약 적용 (커밋 `b0796fa`/`5705f9b`)
 - [ ] 의도된 날카로운 모서리 문서화 (단일 실행 트리, 핸들러의 `next()` 호출 책임, strict positioning) — godoc/README 보강
 - [ ] **arrakis 마이그레이션 적용** (`Value:`→`Default:`, diff.go 주입 패턴 변경)
 - [ ] 다운스트림 4개 레포 최종 회귀 통과
