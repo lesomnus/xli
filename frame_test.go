@@ -17,6 +17,22 @@ import (
 	"github.com/lesomnus/xli/mode"
 )
 
+func TestFrameFlagAfterArg(t *testing.T) {
+	t.Run("flag after argument is rejected", x.F(func(x x.X) {
+		c := &xli.Command{
+			Flags: flg.Flags{
+				&flg.String{Name: "foo"},
+			},
+			Args: arg.Args{
+				&arg.String{Name: "BAR"},
+			},
+		}
+
+		err := c.Run(t.Context(), []string{"baz", "--foo=x"})
+		x.True(errors.Is(err, xli.ErrFlagAfterArg))
+	}))
+}
+
 func TestFrameParseSwitches(t *testing.T) {
 	new_cmd := func() *xli.Command {
 		return &xli.Command{
@@ -441,7 +457,7 @@ func TestFrameParseComposite(t *testing.T) {
 			"--bar", "b",
 			"qux",
 		})
-		x.ErrorContains(err, "flags are must be set at the behind")
+		x.True(errors.Is(err, xli.ErrFlagAfterArg))
 		x.ErrorContains(err, "--bar")
 	}))
 	t.Run("flag with value in single arg in the middle of args", x.F(func(x x.X) {
@@ -462,8 +478,8 @@ func TestFrameParseComposite(t *testing.T) {
 			"--bar=b",
 			"qux",
 		})
-		x.ErrorContains(err, "flags are must be set at the behind")
-		x.ErrorContains(err, `--bar="b"`)
+		x.True(errors.Is(err, xli.ErrFlagAfterArg))
+		x.ErrorContains(err, "--bar")
 	}))
 	t.Run("subcommand with switches, flags, and args", x.F(func(x x.X) {
 		c := &xli.Command{

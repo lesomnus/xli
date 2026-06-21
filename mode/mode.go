@@ -2,7 +2,6 @@ package mode
 
 import (
 	"context"
-	"slices"
 )
 
 type Mode int
@@ -10,12 +9,12 @@ type Mode int
 const (
 	Unspecified Mode = 0b00_0
 
-	Pass = 0b000_1 // There are more commands to be executed.
-	Help = 0b001_0 // Command is executed to print help message.
-	Tab  = 0b010_0 // Command is executed to get completions.
-	Run  = 0b100_0 // Command is executed to do something.
+	Pass Mode = 0b000_1 // There are more commands to be executed.
+	Help Mode = 0b001_0 // Command is executed to print help message.
+	Tab  Mode = 0b010_0 // Command is executed to get completions.
+	Run  Mode = 0b100_0 // Command is executed to do something.
 
-	Kind = 0b111_0
+	Kind Mode = 0b111_0
 )
 
 func (m Mode) Is(v Mode) bool {
@@ -39,14 +38,4 @@ func From(ctx context.Context) Mode {
 
 func Into(ctx context.Context, v Mode) context.Context {
 	return context.WithValue(ctx, ctxKey{}, v)
-}
-
-func Resolve(args []string) Mode {
-	if slices.ContainsFunc(args, func(v string) bool {
-		return v == "--help" || v == "-h"
-	}) {
-		return Help
-	}
-
-	return Run
 }

@@ -8,11 +8,12 @@ import (
 )
 
 var (
-	ErrUnknownFlag = errors.New("unknown flag")
-	ErrNoFlagValue = errors.New("no value is given")
-	ErrUnknownCmd  = errors.New("unknown subcommand")
-	ErrTooManyArgs = errors.New("too many arguments")
-	ErrNeedArgs    = errors.New("required argument not given")
+	ErrUnknownFlag  = errors.New("unknown flag")
+	ErrNoFlagValue  = errors.New("no value is given")
+	ErrFlagAfterArg = errors.New("flag must come before arguments")
+	ErrUnknownCmd   = errors.New("unknown subcommand")
+	ErrTooManyArgs  = errors.New("too many arguments")
+	ErrNeedArgs     = errors.New("required argument not given")
 )
 
 type FlagError struct {

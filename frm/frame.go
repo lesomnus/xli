@@ -29,6 +29,10 @@ func Into(ctx context.Context, v Frame) context.Context {
 
 func HasSeq(f Frame, names ...string) bool {
 	for _, v := range names {
+		if f == nil {
+			return false
+		}
+
 		c := f.Cmd()
 		if c == nil || c.GetName() != v {
 			return false

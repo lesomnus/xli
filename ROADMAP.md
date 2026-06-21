@@ -103,12 +103,20 @@
 
 **결과**: `go build`/`go vet` 클린, 전체 테스트 통과. 커버리지 core 60.9→**64.0%**, arg 38.3→**46.8%**, flg 41.5→**44.7%**, lex 89.2→**89.9%**.
 
-### Phase 1 — 라이브러리 위생 (robustness)
+### Phase 1 — 라이브러리 위생 (robustness) ✅ **완료**
 사용자 입력으로 도달 가능한 모든 panic 제거, 에러 보고 일관화.
-- [ ] parse/complete 경로의 나머지 panic → typed error (`frame.go:171/196`, `command.go:192/277`)
-- [ ] 에러를 sentinel/typed 로 표준화 (`errors.Is` 가능하게). ad-hoc `fmt.Errorf` 문자열 제거, "are must be set at the behind" 문법 오류 수정
-- [ ] dead 코드 정리: `mode.Resolve`, (미사용 시) `arg.IsMany` — wire 하거나 제거
-- [ ] `frm`/`mode`/`tab` 기본 테스트 추가 (현재 0%)
+- [x] 에러 sentinel 표준화: flag-after-arg 를 `ErrFlagAfterArg` + `FlagError` 로 (`errors.Is` 가능), "are must be set at the behind" 문법 오류 제거 ([frame.go](frame.go), [errors.go](errors.go)) + 테스트
+- [x] dead 코드 제거: `mode.Resolve` 삭제 (+ `slices` import 제거)
+- [x] mode 상수 전부 `Mode` 타입으로 통일 (freeze 전 hygiene; 다운스트림 연산자 우선순위 안전 확인)
+- [x] `HasSeq` nil 가드 추가 (이름이 체인보다 길 때 panic 방지 — 다운스트림 `frm.HasSeq` 보호)
+- [x] `frm`/`mode`/`tab` 테스트 추가 → **각 100% 커버리지**
+- [x] 도달 불가 방어 panic(`frame.go:171/196`) 은 lexer 가 4개 토큰만 반환하므로 "사용자 도달 불가 불변식" 으로 주석 명시(변환 안 함 — DoD 충족)
+
+**Phase 1 에서 제외(범위 재조정)**:
+- `command.go:192/277` 의 panic 은 completion 엔진(`runCompletion`) 내부 → **Phase 2 에서 재작성과 함께 처리** (지금 단독 변환은 폐기성 작업).
+- `arg.IsMany` 는 `arg.Arg` 인터페이스 멤버이고 Phase 3 usage 포맷(variadic 판정)에 쓸 수 있어 **유지** (제거 결정은 Phase 4 freeze).
+
+**결과**: `go build`/`go vet`/`go test -race` 클린, 전체 통과. 다운스트림 재검증 — flob/clade/tegra **build+test PASS**, arrakis build PASS(테스트 실패는 동일한 xli-무관 `arks` 패키지).
 
 ### Phase 2 — Completion 마무리 (B8 본체)
 tab completion API 를 완성하고 동결 가능한 형태로 정리.
@@ -163,7 +171,9 @@ tab completion API 를 완성하고 동결 가능한 형태로 정리.
     - tegra-exporter: build ✅ / test ✅
   - → **breaking change 없음** 확인.
 
-### 다음 작업: Phase 1 (라이브러리 위생)
-남은 panic 제거(`frame.go:171/196`, `command.go:192/277`), 에러 sentinel 표준화, dead 코드 정리(`mode.Resolve` 등), `frm`/`mode`/`tab` 0% 패키지 테스트.
+- **2026-06-21**: **Phase 1 완료.** 에러 sentinel 표준화(`ErrFlagAfterArg`), `mode.Resolve` 제거 + mode 상수 타입 통일, `HasSeq` nil 가드, `frm`/`mode`/`tab` 테스트(각 100%). 도달 불가 방어 panic 은 불변식 주석으로 명시. `go test -race` 클린, 다운스트림 회귀 통과.
+
+### 다음 작업: Phase 2 (Completion 마무리)
+arg-value completion 활성화(`TODO_Completion` 제거 → `Handle` 경유), short-flag value completion 픽스, 필수 arg 가 flag-value completion 을 가리는 문제 분리, `tab.Tab` 인터페이스 확장·동결, `runCompletion` 의 panic(`command.go:192/277`)·error-swallow 정리, completion 통합 테스트. (B8/B10)
 
 > 미해결 확정 버그 중 Phase 0 에서 제외한 것: **B8(completion 본체)** → Phase 2, **B10(`NewCmdCompletion` nil-deref)** → Phase 2 와 함께. 기본값 의미론(landmine) → Phase 3.

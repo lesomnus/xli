@@ -128,7 +128,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 
 		case lex.Flag:
 			if len(f.args) > 0 {
-				return f, fmt.Errorf("flags are must be set at the behind of the arguments: %s", v)
+				return f, &FlagError{v, ErrFlagAfterArg}
 			}
 			if n := v.Name(); n == "help" || n == "h" {
 				f.is_help = true
@@ -168,7 +168,8 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				case lex.Arg:
 					v = v.WithArg(w)
 				default:
-					panic("unknown lex item")
+					// Unreachable: lex.Lex only returns *Err, EndOfCommand, Flag, or Arg.
+					panic("xli: unreachable: lex.Lex returned an unexpected token type")
 				}
 			}
 
@@ -193,7 +194,8 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 			return f, nil
 
 		default:
-			panic("unknown lex item")
+			// Unreachable: lex.Lex only returns *Err, EndOfCommand, Flag, or Arg.
+			panic("xli: unreachable: lex.Lex returned an unexpected token type")
 		}
 	}
 
