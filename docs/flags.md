@@ -154,8 +154,9 @@ Provide completion candidates for a flag's value with `flg.OnTab`:
 }
 ```
 
-Candidates may be grouped with `t.Group("name")`. Completion for both long
-(`--format=`) and short (`-f=`) forms is supported.
+Candidates may be grouped with `t.Group("name")`, and `t.Files("*.go")` /
+`t.Dirs()` delegate to the shell's path completion. Completion works for both
+long (`--format=`) and short (`-f=`) forms. See [completion.md](completion.md).
 
 ## Custom flag types
 

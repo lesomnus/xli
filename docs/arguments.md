@@ -124,7 +124,8 @@ Provide candidates with `arg.OnTab`:
 }
 ```
 
-Use `t.Group("name")` to group candidates.
+Use `t.Group("name")` to group candidates, or `t.Files(pattern)` / `t.Dirs()`
+for path completion. See [completion.md](completion.md).
 
 ## Custom argument types
 

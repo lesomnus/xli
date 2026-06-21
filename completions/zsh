@@ -11,21 +11,35 @@ ___XLI_PROG__() {
 	local -a lines
 	lines=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion_zsh" "${curr}" "${lbuf}")}")
 
-	# Each line is "<group>\x1f<value>[:<description>]"; candidates are grouped
-	# under their (possibly empty) heading.
+	# Each line is one of:
+	#   v<sep><group><sep><entry>   a candidate ("value" or "value:desc")
+	#   f<sep><pattern>             request file completion
+	#   d<sep>                      request directory completion
 	typeset -A grouped
-	local -a order
-	local line group entry
+	local -a order file_globs
+	local want_files=0 want_dirs=0
+	local line kind rest group entry
 	local sep=$'\x1f'
 	for line in "${lines[@]}"; do
 		[[ -z ${line} ]] && continue
-		group=${line%%${sep}*}
-		entry=${line#*${sep}}
-		[[ -z ${entry} ]] && continue
-		if (( ! ${+grouped[$group]} )); then
-			order+=("${group}")
-		fi
-		grouped[$group]+="${entry}"$'\n'
+		kind=${line%%${sep}*}
+		rest=${line#*${sep}}
+		case ${kind} in
+		v)
+			group=${rest%%${sep}*}
+			entry=${rest#*${sep}}
+			[[ -z ${entry} ]] && continue
+			(( ${+grouped[$group]} )) || order+=("${group}")
+			grouped[$group]+="${entry}"$'\n'
+			;;
+		f)
+			want_files=1
+			[[ -n ${rest} ]] && file_globs+=("${rest}")
+			;;
+		d)
+			want_dirs=1
+			;;
+		esac
 	done
 
 	local g
@@ -38,6 +52,18 @@ ___XLI_PROG__() {
 			_describe 'values' opts
 		fi
 	done
+
+	(( want_dirs )) && _files -/
+	if (( want_files )); then
+		if (( ${#file_globs} )); then
+			local glob
+			for glob in "${file_globs[@]}"; do
+				_files -g "${glob}"
+			done
+		else
+			_files
+		fi
+	fi
 }
 
 # don't run the completion function when being source-ed or eval-ed

@@ -128,7 +128,7 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] completion 경로 panic 제거: `tab` nil 가드 → no-op, "some completion not considered" 분기 제거 (completion 은 셸을 절대 crash 시키면 안 됨)
 - [x] B10: `NewCmdCompletion` 의 nil-deref 제거 — `Parent().Parent()` 대신 `Root()`(Phase 0 픽스) 사용, panic → error
 - [x] completion 통합 테스트 추가 (`completion_run_test.go`): 루트/중첩 서브커맨드, flag-name, long/short flag value, arg value, shadowing, 스크립트 생성
-- [x] `tab.Tab` 인터페이스 확장: `Group(name) Tab` 추가, ZshTab 와이어 포맷(`group\x1fentry`) + 스크립트 그룹별 `_describe`, 서브커맨드/플래그 category 그룹화 (zsh 5.9 실전 검증)
+- [x] `tab.Tab` 인터페이스 확장: `Group(name) Tab`(category 그룹화) + `Files(pattern)`/`Dirs()`(셸 경로 완성, `_files`/`_files -/`/`_files -g`) 추가, kind-prefixed 와이어 포맷, 서브커맨드/플래그 category 그룹화 (zsh 5.9 실전 검증: 값/그룹/파일/디렉터리 디스패치). 문서 `docs/completion.md`.
 - [ ] (post-1.0) bash/fish/powershell 셸 추가 — Tab 인터페이스 동결 이후
 
 **결과**: 이전엔 arg-value/short-flag value completion 이 **완전히 죽어있었음** → 이제 동작. 코어 커버리지 64.0→**82.8%**. `go test -race`/`vet` 클린, 다운스트림 회귀 통과(`TODO_Completion` 제거가 다운스트림에 영향 없음 확인).

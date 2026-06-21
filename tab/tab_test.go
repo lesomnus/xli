@@ -10,25 +10,37 @@ import (
 )
 
 func TestZshTab(t *testing.T) {
-	t.Run("Value writes an ungrouped entry", x.F(func(x x.X) {
+	t.Run("Value writes an ungrouped candidate", x.F(func(x x.X) {
 		b := &strings.Builder{}
 		z := tab.NewZshTab(b)
 		z.Value("foo")
-		x.Equal("\x1ffoo\n", b.String())
+		x.Equal("v\x1f\x1ffoo\n", b.String())
 	}))
 	t.Run("ValueD writes the value and description", x.F(func(x x.X) {
 		b := &strings.Builder{}
 		z := tab.NewZshTab(b)
 		z.ValueD("foo", "the foo")
-		x.Equal("\x1ffoo:the foo\n", b.String())
+		x.Equal("v\x1f\x1ffoo:the foo\n", b.String())
 	}))
-	t.Run("Group prefixes entries with the group name", x.F(func(x x.X) {
+	t.Run("Group prefixes candidates with the group name", x.F(func(x x.X) {
 		b := &strings.Builder{}
 		z := tab.NewZshTab(b)
 		g := z.Group("net")
 		g.Value("host")
 		g.ValueD("port", "the port")
-		x.Equal("net\x1fhost\nnet\x1fport:the port\n", b.String())
+		x.Equal("v\x1fnet\x1fhost\nv\x1fnet\x1fport:the port\n", b.String())
+	}))
+	t.Run("Files requests file completion", x.F(func(x x.X) {
+		b := &strings.Builder{}
+		z := tab.NewZshTab(b)
+		z.Files("*.go")
+		x.Equal("f\x1f*.go\n", b.String())
+	}))
+	t.Run("Dirs requests directory completion", x.F(func(x x.X) {
+		b := &strings.Builder{}
+		z := tab.NewZshTab(b)
+		z.Dirs()
+		x.Equal("d\x1f\n", b.String())
 	}))
 }
 

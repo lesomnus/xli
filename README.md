@@ -89,6 +89,9 @@ $ greet --help
   required flags, categories, and value completion.
 - [docs/arguments.md](docs/arguments.md) — positional/variadic arguments, the
   default/parsed contract, and value completion.
+- [docs/completion.md](docs/completion.md) — shell completion: setup, the
+  `tab.Tab` sink (values, descriptions, groups, file/dir completion), and
+  `OnTab` handlers.
 
 ## Concepts
 

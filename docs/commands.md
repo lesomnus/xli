@@ -201,5 +201,6 @@ Commands: xli.Commands{ xli.NewCmdCompletion() },
 source <(app completion zsh)
 ```
 
-See [flags.md](flags.md) and [arguments.md](arguments.md) for providing
-completion candidates for flag/argument values.
+See [completion.md](completion.md) for the completion model and the `tab.Tab`
+sink, and [flags.md](flags.md) / [arguments.md](arguments.md) for providing
+candidates for flag/argument values.

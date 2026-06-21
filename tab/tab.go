@@ -10,6 +10,11 @@ type Tab interface {
 	// Group returns a Tab whose candidates are shown under the given heading.
 	// Implementations that do not support grouping may return the receiver.
 	Group(name string) Tab
+	// Files requests filename completion. An empty pattern matches any file;
+	// otherwise it is a shell glob such as "*.go".
+	Files(pattern string)
+	// Dirs requests directory-only completion.
+	Dirs()
 }
 
 type ctxKey struct{}
