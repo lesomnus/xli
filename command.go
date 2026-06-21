@@ -308,14 +308,14 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 //go:embed help.go.tpl
 var DefaultHelpTemplate string
 
-func (c *Command) PrintHelp(w io.Writer) error {
-	// TODO: custom template; pass by context?
-	tpl := template.New("")
-	if _, err := tpl.Parse(DefaultHelpTemplate); err != nil {
-		panic(err)
-	}
+// defaultHelpTemplate is parsed once at startup; the embedded template is a
+// compile-time constant, so a parse failure is a programmer error.
+var defaultHelpTemplate = template.Must(template.New("help").Parse(DefaultHelpTemplate))
 
-	return tpl.Execute(w, c)
+func (c *Command) PrintHelp(w io.Writer) error {
+	// TODO(Phase 4): allow a user-supplied template once the injection
+	// surface (Command field vs context) is decided.
+	return defaultHelpTemplate.Execute(w, c)
 }
 
 type Commands []*Command

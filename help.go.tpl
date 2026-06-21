@@ -33,6 +33,11 @@ Usage:
 		{{ end -}}
 	{{ end -}}
 {{ end -}}
+{{ if $.Synop }}
+
+Description:
+{{ printf "    %s" $.Synop -}}
+{{ end -}}
 
 {{ if len $.Commands | ne 0 }}
 

@@ -54,6 +54,18 @@ func TestPrintHelp(t *testing.T) {
 		x.Contains(b.String(), "(default: ")
 		x.Contains(b.String(), "(required)")
 	}))
+	t.Run("synopsis is rendered as a description", x.F(func(x x.X) {
+		c := &xli.Command{
+			Name:  "app",
+			Synop: "A longer description of the app.",
+		}
+
+		b := &strings.Builder{}
+		err := c.PrintHelp(b)
+		x.NoError(err)
+		x.Contains(b.String(), "Description:")
+		x.Contains(b.String(), "A longer description of the app.")
+	}))
 	t.Run("variadic argument is rendered with ellipsis", x.F(func(x x.X) {
 		c := &xli.Command{
 			Name: "echo",

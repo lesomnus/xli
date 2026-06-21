@@ -141,10 +141,11 @@ tab completion 엔진을 실제로 동작하게 고침.
   - **arrakis 마이그레이션 필요** (런타임 break): `&flg.String{Value:&default_port}` → `&flg.String{Default:&default_port}` (port/kind). `diff.go` 의 `&flg.Switch{Value:&t}` 코드 주입은 새 계약상 "사용자 입력" 으로 안 잡히므로 목적지 변수를 직접 세팅하거나 핸들러 경유로 변경 필요.
 - [x] 값 타입 추가: `Float32`/`Float64`/`Duration` (flg + arg) + 테스트 — 순수 additive
 - [ ] 값 타입 추가(잔여): repeatable/`[]string` (count 누적 — 기본값 계약과 함께 다룸)
-- [ ] custom help template 주입 훅 (`PrintHelp` 의 TODO) + 템플릿 1회 파싱 캐시
-- [ ] `Synop`(long description) 렌더링 또는 필드 제거 결정
-- [ ] usage 자동 포맷 컨벤션 확정 (현재 `<req>`/`[opt]`/`[opt...]` 유지 여부; 사용자는 optional→`[ARG]` 만 명시)
-- [ ] (nice-to-have) env-var 바인딩, enum/choice, 상호배타 그룹
+- [x] 템플릿 1회 파싱 캐시 (`defaultHelpTemplate`, `template.Must`) — 매 호출 재파싱 제거
+- [ ] custom help template 주입 훅 → **Phase 4 로 이관** (`PrintHelp` 시그니처에 ctx 가 없어 주입면 결정 필요: Command 필드 vs context)
+- [x] `Synop`(long description) 렌더링: `Command.Synop` 을 help 의 `Description:` 섹션으로 출력 + 테스트 (arg/flg 의 Synop 렌더링은 Phase 4 결정)
+- [x] usage 자동 포맷 컨벤션 확정: 현행 `<req>`/`[opt]`/`[opt...]` 유지 (사용자 요청 "optional→`[ARG]`" 충족)
+- [ ] (nice-to-have, post-1.0) env-var 바인딩, enum/choice, 상호배타 그룹, repeatable/`[]string`
 
 ### Phase 4 — API 동결 & 폴리시 → `v1.0`
 - [ ] 공개 API 최종 점검 (mode 상수 타입 통일, 죽은 export 제거, 네이밍 일관성)
@@ -183,7 +184,10 @@ tab completion 엔진을 실제로 동작하게 고침.
 
 - **2026-06-21**: **Phase 2 완료.** completion 엔진을 동작하게 수정 — arg-value/short-flag value completion 활성화, shadowing 픽스, panic 제거, B10(nil-deref) 픽스, 통합 테스트(`completion_run_test.go`). 코어 커버리지 82.8%. `tab.Tab` 확장은 Phase 4 freeze 로 이관.
 
-### 다음 작업: Phase 3 (프레임워크 기능 충족)
-`--version`/`-v`, 필수 flag 선언+검증, 기본값 의미론 정리(확정 계약), flag 값 타입 추가(float/duration/`[]string`), custom help template 주입, `Synop` 렌더링, usage 자동 포맷 컨벤션 확정. (대부분 freeze 전 필요, 일부 breaking 포함)
+- **2026-06-21**: **Phase 3 (대부분) 완료.** float/duration 값 타입, required flag 검증, **기본값 계약(Default/Value 분리, breaking)**, help 폴리시(템플릿 1회 파싱, `Synop`→Description, default/required 표시). `--version` 은 미제공 결정. 잔여: custom help template 주입(Phase 4), repeatable/env/enum(post-1.0).
+  - 커밋: `b22eade`(값타입) · `405896f`(required) · `c1f8071`(기본값 계약, breaking) · 그리고 help 폴리시.
+
+### 다음 작업: Phase 4 (API 동결 & 폴리시 → v1.0)
+공개 API 최종 점검(죽은 export 제거, `tab.Tab` 확장 결정, custom help template 주입면 결정), 의도된 날카로운 모서리 문서화, README 작성(현재 2줄)·godoc·예제, 다운스트림 최종 회귀 + **arrakis 마이그레이션 적용**, `v1.0.0` 태그.
 
 > 미해결 확정 버그 중 Phase 0 에서 제외한 것: **B8(completion 본체)** → Phase 2, **B10(`NewCmdCompletion` nil-deref)** → Phase 2 와 함께. 기본값 의미론(landmine) → Phase 3.
