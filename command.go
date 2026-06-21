@@ -171,6 +171,18 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 		ctx = mode.Into(ctx, m|mode.Pass)
 	}
 
+	// Enforce required flags, but only when actually running the command;
+	// --help and completion must work without them.
+	if mode.From(ctx).Is(mode.Run) {
+		for f := f_root; f != nil; f = f.next {
+			for _, fl := range f.c_curr.Flags {
+				if info := fl.Info(); info.Required && fl.Count() == 0 {
+					return fmt.Errorf("%w: --%s", ErrFlagRequired, info.Name)
+				}
+			}
+		}
+	}
+
 	// Set ios if not set.
 	if c.ReadCloser == nil {
 		c.ReadCloser = os.Stdin

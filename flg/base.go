@@ -26,6 +26,10 @@ type Base[T any, P Parser[T]] struct {
 
 	Parser P
 
+	// Required reports that the user must provide this flag; Run returns
+	// ErrFlagRequired when a required flag is absent.
+	Required bool
+
 	count int
 }
 
@@ -34,10 +38,11 @@ func (f *Base[T, P]) Info() *Info {
 		Name:  f.Name,
 		Alias: f.Alias,
 
-		Type:  f.Parser.String(),
-		Brief: f.Brief,
-		Synop: f.Synop,
-		Usage: f.Usage,
+		Type:     f.Parser.String(),
+		Brief:    f.Brief,
+		Synop:    f.Synop,
+		Usage:    f.Usage,
+		Required: f.Required,
 	}
 }
 

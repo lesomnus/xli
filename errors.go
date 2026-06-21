@@ -10,6 +10,7 @@ import (
 var (
 	ErrUnknownFlag  = errors.New("unknown flag")
 	ErrNoFlagValue  = errors.New("no value is given")
+	ErrFlagRequired = errors.New("required flag not set")
 	ErrFlagAfterArg = errors.New("flag must come before arguments")
 	ErrUnknownCmd   = errors.New("unknown subcommand")
 	ErrTooManyArgs  = errors.New("too many arguments")

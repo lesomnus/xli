@@ -133,8 +133,8 @@ tab completion 엔진을 실제로 동작하게 고침.
 
 ### Phase 3 — 프레임워크 기능 충족 (feature parity)
 "진짜 CLI 프레임워크" 최소 기능. API 변경을 수반하므로 freeze 전에 끝낸다.
-- [ ] 내장 `--version`/`-v` + `Command.Version` 필드
-- [ ] 필수 flag 선언 + 검증
+- [x] ~~내장 `--version`/`-v`~~ → **제공하지 않기로 결정** (사용자가 직접 `version` 서브커맨드/플래그 추가; 다운스트림들도 이미 자체 구현)
+- [x] 필수 flag 선언 + 검증: `flg.Base.Required` + `flg.Info.Required`, Run 모드에서만 `ErrFlagRequired` 검증(--help/completion 은 면제) + 테스트
 - [ ] **기본값 의미론 정리** (확정 계약, breaking 허용 — 위 [기본값 의미론](#기본값default-의미론--확정-계약-phase-3-에서-구현-breaking-허용) 절 참조): `Default`/`Value` 필드 분리, `Get`=`count>0`, `MustGet`=`Value→Default→panic`, `Default()` 메서드 제거 후 `flg.Info.Default` 로 help 표시, arrakis 마이그레이션
 - [x] 값 타입 추가: `Float32`/`Float64`/`Duration` (flg + arg) + 테스트 — 순수 additive
 - [ ] 값 타입 추가(잔여): repeatable/`[]string` (count 누적 — 기본값 계약과 함께 다룸)

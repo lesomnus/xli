@@ -10,10 +10,11 @@ type Info struct {
 	Name     string
 	Alias    rune
 
-	Type  string
-	Brief string
-	Synop string
-	Usage fmt.Stringer
+	Type     string
+	Brief    string
+	Synop    string
+	Usage    fmt.Stringer
+	Required bool
 }
 
 func (i *Info) String() string {
