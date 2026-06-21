@@ -136,7 +136,8 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [ ] 내장 `--version`/`-v` + `Command.Version` 필드
 - [ ] 필수 flag 선언 + 검증
 - [ ] **기본값 의미론 정리** (확정 계약, breaking 허용 — 위 [기본값 의미론](#기본값default-의미론--확정-계약-phase-3-에서-구현-breaking-허용) 절 참조): `Default`/`Value` 필드 분리, `Get`=`count>0`, `MustGet`=`Value→Default→panic`, `Default()` 메서드 제거 후 `flg.Info.Default` 로 help 표시, arrakis 마이그레이션
-- [ ] flag 값 타입 추가: `float`, `time.Duration`, repeatable/`[]string`
+- [x] 값 타입 추가: `Float32`/`Float64`/`Duration` (flg + arg) + 테스트 — 순수 additive
+- [ ] 값 타입 추가(잔여): repeatable/`[]string` (count 누적 — 기본값 계약과 함께 다룸)
 - [ ] custom help template 주입 훅 (`PrintHelp` 의 TODO) + 템플릿 1회 파싱 캐시
 - [ ] `Synop`(long description) 렌더링 또는 필드 제거 결정
 - [ ] usage 자동 포맷 컨벤션 확정 (현재 `<req>`/`[opt]`/`[opt...]` 유지 여부; 사용자는 optional→`[ARG]` 만 명시)
