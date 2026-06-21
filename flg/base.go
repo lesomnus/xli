@@ -14,8 +14,9 @@ type Parser[T any] interface {
 }
 
 type Base[T any, P Parser[T]] struct {
-	Name  string
-	Alias rune
+	Name     string
+	Alias    rune
+	Category string
 
 	Brief string
 	Synop string
@@ -44,8 +45,9 @@ type Base[T any, P Parser[T]] struct {
 
 func (f *Base[T, P]) Info() *Info {
 	info := &Info{
-		Name:  f.Name,
-		Alias: f.Alias,
+		Category: f.Category,
+		Name:     f.Name,
+		Alias:    f.Alias,
 
 		Type:     f.Parser.String(),
 		Brief:    f.Brief,
@@ -99,6 +101,10 @@ func (f *Base[T, P]) Handle(ctx context.Context, u string) error {
 
 func (f *Base[T, P]) Count() int {
 	return f.count
+}
+
+func (f *Base[T, P]) setCategory(name string) {
+	f.Category = name
 }
 
 // NoValue reports whether the flag's parser is value-less (a switch).

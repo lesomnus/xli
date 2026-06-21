@@ -82,7 +82,9 @@ func (fs Flags) ByCategory() []Flags {
 
 func (fs Flags) WithCategory(name string, vs ...Flag) Flags {
 	for _, v := range vs {
-		v.Info().Category = name
+		if s, ok := v.(interface{ setCategory(string) }); ok {
+			s.setCategory(name)
+		}
 	}
 	return append(fs, vs...)
 }
