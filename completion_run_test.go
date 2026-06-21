@@ -74,6 +74,20 @@ func TestCompletionRun(t *testing.T) {
 		out := complete(t, newCompletionTestCmd(), "", "", "echo")
 		x.Contains(out, "AVAL")
 	}))
+	t.Run("subcommands are grouped by category", x.F(func(x x.X) {
+		c := &xli.Command{
+			Name: "app",
+			Commands: xli.Commands{
+				&xli.Command{Name: "echo"},
+			}.WithCategory("fruits",
+				&xli.Command{Name: "apple"},
+			),
+		}
+
+		out := complete(t, c, "", "")
+		x.Contains(out, "fruits\x1fapple") // grouped under "fruits"
+		x.Contains(out, "\x1fecho")        // ungrouped
+	}))
 	t.Run("flag value is not shadowed by a missing required arg", x.F(func(x x.X) {
 		c := &xli.Command{
 			Name: "app",

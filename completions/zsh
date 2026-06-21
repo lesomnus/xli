@@ -1,22 +1,46 @@
-#compdef %[1]s
-compdef _%[1]s %[1]s
+#compdef __XLI_PROG__
+compdef ___XLI_PROG__ __XLI_PROG__
 
 # This is a generated code by "github.com/lesomnus/xli".
 
-_%[1]s() {
-	local -a opts
+___XLI_PROG__() {
 	local curr=${words[CURRENT]:Q}
+	local lbuf=""
+	[[ -n ${curr} ]] && lbuf=${LBUFFER[-${#curr},-1]}
 
-	if [[ -z ${curr} ]]; then
-		opts=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion_zsh" "" "")}")
-	else
-		opts=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion_zsh" "${curr}" "${LBUFFER[-${#curr},-1]}")}")
-	fi
+	local -a lines
+	lines=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion_zsh" "${curr}" "${lbuf}")}")
 
-	_describe 'values' opts
+	# Each line is "<group>\x1f<value>[:<description>]"; candidates are grouped
+	# under their (possibly empty) heading.
+	typeset -A grouped
+	local -a order
+	local line group entry
+	local sep=$'\x1f'
+	for line in "${lines[@]}"; do
+		[[ -z ${line} ]] && continue
+		group=${line%%${sep}*}
+		entry=${line#*${sep}}
+		[[ -z ${entry} ]] && continue
+		if (( ! ${+grouped[$group]} )); then
+			order+=("${group}")
+		fi
+		grouped[$group]+="${entry}"$'\n'
+	done
+
+	local g
+	for g in "${order[@]}"; do
+		local -a opts
+		opts=("${(@f)${grouped[$g]%$'\n'}}")
+		if [[ -n ${g} ]]; then
+			_describe "${g}" opts
+		else
+			_describe 'values' opts
+		fi
+	done
 }
 
 # don't run the completion function when being source-ed or eval-ed
-if [ "$funcstack[1]" = "_%[1]s" ]; then
-    _%[1]s
+if [ "$funcstack[1]" = "___XLI_PROG__" ]; then
+    ___XLI_PROG__
 fi

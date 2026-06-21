@@ -31,8 +31,11 @@ func newCmdZshCompletion() *Command {
 
 			// The generated script is keyed on the root command's name,
 			// regardless of how deeply the completion command is mounted.
+			// A plain string replace is used (not Printf) because the script
+			// contains '%' in shell parameter expansions.
 			root := cmd.Root()
-			if _, err := cmd.Printf(string(b), root.Name); err != nil {
+			script := strings.ReplaceAll(string(b), "__XLI_PROG__", root.Name)
+			if _, err := cmd.Print(script); err != nil {
 				return err
 			}
 

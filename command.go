@@ -198,6 +198,33 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 	return f_root.execute(ctx)
 }
 
+// completeCommands emits subcommand candidates, grouped by category.
+func completeCommands(t tab.Tab, c *Command) {
+	for _, group := range c.Commands.ByCategory() {
+		sink := t
+		if cat := group[0].Category; cat != "" {
+			sink = t.Group(cat)
+		}
+		for _, v := range group {
+			sink.ValueD(v.Name, v.Brief)
+		}
+	}
+}
+
+// completeFlagNames emits flag-name candidates, grouped by category.
+func completeFlagNames(t tab.Tab, c *Command) {
+	for _, group := range c.Flags.ByCategory() {
+		sink := t
+		if cat := group[0].Info().Category; cat != "" {
+			sink = t.Group(cat)
+		}
+		for _, u := range group {
+			v := u.Info()
+			sink.ValueD(fmt.Sprintf("--%s", v.Name), v.Brief)
+		}
+	}
+}
+
 // args must be a normalized one by `NormalizeCompletionArgs`.
 func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	tab := tab.From(ctx)
@@ -245,18 +272,14 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		// A flag value or an argument is being completed; handled below.
 
 	case strings.HasPrefix(last, "-"):
-		// "--" or "-": suggest flag names.
-		for _, u := range c.Flags {
-			v := u.Info()
-			tab.ValueD(fmt.Sprintf("--%s", v.Name), v.Brief)
-		}
+		// "--" or "-": suggest flag names, grouped by category.
+		completeFlagNames(tab, c)
 		return nil
 
 	default:
-		// Start of a (sub)command or a non-flag token: suggest subcommands.
-		for _, v := range c.Commands {
-			tab.ValueD(v.Name, v.Brief)
-		}
+		// Start of a (sub)command or a non-flag token: suggest subcommands,
+		// grouped by category.
+		completeCommands(tab, c)
 		return nil
 	}
 

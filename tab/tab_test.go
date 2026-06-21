@@ -10,17 +10,25 @@ import (
 )
 
 func TestZshTab(t *testing.T) {
-	t.Run("Value writes the value with a newline", x.F(func(x x.X) {
+	t.Run("Value writes an ungrouped entry", x.F(func(x x.X) {
 		b := &strings.Builder{}
 		z := tab.NewZshTab(b)
 		z.Value("foo")
-		x.Equal("foo\n", b.String())
+		x.Equal("\x1ffoo\n", b.String())
 	}))
 	t.Run("ValueD writes the value and description", x.F(func(x x.X) {
 		b := &strings.Builder{}
 		z := tab.NewZshTab(b)
 		z.ValueD("foo", "the foo")
-		x.Equal("foo:the foo\n", b.String())
+		x.Equal("\x1ffoo:the foo\n", b.String())
+	}))
+	t.Run("Group prefixes entries with the group name", x.F(func(x x.X) {
+		b := &strings.Builder{}
+		z := tab.NewZshTab(b)
+		g := z.Group("net")
+		g.Value("host")
+		g.ValueD("port", "the port")
+		x.Equal("net\x1fhost\nnet\x1fport:the port\n", b.String())
 	}))
 }
 
