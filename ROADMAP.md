@@ -147,12 +147,15 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] usage 자동 포맷 컨벤션 확정: 현행 `<req>`/`[opt]`/`[opt...]` 유지 (사용자 요청 "optional→`[ARG]`" 충족)
 - [ ] (nice-to-have, post-1.0) env-var 바인딩, enum/choice, 상호배타 그룹, repeatable/`[]string`
 
-### Phase 4 — API 동결 & 폴리시 → `v1.0`
-- [ ] 공개 API 최종 점검 (mode 상수 타입 통일, 죽은 export 제거, 네이밍 일관성)
-- [ ] 단일 실행 트리/핸들러가 `next()` 호출 책임/strict positioning 등 "의도된 날카로운 모서리" 문서화
-- [ ] README 작성 (현재 2줄), 예제 보강, godoc
+### Phase 4 — API 동결 & 폴리시 → `v1.0` (진행 중)
+- [x] (선행) `flg.Flags.WithCategory` 버그 픽스 — `Base.Category` 필드 + setter (이전엔 no-op)
+- [x] README 작성 (검증된 quick-start 예제 포함; 현재 2줄 → 본문)
+- [ ] 공개 API 최종 점검 (mode 상수 타입 통일 ✅, 죽은 export 제거 — `mode.Resolve`✅ / `arg.IsMany` 검토, 네이밍 일관성)
+- [ ] **freeze 결정** (사용자 판단 필요): `tab.Tab` 인터페이스 확장 여부, custom help template 주입면(Command 필드 vs ctx), `arg` 패키지에도 기본값 계약 적용 여부
+- [ ] 의도된 날카로운 모서리 문서화 (단일 실행 트리, 핸들러의 `next()` 호출 책임, strict positioning) — godoc/README 보강
+- [ ] **arrakis 마이그레이션 적용** (`Value:`→`Default:`, diff.go 주입 패턴 변경)
 - [ ] 다운스트림 4개 레포 최종 회귀 통과
-- [ ] `v1.0.0` 태그
+- [ ] **`v1.0.0` 태그** (릴리즈 시점은 사용자 결정)
 
 ---
 
