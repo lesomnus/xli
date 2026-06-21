@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"unicode/utf8"
 
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
@@ -189,7 +190,9 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	tab := tab.From(ctx)
 	if tab == nil {
-		panic("tab must exist")
+		// Completion must never crash the user's shell; without a sink
+		// there is nothing to emit.
+		return nil
 	}
 
 	f_root, parse_err := parseFrameAll(c, args)
@@ -206,27 +209,31 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	}
 
 	c = f_last.c_curr
-	need_arg = need_arg || slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
-		return a.IsOptional()
-	})
+
+	last := ""
+	if len(args) > 0 {
+		last = args[len(args)-1]
+	}
+
+	// A trailing "=" ("--flag=" or "-x=") means a flag value is being
+	// completed; this takes precedence over a missing required argument so
+	// that a command with required args can still complete its flag values.
+	if strings.HasSuffix(last, "=") {
+		need_val = true
+		need_arg = false
+	}
+	if !need_val {
+		need_arg = need_arg || slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
+			return a.IsOptional()
+		})
+	}
 
 	switch {
 	case need_val || need_arg:
-		break
+		// A flag value or an argument is being completed; handled below.
 
-	case len(args) == 0:
-		fallthrough
-	case !strings.HasPrefix(args[len(args)-1], "--"):
-		for _, v := range c.Commands {
-			tab.ValueD(v.Name, v.Brief)
-		}
-		return nil
-
-	case len(c.Flags) == 0:
-		return nil
-
-	case !strings.HasSuffix(args[len(args)-1], "="):
-		// last == "--"
+	case strings.HasPrefix(last, "-"):
+		// "--" or "-": suggest flag names.
 		for _, u := range c.Flags {
 			v := u.Info()
 			tab.ValueD(fmt.Sprintf("--%s", v.Name), v.Brief)
@@ -234,10 +241,11 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		return nil
 
 	default:
-		// Some args are given.
-		// Required args are given if the command needs some.
-		// The command has flags and value of one of the flags needed to be completed.
-		need_val = true
+		// Start of a (sub)command or a non-flag token: suggest subcommands.
+		for _, v := range c.Commands {
+			tab.ValueD(v.Name, v.Brief)
+		}
+		return nil
 	}
 
 	if f_root != f_last {
@@ -248,7 +256,9 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		ctx = mode.Into(ctx, mode.Tab|mode.Pass)
 		for f := range f_root.Iter() {
 			if err := f.prepare(ctx); err != nil {
-				// TODO: should I ignore some parse error?
+				// Parent frames are only walked to set up context for the
+				// command being completed; a parse error there just means
+				// there is nothing to complete, so emit nothing.
 				return nil
 			}
 		}
@@ -259,22 +269,25 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 
 	ctx = mode.Into(ctx, mode.Tab)
 	if need_val {
-		a := args[len(args)-1]
-		n := lex.Flag(a).Name()
-		if v := c.Flags.Get(n); v != nil {
+		f := lex.Flag(args[len(args)-1])
+		var v flg.Flag
+		if f.IsShort() {
+			r, _ := utf8.DecodeRuneInString(f.Name())
+			v = c.Flags.GetByAlias(r)
+		} else {
+			v = c.Flags.Get(f.Name())
+		}
+		if v != nil {
 			v.Handle(ctx, "")
 		}
-	} else if need_arg {
+	} else if need_arg && len(c.Args) > 0 {
 		i := len(f_last.args)
-		if l := len(c.Args); i >= l {
-			i = l - 1
+		if i >= len(c.Args) {
+			i = len(c.Args) - 1
 		}
-		v := c.Args[i]
-		if f := v.Info().TODO_Completion; f != nil {
-			f(ctx)
+		if h := c.Args[i].Info().Handle; h != nil {
+			h(ctx)
 		}
-	} else {
-		panic("some completion not considered")
 	}
 
 	return nil

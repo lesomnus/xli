@@ -12,8 +12,7 @@ type Info struct {
 	Synop string
 	Usage fmt.Stringer
 
-	Handle          func(ctx context.Context)
-	TODO_Completion func(ctx context.Context)
+	Handle func(ctx context.Context)
 }
 
 type Arg interface {

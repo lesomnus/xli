@@ -118,14 +118,18 @@
 
 **결과**: `go build`/`go vet`/`go test -race` 클린, 전체 통과. 다운스트림 재검증 — flob/clade/tegra **build+test PASS**, arrakis build PASS(테스트 실패는 동일한 xli-무관 `arks` 패키지).
 
-### Phase 2 — Completion 마무리 (B8 본체)
-tab completion API 를 완성하고 동결 가능한 형태로 정리.
-- [ ] arg-value completion 을 arg 의 `Handle`(mode-gated) 경유로 라우팅, `TODO_Completion` 제거/개명
-- [ ] short-flag value completion 픽스 (`GetByAlias`, `-x=` 처리)
-- [ ] 필수 arg 누락이 flag-value completion 을 가리지 않도록 분리
-- [ ] `tab.Tab` 인터페이스 확장(directive/grouping/error) 후 동결
-- [ ] completion 통합 테스트 추가
-- [ ] (post-freeze) bash/fish/powershell 셸 추가 — Tab 인터페이스 동결 이후
+### Phase 2 — Completion 마무리 (B8 본체) ✅ **완료**
+tab completion 엔진을 실제로 동작하게 고침.
+- [x] arg-value completion 을 arg 의 `Info().Handle`(Tab 모드에서 zero value 로 핸들러 발화) 경유로 라우팅 → `arg.OnTab` 핸들러가 실제로 동작. `arg.Info.TODO_Completion` 필드 **제거**.
+- [x] short-flag value completion 픽스: `runCompletion` switch 를 `=` 접미사 우선 판정으로 재배열 + short flag 는 `GetByAlias`/`utf8` 로 조회 ([command.go](command.go))
+- [x] **shadowing 픽스**: `--flag=`/`-x=` 의 `=` 접미사 판정을 `need_arg` 단축평가보다 앞으로 옮겨, 필수 arg 가 있어도 flag-value completion 이 가려지지 않게 함
+- [x] completion 경로 panic 제거: `tab` nil 가드 → no-op, "some completion not considered" 분기 제거 (completion 은 셸을 절대 crash 시키면 안 됨)
+- [x] B10: `NewCmdCompletion` 의 nil-deref 제거 — `Parent().Parent()` 대신 `Root()`(Phase 0 픽스) 사용, panic → error
+- [x] completion 통합 테스트 추가 (`completion_run_test.go`): 루트/중첩 서브커맨드, flag-name, long/short flag value, arg value, shadowing, 스크립트 생성
+- [ ] (Phase 4 freeze 결정으로 이관) `tab.Tab` 인터페이스 확장(grouping/directive/error) — 현재 2-메서드로 동작하며, 확장은 서드파티 Tab 구현을 깨므로 freeze 시점에 함께 결정
+- [ ] (post-1.0) bash/fish/powershell 셸 추가 — Tab 인터페이스 동결 이후
+
+**결과**: 이전엔 arg-value/short-flag value completion 이 **완전히 죽어있었음** → 이제 동작. 코어 커버리지 64.0→**82.8%**. `go test -race`/`vet` 클린, 다운스트림 회귀 통과(`TODO_Completion` 제거가 다운스트림에 영향 없음 확인).
 
 ### Phase 3 — 프레임워크 기능 충족 (feature parity)
 "진짜 CLI 프레임워크" 최소 기능. API 변경을 수반하므로 freeze 전에 끝낸다.
@@ -173,7 +177,9 @@ tab completion API 를 완성하고 동결 가능한 형태로 정리.
 
 - **2026-06-21**: **Phase 1 완료.** 에러 sentinel 표준화(`ErrFlagAfterArg`), `mode.Resolve` 제거 + mode 상수 타입 통일, `HasSeq` nil 가드, `frm`/`mode`/`tab` 테스트(각 100%). 도달 불가 방어 panic 은 불변식 주석으로 명시. `go test -race` 클린, 다운스트림 회귀 통과.
 
-### 다음 작업: Phase 2 (Completion 마무리)
-arg-value completion 활성화(`TODO_Completion` 제거 → `Handle` 경유), short-flag value completion 픽스, 필수 arg 가 flag-value completion 을 가리는 문제 분리, `tab.Tab` 인터페이스 확장·동결, `runCompletion` 의 panic(`command.go:192/277`)·error-swallow 정리, completion 통합 테스트. (B8/B10)
+- **2026-06-21**: **Phase 2 완료.** completion 엔진을 동작하게 수정 — arg-value/short-flag value completion 활성화, shadowing 픽스, panic 제거, B10(nil-deref) 픽스, 통합 테스트(`completion_run_test.go`). 코어 커버리지 82.8%. `tab.Tab` 확장은 Phase 4 freeze 로 이관.
+
+### 다음 작업: Phase 3 (프레임워크 기능 충족)
+`--version`/`-v`, 필수 flag 선언+검증, 기본값 의미론 정리(확정 계약), flag 값 타입 추가(float/duration/`[]string`), custom help template 주입, `Synop` 렌더링, usage 자동 포맷 컨벤션 확정. (대부분 freeze 전 필요, 일부 breaking 포함)
 
 > 미해결 확정 버그 중 Phase 0 에서 제외한 것: **B8(completion 본체)** → Phase 2, **B10(`NewCmdCompletion` nil-deref)** → Phase 2 와 함께. 기본값 의미론(landmine) → Phase 3.

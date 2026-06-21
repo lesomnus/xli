@@ -3,6 +3,8 @@ package arg
 import (
 	"context"
 	"fmt"
+
+	"github.com/lesomnus/xli/mode"
 )
 
 type Parser[T any] interface {
@@ -46,7 +48,18 @@ func (a *Base[T, P]) Info() *Info {
 		Usage: usage,
 
 		Handle: func(ctx context.Context) {
-			if a.Handler != nil && a.Value != nil {
+			if a.Handler == nil {
+				return
+			}
+			if mode.From(ctx) == mode.Tab {
+				// Completion: invoke the handler with a zero value so an
+				// OnTab handler can emit suggestions even before a value
+				// has been parsed.
+				var z T
+				a.Handler.Handle(ctx, z)
+				return
+			}
+			if a.Value != nil {
 				a.Handler.Handle(ctx, *a.Value)
 			}
 		},

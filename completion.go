@@ -26,12 +26,14 @@ func newCmdZshCompletion() *Command {
 		Handler: OnRun(func(ctx context.Context, cmd *Command, next Next) error {
 			b, err := completions.ReadFile("completions/zsh")
 			if err != nil {
-				panic(err)
+				return err
 			}
 
-			c := cmd.Parent().Parent()
-			if _, err := cmd.Printf(string(b), c.Name); err != nil {
-				panic(err)
+			// The generated script is keyed on the root command's name,
+			// regardless of how deeply the completion command is mounted.
+			root := cmd.Root()
+			if _, err := cmd.Printf(string(b), root.Name); err != nil {
+				return err
 			}
 
 			return next(ctx)
