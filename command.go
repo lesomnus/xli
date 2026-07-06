@@ -261,7 +261,10 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		need_val = true
 		need_arg = false
 	}
-	if !need_val {
+	// Treat an optional argument as "being completed" so its values are offered
+	// even with nothing typed — but not when the token is a flag ("-"/"--"),
+	// which must still complete flag names rather than the optional arg.
+	if !need_val && !strings.HasPrefix(last, "-") {
 		need_arg = need_arg || slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
 			return a.IsOptional()
 		})

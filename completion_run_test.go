@@ -105,6 +105,27 @@ func TestCompletionRun(t *testing.T) {
 		out := complete(t, c, "--bar=", "--bar=", "--bar=")
 		x.Contains(out, "BVAL")
 	}))
+	t.Run("flag names are not shadowed by an optional arg", x.F(func(x x.X) {
+		c := &xli.Command{
+			Name: "app",
+			Flags: flg.Flags{
+				&flg.String{Name: "bar", Handler: flg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
+					t.Value("BVAL")
+					return nil
+				})},
+			},
+			Args: arg.Args{
+				&arg.String{Name: "OPT", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+					t.Value("AVAL")
+				})},
+			},
+		}
+
+		// Typing "--" must offer flag names, not the optional argument's values.
+		out := complete(t, c, "--", "--", "--")
+		x.Contains(out, "--bar")
+		x.False(strings.Contains(out, "AVAL"))
+	}))
 	t.Run("nested subcommands", x.F(func(x x.X) {
 		c := &xli.Command{
 			Name: "app",
