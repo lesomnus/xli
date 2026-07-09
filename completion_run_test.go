@@ -126,6 +126,81 @@ func TestCompletionRun(t *testing.T) {
 		x.Contains(out, "--bar")
 		x.False(strings.Contains(out, "AVAL"))
 	}))
+	t.Run("filled optional arg is not re-offered at the next position", x.F(func(x x.X) {
+		newCmd := func() *xli.Command {
+			return &xli.Command{
+				Name: "app",
+				Args: arg.Args{
+					&arg.String{Name: "OPT", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+						t.Value("AVAL")
+					})},
+				},
+			}
+		}
+
+		// At the empty first position the optional arg's values are offered.
+		out := complete(t, newCmd(), "", "")
+		x.Contains(out, "AVAL")
+
+		// After the single arg is filled ("app foo "), the cursor sits one
+		// position past it; a further tab must not re-offer the same arg.
+		out = complete(t, newCmd(), "", "", "foo")
+		x.False(strings.Contains(out, "AVAL"))
+	}))
+	t.Run("filled required arg is not re-offered at the next position", x.F(func(x x.X) {
+		newCmd := func() *xli.Command {
+			return &xli.Command{
+				Name: "app",
+				Args: arg.Args{
+					&arg.String{Name: "REQ", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+						t.Value("AVAL")
+					})},
+				},
+			}
+		}
+
+		out := complete(t, newCmd(), "", "")
+		x.Contains(out, "AVAL")
+
+		out = complete(t, newCmd(), "", "", "foo")
+		x.False(strings.Contains(out, "AVAL"))
+	}))
+	t.Run("variadic arg keeps offering values past the first", x.F(func(x x.X) {
+		// A "rest" argument accepts any number of values, so its hint must
+		// still appear once one value has been filled in.
+		out := complete(t, newCompletionTestCmd(), "", "", "echo", "foo")
+		x.Contains(out, "AVAL")
+	}))
+	t.Run("position advances to the next arg", x.F(func(x x.X) {
+		newCmd := func() *xli.Command {
+			return &xli.Command{
+				Name: "app",
+				Args: arg.Args{
+					&arg.String{Name: "FIRST", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+						t.Value("FIRST_VAL")
+					})},
+					&arg.String{Name: "SECOND", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+						t.Value("SECOND_VAL")
+					})},
+				},
+			}
+		}
+
+		// Nothing typed: the first argument is being completed.
+		out := complete(t, newCmd(), "", "")
+		x.Contains(out, "FIRST_VAL")
+		x.False(strings.Contains(out, "SECOND_VAL"))
+
+		// First argument filled: completion advances to the second argument.
+		out = complete(t, newCmd(), "", "", "foo")
+		x.Contains(out, "SECOND_VAL")
+		x.False(strings.Contains(out, "FIRST_VAL"))
+
+		// Both arguments filled: neither is re-offered.
+		out = complete(t, newCmd(), "", "", "foo", "bar")
+		x.False(strings.Contains(out, "FIRST_VAL"))
+		x.False(strings.Contains(out, "SECOND_VAL"))
+	}))
 	t.Run("nested subcommands", x.F(func(x x.X) {
 		c := &xli.Command{
 			Name: "app",

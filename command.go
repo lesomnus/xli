@@ -321,10 +321,20 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	} else if need_arg && len(c.Args) > 0 {
 		i := len(f_last.args)
 		if i >= len(c.Args) {
-			i = len(c.Args) - 1
+			// The cursor sits past the last declared argument. Only a
+			// variadic (many) trailing argument keeps accepting values, so
+			// its hint may repeat; a fixed argument that is already filled
+			// has nothing left to complete and must not be re-offered.
+			if last := c.Args[len(c.Args)-1]; last.IsMany() {
+				i = len(c.Args) - 1
+			} else {
+				i = -1
+			}
 		}
-		if h := c.Args[i].Info().Handle; h != nil {
-			h(ctx)
+		if i >= 0 {
+			if h := c.Args[i].Info().Handle; h != nil {
+				h(ctx)
+			}
 		}
 	}
 

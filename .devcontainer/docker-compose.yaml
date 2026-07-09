@@ -15,7 +15,6 @@ services:
 
       - ..:/workspace
       - ${HOME}/workspaces:/workspaces
-      - ${HOME}/.claude:/home/hypnos/.claude
 
     deploy:
       resources:
@@ -27,6 +26,6 @@ services:
           memory: 4G
 
 volumes:
+  command.history:
   go.cache.mod:
   go.cache.bin:
-  command.history:
