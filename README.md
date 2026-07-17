@@ -23,6 +23,8 @@ and context is nested as you go down the tree.
 - **Defaults & required flags** — a clear contract between the configured default
   and the value the user actually provided.
 - **Generated help** and **shell completion** (zsh).
+- **Testing helpers** — the `xlitest` package runs a command against in-memory
+  IO and decodes completion output, so tests assert on results, not wiring.
 
 ## Install
 
@@ -92,6 +94,9 @@ $ greet --help
 - [docs/completion.md](docs/completion.md) — shell completion: setup, the
   `tab.Tab` sink (values, descriptions, groups, file/dir completion), and
   `OnTab` handlers.
+- [docs/testing.md](docs/testing.md) — testing your commands with the
+  `xlitest` package: running, asserting output/errors/parsed values, stdin, and
+  decoding shell completion.
 
 ## Concepts
 
