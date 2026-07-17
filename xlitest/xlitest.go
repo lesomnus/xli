@@ -29,17 +29,8 @@ import (
 	"testing"
 
 	"github.com/lesomnus/xli"
+	"github.com/lesomnus/xli/internal/comp"
 )
-
-// completionTag is the marker the generated zsh script passes as the
-// third-to-last argument to trigger the completion path. It is xli's internal
-// completion tag prefix ("$$xli_completion_") followed by the shell name.
-const completionTag = "$$xli_completion_zsh"
-
-// zshSep is the field separator xli's zsh completion sink writes between the
-// kind, group, and entry of each emitted line. It mirrors the unexported
-// tab.zshSep.
-const zshSep = "\x1f"
 
 // Result captures the outcome of running a command.
 type Result struct {
@@ -195,7 +186,7 @@ func (h Harness) Complete(t testing.TB, line string) Completions {
 	args, curr, buff := splitLine(line)
 	full := make([]string, 0, len(args)+3)
 	full = append(full, args...)
-	full = append(full, completionTag, curr, buff)
+	full = append(full, comp.Tag("zsh"), curr, buff)
 
 	stdout, _, err := h.run(t, full)
 	c := decodeZsh(stdout.String())
@@ -229,13 +220,13 @@ func splitLine(line string) (args []string, curr, buff string) {
 func decodeZsh(raw string) Completions {
 	c := Completions{Raw: raw}
 	for _, line := range strings.Split(raw, "\n") {
-		kind, rest, ok := strings.Cut(line, zshSep)
+		kind, rest, ok := strings.Cut(line, comp.Sep)
 		if !ok {
 			continue
 		}
 		switch kind {
 		case "v":
-			group, entry, ok := strings.Cut(rest, zshSep)
+			group, entry, ok := strings.Cut(rest, comp.Sep)
 			if !ok || entry == "" {
 				continue
 			}

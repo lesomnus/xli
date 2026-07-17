@@ -8,11 +8,10 @@ import (
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
+	"github.com/lesomnus/xli/internal/comp"
 	"github.com/lesomnus/xli/internal/x"
 	"github.com/lesomnus/xli/tab"
 )
-
-const completionTag = "$$xli_completion_zsh"
 
 // complete drives the shell-completion path end to end the way the generated
 // zsh script does: the last three argv entries are the completion tag, the
@@ -21,7 +20,7 @@ func complete(t *testing.T, c *xli.Command, curr, buff string, args ...string) s
 	t.Helper()
 	b := &strings.Builder{}
 	c.Writer = b
-	full := append(append([]string{}, args...), completionTag, curr, buff)
+	full := append(append([]string{}, args...), comp.Tag("zsh"), curr, buff)
 	if err := c.Run(context.Background(), full); err != nil {
 		t.Fatalf("completion run failed: %v", err)
 	}

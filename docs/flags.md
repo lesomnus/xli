@@ -22,8 +22,11 @@ declared on `Command.Flags` and must appear **before** positional arguments.
 | `flg.Uint` `flg.Uint32` `flg.Uint64` | unsigned ints | |
 | `flg.Float32` `flg.Float64` | floats | |
 | `flg.Duration` | `time.Duration` | accepts `1m30s`, `500ms`, … |
+| `flg.Strings` | `[]string` | repeatable; each `--flag v` appends one value (see [Repeatable flags](#repeatable-flags)) |
 
-All of them are aliases of the generic `flg.Base[T, P]`.
+The scalar types are aliases of the generic `flg.Base[T, P]`; the repeatable
+`flg.Strings` is an alias of `flg.Multi[T, P]`, which accumulates one value per
+occurrence.
 
 Every flag carries metadata:
 
@@ -110,6 +113,37 @@ so custom no-value flags are possible (see below).
 
 Short aliases use a single rune: `&flg.Switch{Name: "verbose", Alias: 'v'}`
 enables `-v`.
+
+## Repeatable flags
+
+`flg.Strings` accumulates a value for every occurrence on the command line
+instead of letting the last one win:
+
+```go
+Flags: flg.Flags{
+	&flg.Strings{Name: "tag", Alias: 't', Brief: "labels to attach"},
+},
+```
+
+```console
+$ app --tag a --tag b -t c   # or --tag=a --tag=b
+```
+
+reads back as `[]string{"a", "b", "c"}`:
+
+```go
+tags, ok := flg.Get[[]string](cmd, "tag") // ok == user provided --tag at least once
+all := flg.MustGet[[]string](cmd, "tag")  // provided values, else Default, else panic
+```
+
+`Default` and `Value` are plain `[]string` (a `nil` slice means "absent"), unlike
+the scalar flags' `*T`. `Count()` reports the number of occurrences. It follows
+the same default/parsed contract: `Get` reports only what the user provided;
+`Default` is consulted only by `MustGet`.
+
+`flg.Strings` is `flg.Multi[string, flg.StringParser]`; the generic
+`flg.Multi[T, P]` can be aliased to other element types the same way
+`arg.Rest` is (e.g. a repeatable int flag).
 
 ## Categories
 

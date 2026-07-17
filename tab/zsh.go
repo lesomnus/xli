@@ -3,11 +3,9 @@ package tab
 import (
 	"fmt"
 	"io"
-)
 
-// zshSep separates fields on each emitted line. It is a non-printing byte that
-// survives shell command substitution (unlike NUL).
-const zshSep = "\x1f"
+	"github.com/lesomnus/xli/internal/comp"
+)
 
 // Each emitted line is one of:
 //
@@ -36,13 +34,13 @@ func (t *ZshTab) Group(name string) Tab {
 }
 
 func (t *ZshTab) Files(pattern string) {
-	fmt.Fprintf(t, "f%s%s\n", zshSep, pattern)
+	fmt.Fprintf(t, "f%s%s\n", comp.Sep, pattern)
 }
 
 func (t *ZshTab) Dirs() {
-	fmt.Fprintf(t, "d%s\n", zshSep)
+	fmt.Fprintf(t, "d%s\n", comp.Sep)
 }
 
 func (t *ZshTab) candidate(entry string) {
-	fmt.Fprintf(t, "v%s%s%s%s\n", zshSep, t.group, zshSep, entry)
+	fmt.Fprintf(t, "v%s%s%s%s\n", comp.Sep, t.group, comp.Sep, entry)
 }

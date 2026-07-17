@@ -8,6 +8,8 @@ ___XLI_PROG__() {
 	local lbuf=""
 	[[ -n ${curr} ]] && lbuf=${LBUFFER[-${#curr},-1]}
 
+	# The trigger tag and separator below mirror internal/comp (TagPrefix+"zsh"
+	# and Sep); keep them in sync with that package.
 	local -a lines
 	lines=("${(@f)$(${words[1,CURRENT]:Q} "\$\$xli_completion_zsh" "${curr}" "${lbuf}")}")
 

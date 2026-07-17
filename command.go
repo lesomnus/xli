@@ -14,6 +14,7 @@ import (
 
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
+	"github.com/lesomnus/xli/internal/comp"
 	"github.com/lesomnus/xli/lex"
 	"github.com/lesomnus/xli/mode"
 	"github.com/lesomnus/xli/tab"
@@ -119,7 +120,7 @@ func (c *Command) Scanln(vs ...any) (int, error) {
 func (c *Command) Run(ctx context.Context, args []string) error {
 	if l := len(args); l > 2 {
 		tag := args[l-3]
-		if sh, ok := strings.CutPrefix(tag, completion_tag_prefix); ok {
+		if sh, ok := strings.CutPrefix(tag, comp.TagPrefix); ok {
 			curr := args[l-2] // Word where the cursor is.
 			buff := args[l-1] // len(curr) characters on left of the cursor.
 

@@ -19,7 +19,8 @@ and context is nested as you go down the tree.
 - **Strict flag/arg positioning** — a command owns only its own flags and args;
   flags must come before args. This keeps parsing unambiguous across deep trees.
 - **Typed flags and arguments** — `string`, `bool` (switch), `int`/`uint`
-  families, `float32`/`float64`, and `time.Duration`, plus variadic arguments.
+  families, `float32`/`float64`, and `time.Duration`, plus variadic arguments
+  and repeatable (`[]string`) flags.
 - **Defaults & required flags** — a clear contract between the configured default
   and the value the user actually provided.
 - **Generated help** and **shell completion** (zsh).
