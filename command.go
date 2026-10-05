@@ -347,7 +347,37 @@ var DefaultHelpTemplate string
 
 // defaultHelpTemplate is parsed once at startup; the embedded template is a
 // compile-time constant, so a parse failure is a programmer error.
-var defaultHelpTemplate = template.Must(template.New("help").Parse(DefaultHelpTemplate))
+var defaultHelpTemplate = template.Must(template.New("help").Funcs(helpFuncs).Parse(DefaultHelpTemplate))
+
+var helpFuncs = template.FuncMap{
+	"usage": usageLine,
+}
+
+// usageLine renders the synopsis line of c, e.g. "app deploy [options] <TARGET>".
+// Ancestors contribute their name and arguments; options are placed before the
+// arguments of c because flags must precede arguments.
+func usageLine(c *Command) string {
+	parts := []string{}
+	tree := c.Tree()
+	for _, p := range tree[:len(tree)-1] {
+		parts = append(parts, p.Name)
+		for _, a := range p.Args {
+			parts = append(parts, a.Info().Usage.String())
+		}
+	}
+
+	parts = append(parts, c.Name)
+	if len(c.Flags) > 0 {
+		parts = append(parts, "[options]")
+	}
+	for _, a := range c.Args {
+		parts = append(parts, a.Info().Usage.String())
+	}
+	if len(c.Commands) > 0 {
+		parts = append(parts, "[command]")
+	}
+	return strings.Join(parts, " ")
+}
 
 func (c *Command) PrintHelp(w io.Writer) error {
 	// TODO(Phase 4): allow a user-supplied template once the injection

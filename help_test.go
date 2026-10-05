@@ -8,6 +8,7 @@ import (
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/internal/x"
+	"github.com/lesomnus/xli/xlitest"
 )
 
 func TestPrintHelp(t *testing.T) {
@@ -79,6 +80,45 @@ func TestPrintHelp(t *testing.T) {
 		x.NoError(err)
 		x.Contains(b.String(), "Description:")
 		x.Contains(b.String(), "A longer description of the app.")
+	}))
+	t.Run("options are placed before arguments in usage", x.F(func(x x.X) {
+		c := &xli.Command{
+			Name:  "deploy",
+			Flags: flg.Flags{&flg.String{Name: "port"}},
+			Args:  arg.Args{&arg.String{Name: "TARGET"}},
+		}
+
+		b := &strings.Builder{}
+		err := c.PrintHelp(b)
+		x.NoError(err)
+		x.Contains(b.String(), "    deploy [options] <TARGET>\n")
+	}))
+	t.Run("subcommand usage includes ancestors", x.F(func(x x.X) {
+		c := &xli.Command{
+			Name:  "app",
+			Flags: flg.Flags{&flg.Switch{Name: "verbose"}},
+			Commands: xli.Commands{
+				&xli.Command{
+					Name:  "deploy",
+					Flags: flg.Flags{&flg.String{Name: "port"}},
+					Args:  arg.Args{&arg.String{Name: "TARGET"}},
+				},
+			},
+		}
+
+		got := xlitest.Run(x.T, c, "deploy", "-h")
+		x.NoError(got.Err)
+		x.Contains(got.Stdout, "    app deploy [options] <TARGET>\n")
+	}))
+	t.Run("help flag is listed in options", x.F(func(x x.X) {
+		c := &xli.Command{Name: "app"}
+
+		b := &strings.Builder{}
+		err := c.PrintHelp(b)
+		x.NoError(err)
+		x.Contains(b.String(), "Options:")
+		x.Contains(b.String(), "-h,--help")
+		x.NotContains(b.String(), "[options]")
 	}))
 	t.Run("variadic argument is rendered with ellipsis", x.F(func(x x.X) {
 		c := &xli.Command{
