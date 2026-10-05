@@ -32,9 +32,25 @@ Run a command with `Run(ctx, args)`, where `args` is usually `os.Args[1:]`:
 root := &xli.Command{Name: "app", /* ... */}
 if err := root.Run(context.Background(), os.Args[1:]); err != nil {
 	fmt.Fprintln(os.Stderr, err)
+
+	var ue *xli.UsageError
+	if errors.As(err, &ue) {
+		fmt.Fprintf(os.Stderr, "Run '%s --help' for usage.\n", ue.Path())
+		os.Exit(2)
+	}
 	os.Exit(1)
 }
 ```
+
+### Errors
+
+If the command line doesn't match what the commands declare (an unknown flag or
+subcommand, a bad value, a missing required flag or argument), `Run` returns an
+`*xli.UsageError`. It names the command the mistake was made on, so the message
+looks like `app deploy: --prot: unknown flag`. `ue.Cmd` is that command, so
+`ue.Cmd.PrintHelp(w)` prints its help. The sentinel errors (`ErrUnknownFlag`,
+`ErrUnknownCmd`, `ErrNeedArgs`, `ErrNeedCmd`, `ErrFlagRequired`, ...) still work
+with `errors.Is`. Errors returned by your handlers are passed through unchanged.
 
 ### Keep constructors cheap
 

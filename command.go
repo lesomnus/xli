@@ -155,7 +155,7 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 			break
 		}
 		if err := f.prepare(ctx); err != nil {
-			return err
+			return &UsageError{Cmd: f.c_curr, Err: err}
 		}
 	}
 
@@ -178,7 +178,10 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 		for f := f_root; f != nil; f = f.next {
 			for _, fl := range f.c_curr.Flags {
 				if info := fl.Info(); info.Required && fl.Count() == 0 {
-					return fmt.Errorf("%w: --%s", ErrFlagRequired, info.Name)
+					return &UsageError{
+						Cmd: f.c_curr,
+						Err: fmt.Errorf("%w: --%s", ErrFlagRequired, info.Name),
+					}
 				}
 			}
 		}
