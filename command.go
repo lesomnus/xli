@@ -32,6 +32,10 @@ type Command struct {
 	Args     arg.Args
 	Commands Commands
 
+	// Exclusive lists groups of flag names of which at most one may be given,
+	// e.g. {{"json", "yaml"}}. Run returns ErrFlagConflict otherwise.
+	Exclusive [][]string
+
 	Handler Handler
 
 	// Hidden omits the command from its parent's help and completion; it can
@@ -176,8 +180,8 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 		ctx = mode.Into(ctx, m|mode.Pass)
 	}
 
-	// Enforce required flags, but only when actually running the command;
-	// --help and completion must work without them.
+	// Enforce required and exclusive flags, but only when actually running
+	// the command; --help and completion must work regardless.
 	if mode.From(ctx).Is(mode.Run) {
 		for f := f_root; f != nil; f = f.next {
 			for _, fl := range f.c_curr.Flags {
@@ -187,6 +191,9 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 						Err: fmt.Errorf("%w: --%s", ErrFlagRequired, info.Name),
 					}
 				}
+			}
+			if err := f.c_curr.checkExclusive(); err != nil {
+				return err
 			}
 		}
 	}
@@ -204,6 +211,30 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 
 	// Handlers are invoked sequentially.
 	return f_root.execute(ctx)
+}
+
+// checkExclusive reports a UsageError if more than one flag of an Exclusive
+// group was given.
+func (c *Command) checkExclusive() error {
+	for _, group := range c.Exclusive {
+		given := []string{}
+		for _, name := range group {
+			fl := c.Flags.Get(name)
+			if fl == nil {
+				return fmt.Errorf("%s: Exclusive refers to an unknown flag %q", c.Name, name)
+			}
+			if fl.Count() > 0 {
+				given = append(given, "--"+name)
+			}
+		}
+		if len(given) > 1 {
+			return &UsageError{
+				Cmd: c,
+				Err: fmt.Errorf("%w: %s", ErrFlagConflict, strings.Join(given, ", ")),
+			}
+		}
+	}
+	return nil
 }
 
 // completeCommands emits subcommand candidates, grouped by category.
