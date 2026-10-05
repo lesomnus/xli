@@ -12,15 +12,7 @@ Name:
 	{{ end }}
 
 Usage:
-{{ print "    " -}}
-	{{ range . -}}
-		{{ print .Name " " -}}
-		{{ range .Args -}}
-			{{ print .Info.Usage.String " " -}}
-		{{ end -}}
-	{{ end -}}
-	{{ if len $.Flags    | ne 0 }}[options] {{ end -}}
-	{{ if len $.Commands | ne 0 }}[command]{{ end -}}
+{{ print "    " (usage $) -}}
 	{{ range . -}}
 		{{ if len .Args | ne 0 -}}
 			{{ printf "\n" -}}
@@ -52,11 +44,11 @@ Commands:{{ range $.Commands.ByCategory -}}
 			{{ printf "\n    %-20s %s" .String .Brief -}}
 		{{ end -}}
 	{{ end -}}
-{{ end -}}
+{{ end }}
 
-{{ if len $.Flags | ne 0 }}
-
-Options:{{ range $.Flags.ByCategory -}}
+Options:
+{{- printf "\n    %-20s %s" "-h,--help" "show help" -}}
+{{ range $.Flags.ByCategory -}}
 		{{ $category := (index . 0).Info.Category -}}
 		{{ if len $category | ne 0 -}}
 			{{ printf "\n  %s:" $category -}}
@@ -67,6 +59,5 @@ Options:{{ range $.Flags.ByCategory -}}
 			{{ if .HasDefault }}{{ printf " (default: %s)" .Default -}}{{ end -}}
 		{{ end -}}{{ end -}}
 	{{ end -}}
-{{ end -}}
 
 {{ print "\n" -}}
