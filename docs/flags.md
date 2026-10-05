@@ -106,6 +106,23 @@ def := "config.yaml"
 If a required flag is absent, `Run` returns `ErrFlagRequired`. `--help` and shell
 completion are exempt, so they keep working.
 
+### Mutually exclusive flags
+
+```go
+&xli.Command{
+	Flags: flg.Flags{
+		&flg.Switch{Name: "json"},
+		&flg.Switch{Name: "yaml"},
+	},
+	Exclusive: [][]string{{"json", "yaml"}},
+}
+```
+
+`Command.Exclusive` lists groups of flag names, and at most one flag from each
+group may be given. Otherwise `Run` returns `ErrFlagConflict`
+(`app: flags cannot be used together: --json, --yaml`). As with required flags,
+this is checked only when running, not for `--help` or completion.
+
 ### Hidden flags
 
 ```go

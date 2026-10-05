@@ -18,6 +18,8 @@ type Command struct {
 	Args     arg.Args
 	Commands Commands
 
+	Exclusive [][]string // groups of flags of which at most one may be given
+
 	Handler Handler
 
 	Hidden bool // omit from the parent's help and completion
