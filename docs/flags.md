@@ -23,6 +23,7 @@ declared on `Command.Flags` and must appear **before** positional arguments.
 | `flg.Float32` `flg.Float64` | floats | |
 | `flg.Duration` | `time.Duration` | accepts `1m30s`, `500ms`, … |
 | `flg.Strings` | `[]string` | repeatable; each `--flag v` appends one value (see [Repeatable flags](#repeatable-flags)) |
+| `flg.Choice` | `string` | one of a fixed set (see [Choices](#choices)) |
 
 The scalar types are aliases of the generic `flg.Base[T, P]`; the repeatable
 `flg.Strings` is an alias of `flg.Multi[T, P]`, which accumulates one value per
@@ -154,6 +155,23 @@ the same default/parsed contract: `Get` reports only what the user provided;
 `flg.Strings` is `flg.Multi[string, flg.StringParser]`; the generic
 `flg.Multi[T, P]` can be aliased to other element types the same way
 `arg.Rest` is (e.g. a repeatable int flag).
+
+## Choices
+
+`flg.Choice` restricts a string flag to a fixed set of values:
+
+```go
+&flg.Choice{Name: "format", Parser: flg.ChoiceParser{"json", "yaml"}}
+```
+
+- Any other value is rejected:
+  `invalid value "jsno": must be one of "json", "yaml" (did you mean "json"?)`.
+- Help shows the choices as the type: `--format json|yaml`.
+- Shell completion offers the choices for `--format=` without a handler.
+
+For a repeatable choice, use `flg.Multi[string, flg.ChoiceParser]`. Any custom
+parser can offer completion candidates the same way by implementing
+`Complete(t tab.Tab)`.
 
 ## Categories
 

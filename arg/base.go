@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lesomnus/xli/mode"
+	"github.com/lesomnus/xli/tab"
 )
 
 type Parser[T any] interface {
@@ -55,6 +56,9 @@ func (a *Base[T, P]) Info() *Info {
 		Usage: usage,
 
 		Handle: func(ctx context.Context) {
+			if mode.From(ctx) == mode.Tab {
+				complete(tab.From(ctx), a.Parser)
+			}
 			if a.Handler == nil {
 				return
 			}

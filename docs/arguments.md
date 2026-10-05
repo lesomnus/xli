@@ -24,8 +24,20 @@ By convention argument names are upper-case; the usage line renders them as
 | `arg.Uint` `arg.Uint32` `arg.Uint64` | unsigned ints |
 | `arg.Float32` `arg.Float64` | floats |
 | `arg.Duration` | `time.Duration` |
+| `arg.Choice` | `string`, one of a fixed set |
 
 Scalar types are aliases of `arg.Base[T, P]`.
+
+`arg.Choice` accepts only the values listed in its parser. Other values are
+rejected with a "did you mean" hint, and the choices are offered as shell
+completion candidates without writing a handler:
+
+```go
+&arg.Choice{Name: "SHELL", Parser: arg.ChoiceParser{"bash", "zsh", "fish"}}
+```
+
+A variadic version is
+`arg.Rest[string, arg.ChoiceParser]{Parser: arg.RestParser[string, arg.ChoiceParser]{Base: arg.ChoiceParser{...}}}`.
 
 Variadic (collect the rest) types use `arg.Rest[T, P]`:
 
