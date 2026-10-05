@@ -20,6 +20,8 @@ type Command struct {
 
 	Handler Handler
 
+	Hidden bool // omit from the parent's help and completion
+
 	io.ReadCloser // input;  defaults to os.Stdin
 	io.Writer     // output; defaults to os.Stdout
 	ErrWriter io.Writer
@@ -160,6 +162,11 @@ Commands: xli.Commands{
 ```
 
 Categories become headings in `--help` and groups in shell completion.
+
+A command with `Hidden: true` can still be run by name, but it is left out of its
+parent's help, shell completion, and "did you mean" suggestions. This is useful
+for internal or deprecated commands. `Commands.Visible()` / `Flags.Visible()`
+return only the non-hidden entries.
 
 Require a subcommand to be chosen with `xli.RequireSubcommand()`:
 

@@ -337,7 +337,7 @@ func (f *frame) execute(ctx context.Context) error {
 // flagNames lists the long forms ("--name") of fs, for suggestions.
 func flagNames(fs flg.Flags) []string {
 	vs := make([]string, 0, len(fs))
-	for _, f := range fs {
+	for _, f := range fs.Visible() {
 		vs = append(vs, "--"+f.Info().Name)
 	}
 	return vs
@@ -346,7 +346,7 @@ func flagNames(fs flg.Flags) []string {
 // commandNames lists the names and aliases of cs, for suggestions.
 func commandNames(cs Commands) []string {
 	vs := []string{}
-	for _, c := range cs {
+	for _, c := range cs.Visible() {
 		vs = append(vs, c.Name)
 		vs = append(vs, c.Aliases...)
 	}

@@ -16,6 +16,10 @@ type Info struct {
 	Usage    fmt.Stringer
 	Required bool
 
+	// Hidden reports that the flag is omitted from help and completion; it is
+	// still accepted on the command line.
+	Hidden bool
+
 	// Default is the string form of the flag's default value, for help
 	// rendering. HasDefault is false when the flag has no default.
 	Default    string
@@ -43,6 +47,17 @@ type Flag interface {
 }
 
 type Flags []Flag
+
+// Visible returns the flags that are not hidden.
+func (fs Flags) Visible() Flags {
+	vs := Flags{}
+	for _, f := range fs {
+		if !f.Info().Hidden {
+			vs = append(vs, f)
+		}
+	}
+	return vs
+}
 
 func (fs Flags) Get(name string) Flag {
 	for _, f := range fs {

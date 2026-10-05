@@ -40,6 +40,10 @@ type Base[T any, P Parser[T]] struct {
 	// ErrFlagRequired when a required flag is absent.
 	Required bool
 
+	// Hidden omits the flag from help and completion; it is still accepted on
+	// the command line.
+	Hidden bool
+
 	count int
 }
 
@@ -54,6 +58,7 @@ func (f *Base[T, P]) Info() *Info {
 		Synop:    f.Synop,
 		Usage:    f.Usage,
 		Required: f.Required,
+		Hidden:   f.Hidden,
 	}
 	if f.Default != nil {
 		info.Default = f.Parser.ToString(*f.Default)

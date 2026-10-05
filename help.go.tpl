@@ -33,9 +33,9 @@ Description:
 {{ printf "    %s" $.Synop -}}
 {{ end -}}
 
-{{ if len $.Commands | ne 0 }}
+{{ if len $.Commands.Visible | ne 0 }}
 
-Commands:{{ range $.Commands.ByCategory -}}
+Commands:{{ range $.Commands.Visible.ByCategory -}}
 		{{ $category := (index . 0).Category -}}
 		{{ if len $category | ne 0 -}}
 			{{ printf "\n  %s:" $category -}}
@@ -48,7 +48,7 @@ Commands:{{ range $.Commands.ByCategory -}}
 
 Options:
 {{- printf "\n    %-20s %s" "-h,--help" "show help" -}}
-{{ range $.Flags.ByCategory -}}
+{{ range $.Flags.Visible.ByCategory -}}
 		{{ $category := (index . 0).Info.Category -}}
 		{{ if len $category | ne 0 -}}
 			{{ printf "\n  %s:" $category -}}

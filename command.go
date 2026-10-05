@@ -34,6 +34,10 @@ type Command struct {
 
 	Handler Handler
 
+	// Hidden omits the command from its parent's help and completion; it can
+	// still be run by name.
+	Hidden bool
+
 	io.ReadCloser
 	io.Writer
 	ErrWriter io.Writer
@@ -204,7 +208,7 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 
 // completeCommands emits subcommand candidates, grouped by category.
 func completeCommands(t tab.Tab, c *Command) {
-	for _, group := range c.Commands.ByCategory() {
+	for _, group := range c.Commands.Visible().ByCategory() {
 		sink := t
 		if cat := group[0].Category; cat != "" {
 			sink = t.Group(cat)
@@ -217,7 +221,7 @@ func completeCommands(t tab.Tab, c *Command) {
 
 // completeFlagNames emits flag-name candidates, grouped by category.
 func completeFlagNames(t tab.Tab, c *Command) {
-	for _, group := range c.Flags.ByCategory() {
+	for _, group := range c.Flags.Visible().ByCategory() {
 		sink := t
 		if cat := group[0].Info().Category; cat != "" {
 			sink = t.Group(cat)
@@ -370,13 +374,13 @@ func usageLine(c *Command) string {
 	}
 
 	parts = append(parts, c.Name)
-	if len(c.Flags) > 0 {
+	if len(c.Flags.Visible()) > 0 {
 		parts = append(parts, "[options]")
 	}
 	for _, a := range c.Args {
 		parts = append(parts, a.Info().Usage.String())
 	}
-	if len(c.Commands) > 0 {
+	if len(c.Commands.Visible()) > 0 {
 		parts = append(parts, "[command]")
 	}
 	return strings.Join(parts, " ")
@@ -389,6 +393,17 @@ func (c *Command) PrintHelp(w io.Writer) error {
 }
 
 type Commands []*Command
+
+// Visible returns the commands that are not hidden.
+func (cs Commands) Visible() Commands {
+	vs := Commands{}
+	for _, c := range cs {
+		if !c.Hidden {
+			vs = append(vs, c)
+		}
+	}
+	return vs
+}
 
 func (cs Commands) Get(name string) *Command {
 	for _, c := range cs {
