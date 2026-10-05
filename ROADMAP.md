@@ -145,6 +145,7 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] ~~custom help template 주입 훅~~ → **만들지 않기로 결정** (사용자 결정; 기본 템플릿만 제공)
 - [x] `Synop`(long description) 렌더링: `Command.Synop` 을 help 의 `Description:` 섹션으로 출력 + 테스트 (arg/flg 의 Synop 렌더링은 Phase 4 결정)
 - [x] usage 자동 포맷 컨벤션 확정: 현행 `<req>`/`[opt]`/`[opt...]` 유지 (사용자 요청 "optional→`[ARG]`" 충족)
+- [x] ~~lazy command initialization (이슈 #2)~~ → **not planned**. 측정: 커맨드 210개(각 flag 5개) eager 생성 ≈ 112µs / 253KB / 2.5k allocs — Go 런타임 기동 비용 대비 무시 가능. 실제 병목은 생성자 내부 작업(→ Handler 로 옮기라는 가이드로 해결)이나 의존성 `init()`(lazy 로 해결 불가). 필요해지면 post-1.0 에 additive 하게 `Command.Init func(*Command)` (헤더 eager, body 는 선택 시 1회 채움) 로 추가 가능.
 - [ ] (nice-to-have, post-1.0) env-var 바인딩, enum/choice, 상호배타 그룹. repeatable 다른 원소 타입(`Multi[int,...]` 등)은 `flg.Multi` 로 사소하게 추가 가능.
 
 ### Phase 4 — API 동결 & 폴리시 → `v1.0` (진행 중)
@@ -153,6 +154,7 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [ ] 공개 API 최종 점검 (mode 상수 타입 통일 ✅, 죽은 export 제거 — `mode.Resolve`✅ / `arg.IsMany` 검토, 네이밍 일관성). `xmd` 패키지는 **public 유지 결정** (xli↔frm import cycle 차단용 최소 인터페이스 `Command{GetName/GetFlags/GetArgs}`, 유지 비용 낮음).
 - [x] **freeze 결정 완료**: `tab.Tab` 확장(`Group`) 적용, custom help template 미제공 결정, `arg` 패키지 기본값 계약 적용 (커밋 `b0796fa`/`5705f9b`)
 - [ ] 의도된 날카로운 모서리 문서화 (단일 실행 트리, 핸들러의 `next()` 호출 책임, strict positioning) — godoc/README 보강
+  - [x] "생성자는 가볍게, 무거운 작업은 Handler 에서" 가이드 (`docs/commands.md`) — 이슈 #2(lazy command init) 를 not planned 로 닫으며 대체
 - [ ] **arrakis 마이그레이션 적용** (`Value:`→`Default:`, diff.go 주입 패턴 변경)
 - [ ] 다운스트림 4개 레포 최종 회귀 통과
 - [ ] **`v1.0.0` 태그** (릴리즈 시점은 사용자 결정)

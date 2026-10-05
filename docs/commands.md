@@ -36,6 +36,16 @@ if err := root.Run(context.Background(), os.Args[1:]); err != nil {
 }
 ```
 
+### Keep constructors cheap
+
+The whole tree is built eagerly, even though a single run only visits one path
+through it. Building the tree itself costs almost nothing (about 0.1 ms and
+250 KB for ~200 commands with several flags each, which is small next to Go
+runtime startup). What does cost something is real work inside constructors.
+Keep `newXxx()` functions to declaring structs, and do I/O, config loading, and
+client setup inside the `Handler`, where it runs only for the command that is
+actually executed.
+
 ## Handlers are middleware
 
 A `Handler` receives the command and a `next` function:
