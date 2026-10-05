@@ -47,6 +47,10 @@ type Multi[T any, P Parser[T]] struct {
 	// Required reports that the user must provide this flag at least once; Run
 	// returns ErrFlagRequired when a required flag is absent.
 	Required bool
+
+	// Hidden omits the flag from help and completion; it is still accepted on
+	// the command line.
+	Hidden bool
 }
 
 func (f *Multi[T, P]) Info() *Info {
@@ -60,6 +64,7 @@ func (f *Multi[T, P]) Info() *Info {
 		Synop:    f.Synop,
 		Usage:    f.Usage,
 		Required: f.Required,
+		Hidden:   f.Hidden,
 	}
 	if f.Default != nil {
 		info.Default = f.defaultString()

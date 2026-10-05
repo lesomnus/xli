@@ -105,6 +105,16 @@ def := "config.yaml"
 If a required flag is absent, `Run` returns `ErrFlagRequired`. `--help` and shell
 completion are exempt, so they keep working.
 
+### Hidden flags
+
+```go
+&flg.Switch{Name: "debug-dump", Hidden: true}
+```
+
+A hidden flag is still accepted on the command line. It is left out of `--help`,
+shell completion, and "did you mean" suggestions. Use it for internal,
+experimental, or deprecated flags.
+
 ## Switches and short flags
 
 `flg.Switch` takes no value: `--verbose` sets it to `true`; `--verbose=false`
