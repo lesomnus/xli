@@ -10,6 +10,7 @@ import (
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/frm"
+	"github.com/lesomnus/xli/internal/suggest"
 	"github.com/lesomnus/xli/lex"
 	"github.com/lesomnus/xli/mode"
 	"github.com/lesomnus/xli/xmd"
@@ -132,7 +133,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 
 		case lex.Flag:
 			if len(f.args) > 0 {
-				return f, &FlagError{v, ErrFlagAfterArg}
+				return f, &FlagError{flag: v, err: ErrFlagAfterArg}
 			}
 			if n := v.Name(); n == "help" || n == "h" {
 				f.is_help = true
@@ -148,7 +149,11 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 			}
 
 			if w == nil {
-				return f, &FlagError{v, ErrUnknownFlag}
+				err := &FlagError{flag: v, err: ErrUnknownFlag}
+				if !v.IsShort() {
+					err.suggestions = suggest.Of("--"+v.Name(), flagNames(cmd.Flags))
+				}
+				return f, err
 			} else if w.NoValue() {
 				// Flag is a switch and does not consume a value.
 				if _, ok := v.Arg(); !ok {
@@ -159,16 +164,16 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				i++
 				if i == len(args_rest) {
 					// There are no more args.
-					return f, &FlagError{v, ErrNoFlagValue}
+					return f, &FlagError{flag: v, err: ErrNoFlagValue}
 				}
 
 				switch w := lex.Lex(args_rest[i]).(type) {
 				case *lex.Err:
 					return f, fmt.Errorf("%s: %w", v, w)
 				case lex.EndOfCommand:
-					return f, &FlagError{v, ErrNoFlagValue}
+					return f, &FlagError{flag: v, err: ErrNoFlagValue}
 				case lex.Flag:
-					return f, &FlagError{v, ErrNoFlagValue}
+					return f, &FlagError{flag: v, err: ErrNoFlagValue}
 				case lex.Arg:
 					v = v.WithArg(w)
 				default:
@@ -185,12 +190,16 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 				continue
 			}
 			if len(cmd.Commands) == 0 {
-				return f, &ArgError{v, ErrTooManyArgs}
+				return f, &ArgError{arg: v, err: ErrTooManyArgs}
 			}
 
 			f.c_next = cmd.Commands.Get(v.Raw())
 			if f.c_next == nil {
-				return f, &ArgError{v, ErrUnknownCmd}
+				return f, &ArgError{
+					arg:         v,
+					err:         ErrUnknownCmd,
+					suggestions: suggest.Of(v.Raw(), commandNames(cmd.Commands)),
+				}
 			}
 
 			// Subcommand is found so stop parsing.
@@ -207,7 +216,7 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 		a := cmd.Args[i]
 		if !a.IsOptional() {
 			name := fmt.Sprintf("%q", a.Info().Name)
-			return f, &ArgError{lex.Arg(name), ErrNeedArgs}
+			return f, &ArgError{arg: lex.Arg(name), err: ErrNeedArgs}
 		}
 	}
 
@@ -323,4 +332,23 @@ func (f *frame) execute(ctx context.Context) error {
 		}
 		return nil
 	})
+}
+
+// flagNames lists the long forms ("--name") of fs, for suggestions.
+func flagNames(fs flg.Flags) []string {
+	vs := make([]string, 0, len(fs))
+	for _, f := range fs {
+		vs = append(vs, "--"+f.Info().Name)
+	}
+	return vs
+}
+
+// commandNames lists the names and aliases of cs, for suggestions.
+func commandNames(cs Commands) []string {
+	vs := []string{}
+	for _, c := range cs {
+		vs = append(vs, c.Name)
+		vs = append(vs, c.Aliases...)
+	}
+	return vs
 }

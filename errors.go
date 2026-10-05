@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/lesomnus/xli/internal/suggest"
 	"github.com/lesomnus/xli/lex"
 )
 
@@ -22,10 +23,13 @@ var (
 type FlagError struct {
 	flag lex.Flag
 	err  error
+
+	// suggestions are likely intended flags for an unknown one.
+	suggestions []string
 }
 
 func (e *FlagError) Error() string {
-	return fmt.Sprintf("%s: %s", e.flag.WithoutArg().Raw(), e.err.Error())
+	return fmt.Sprintf("%s: %s%s", e.flag.WithoutArg().Raw(), e.err.Error(), suggest.Hint(e.suggestions))
 }
 
 func (e *FlagError) Unwrap() error {
@@ -35,10 +39,13 @@ func (e *FlagError) Unwrap() error {
 type ArgError struct {
 	arg lex.Arg
 	err error
+
+	// suggestions are likely intended subcommands for an unknown one.
+	suggestions []string
 }
 
 func (e *ArgError) Error() string {
-	return fmt.Sprintf("%s: %s", e.arg.Raw(), e.err.Error())
+	return fmt.Sprintf("%s: %s%s", e.arg.Raw(), e.err.Error(), suggest.Hint(e.suggestions))
 }
 
 func (e *ArgError) Unwrap() error {

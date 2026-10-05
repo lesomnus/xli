@@ -58,6 +58,25 @@ func TestUsageError(t *testing.T) {
 		}))
 	}
 
+	t.Run("unknown subcommand suggests a close name", x.F(func(x x.X) {
+		err := newCmd().Run(context.Background(), []string{"deplyo"})
+		x.ErrorContains(err, `deplyo: unknown subcommand (did you mean "deploy"?)`)
+	}))
+	t.Run("unknown subcommand suggests an alias", x.F(func(x x.X) {
+		c := newCmd()
+		c.Commands[0].Aliases = []string{"ship"}
+		err := c.Run(context.Background(), []string{"shp"})
+		x.ErrorContains(err, `(did you mean "ship"?)`)
+	}))
+	t.Run("unknown long flag suggests a close name", x.F(func(x x.X) {
+		err := newCmd().Run(context.Background(), []string{"deploy", "--prot=1", "web"})
+		x.ErrorContains(err, `--prot: unknown flag (did you mean "--port"?)`)
+	}))
+	t.Run("nothing close means no suggestion", x.F(func(x x.X) {
+		err := newCmd().Run(context.Background(), []string{"xyz"})
+		x.ErrorContains(err, "xyz: unknown subcommand")
+		x.NotContains(err.Error(), "did you mean")
+	}))
 	t.Run("Path joins the command names", x.F(func(x x.X) {
 		err := newCmd().Run(context.Background(), []string{"deploy", "web"})
 
