@@ -47,7 +47,9 @@ if err := root.Run(context.Background(), os.Args[1:]); err != nil {
 If the command line doesn't match what the commands declare (an unknown flag or
 subcommand, a bad value, a missing required flag or argument), `Run` returns an
 `*xli.UsageError`. It names the command the mistake was made on, so the message
-looks like `app deploy: --prot: unknown flag`. `ue.Cmd` is that command, so
+looks like `app deploy: --prot: unknown flag (did you mean "--port"?)`. Unknown
+subcommands and long flags get a "did you mean" suggestion when a close name
+exists. `ue.Cmd` is the command in question, so
 `ue.Cmd.PrintHelp(w)` prints its help. The sentinel errors (`ErrUnknownFlag`,
 `ErrUnknownCmd`, `ErrNeedArgs`, `ErrNeedCmd`, `ErrFlagRequired`, ...) still work
 with `errors.Is`. Errors returned by your handlers are passed through unchanged.
