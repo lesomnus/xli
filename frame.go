@@ -85,11 +85,15 @@ func parseFrameAll(cmd *Command, args_rest []string) (*frame, error) {
 		rest:   args_rest,
 	}
 	for f := root; f.c_next != nil; f = f.next {
+		if f.c_curr != nil {
+			// Link early so a UsageError can report the full command path.
+			f.c_next.parent = f.c_curr
+		}
 		f_next, err := parseFrame(f.c_next, f.rest)
 		f_next.prev = f
 		f.next = f_next
 		if err != nil {
-			return root.next, err
+			return root.next, &UsageError{Cmd: f_next.c_curr, Err: err}
 		}
 		if f_next == nil {
 			break
