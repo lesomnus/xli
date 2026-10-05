@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lesomnus/xli/mode"
+	"github.com/lesomnus/xli/tab"
 )
 
 type Parser[T any] interface {
@@ -89,6 +90,7 @@ func (f *Base[T, P]) lookupDefault() (T, bool) {
 
 func (f *Base[T, P]) Handle(ctx context.Context, u string) error {
 	if m := mode.From(ctx); m == mode.Tab {
+		complete(tab.From(ctx), f.Parser)
 		var z T
 		f.handle(ctx, z)
 		return nil
