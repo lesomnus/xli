@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/flg"
@@ -201,35 +202,80 @@ func ConfigFlag() *flg.String {
 	}
 }
 
-// Load is a handler for the root command that loads the configuration before
-// any subcommand runs:
+// Load is a handler that loads the configuration before the command it is
+// mounted on, and the commands under it, run. On the root command it loads for
+// every command but those in except and the commands under them, such as
+// xli.NewCmdCompletion, which need no configuration and should not fail for a
+// bad one:
 //
-//	Flags:   flg.Flags{cfg.ConfigFlag()},
-//	Handler: xli.Chain(cfg.Load(l), xli.RequireSubcommand()),
+//	comp := xli.NewCmdCompletion()
+//	root := &xli.Command{
+//		Flags:    flg.Flags{cfg.ConfigFlag()},
+//		Commands: xli.Commands{serve, comp, cfg.NewCmdConfig(l)},
+//		Handler:  xli.Chain(cfg.Load(l, comp), xli.RequireSubcommand()),
+//	}
 //
-// It reads the file named by --config (or the first of the default paths that
-// exists), the process environment, and the flags bound to l on every command
-// of the path being run, including the subcommand's: flags are parsed before
-// any handler runs. Environment variables under the prefix that nothing reads
-// are reported to the command's ErrWriter.
+// It may as well be mounted on each command that needs the configuration
+// instead. It runs once for a command run, whichever of the commands on the
+// way it is mounted on.
 //
-// It runs whenever the command runs, also on the way to a subcommand
+// It reads the file named by --config (none for an empty one), or else the
+// first of the default paths that exists; the process environment; and the
+// flags bound to l on every command of the path being run, above and below
+// it: flags are parsed before any handler runs. Environment variables under
+// the prefix that nothing reads, and secret files not there yet, are reported
+// to the command's ErrWriter.
+//
+// A configuration that fails to load fails the command, but for `config` of
+// NewCmdConfig, which prints what it read and what is wrong with it; `config
+// env` does not load it at all.
+//
+// It runs when the command runs, also on the way to a subcommand
 // (mode.Run|mode.Pass), and not for help or completion.
-func Load[T any](l *Loader[T]) xli.Handler {
+func Load[T any](l *Loader[T], except ...*xli.Command) xli.Handler {
 	return xli.On(mode.Run, func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
-		path, _ := flg.Find[string](cmd, ConfigName)
+		if ctx.Value(loadedKey{l}) != nil {
+			// Loaded on the way here.
+			return next(ctx)
+		}
+		ctx = context.WithValue(ctx, loadedKey{l}, true)
 
-		fs := []flg.Flag{}
+		// The commands of the path being run: the ones above this one, it,
+		// and the ones below.
+		path := cmd.Tree()
 		for f := frm.From(ctx); f != nil; f = f.Next() {
-			if c := f.Cmd(); c != nil {
-				fs = append(fs, c.GetFlags()...)
+			if c, ok := f.Cmd().(*xli.Command); ok && c != cmd {
+				path = append(path, c)
+			}
+		}
+		for _, c := range path {
+			if slices.Contains(except, c) || l.skips(c) {
+				return next(ctx)
 			}
 		}
 
-		s, err := l.Load(path, l.opts.environ(), fs...)
+		fs := []flg.Flag{}
+		for _, c := range path {
+			fs = append(fs, c.GetFlags()...)
+		}
+		bound, err := l.bindings(fs)
 		if err != nil {
 			return err
 		}
+		in := &inputs{environ: l.opts.environ(), bound: bound}
+		if p, ok := flg.Find[string](cmd, ConfigName); ok {
+			in.path, in.noFile = p, p == ""
+		}
+
+		s, err := l.load(in)
+		if err != nil {
+			if !l.tolerates(path[len(path)-1]) {
+				return err
+			}
+			l.failed.Store(&failure[T]{s, err})
+			return next(ctx)
+		}
+		l.failed.Store(nil)
 
 		w := cmd.ErrWriter
 		if w == nil {
@@ -243,4 +289,19 @@ func Load[T any](l *Loader[T]) xli.Handler {
 		}
 		return next(ctx)
 	})
+}
+
+// loadedKey marks a context the Load handler of a loader loaded on.
+type loadedKey struct{ l any }
+
+func (l *Loader[T]) skips(c *xli.Command) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Contains(l.skip, c)
+}
+
+func (l *Loader[T]) tolerates(c *xli.Command) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Contains(l.tolerant, c)
 }

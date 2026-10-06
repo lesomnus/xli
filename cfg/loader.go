@@ -20,6 +20,7 @@ import (
 	"github.com/goccy/go-yaml/lexer"
 	"github.com/goccy/go-yaml/parser"
 	"github.com/goccy/go-yaml/token"
+	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/flg"
 )
 
@@ -44,6 +45,19 @@ type Loader[T any] struct {
 	first *Snapshot[T]
 	// in is what the first load read, for Watch.
 	in *inputs
+
+	// skip are commands the Load handler does not load the configuration
+	// for, and tolerant those it runs even when the configuration fails to
+	// load: `config env` and `config` of NewCmdConfig.
+	skip, tolerant []*xli.Command
+	// failed is the load that failed for a tolerant command.
+	failed atomic.Pointer[failure[T]]
+}
+
+// failure is a load that failed, and the snapshot of what it read.
+type failure[T any] struct {
+	s   *Snapshot[T]
+	err error
 }
 
 // Snapshot is one load of the configuration.
@@ -263,6 +277,7 @@ func (s *Snapshot[T]) Origins() []Origin {
 // inputs are what a load reads besides the file's content.
 type inputs struct {
 	path    string // named by the user; "" to try the default paths
+	noFile  bool   // read no file at all (--config=)
 	environ []string
 	bound   []*binding
 }
@@ -276,10 +291,19 @@ func (l *Loader[T]) Load(path string, environ []string, flags ...flg.Flag) (*Sna
 	if err != nil {
 		return nil, err
 	}
-	in := &inputs{path: path, environ: environ, bound: bound}
-	s, err := l.read(in)
+	s, err := l.load(&inputs{path: path, environ: environ, bound: bound})
 	if err != nil {
 		return nil, err
+	}
+	return s, nil
+}
+
+// load is Load with its inputs. A load that fails returns what it read before
+// it failed, if anything, for config to print.
+func (l *Loader[T]) load(in *inputs) (*Snapshot[T], error) {
+	s, err := l.read(in)
+	if err != nil {
+		return s, err
 	}
 
 	l.mu.Lock()
@@ -298,7 +322,11 @@ func (l *Loader[T]) Read(path string, environ []string, flags ...flg.Flag) (*Sna
 	if err != nil {
 		return nil, err
 	}
-	return l.read(&inputs{path: path, environ: environ, bound: bound})
+	s, err := l.read(&inputs{path: path, environ: environ, bound: bound})
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // bindings are the flags among fs bound to this loader.
@@ -330,6 +358,9 @@ func (l *Loader[T]) readFile(in *inputs) (path string, content []byte, err error
 		b, err := os.ReadFile(l.file)
 		return l.file, b, err
 	}
+	if in.noFile {
+		return "", nil, nil
+	}
 	if in.path != "" {
 		b, err := os.ReadFile(in.path)
 		return in.path, b, err
@@ -353,7 +384,8 @@ func (l *Loader[T]) read(in *inputs) (*Snapshot[T], error) {
 }
 
 // build loads the configuration: defaults, then the file, then the
-// environment, then the flags; then validates it.
+// environment, then the flags; then validates it. On an error, the snapshot is
+// what it read.
 func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T], error) {
 	cfg := new(T)
 	rv := reflect.ValueOf(cfg).Elem()
@@ -440,7 +472,7 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 		fatal = append(fatal, err)
 	}
 	if err := fatal.join(); err != nil {
-		return nil, err
+		return s, err
 	}
 	return s, nil
 }
