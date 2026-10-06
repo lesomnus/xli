@@ -27,6 +27,9 @@ type resolver struct {
 	// taken as they are: only a secret given as exactly one reference reads
 	// it.
 	verbatim bool
+	// keepFiles leaves `${file:}` references as they are, for a type that
+	// decodes itself, whose secrets read them.
+	keepFiles bool
 	// refs collects the references the current value was read through.
 	refs []string
 }
@@ -107,6 +110,10 @@ func (r *resolver) expandRef(ref string) (string, error) {
 		r.refs = append(r.refs, ref)
 		return v, nil
 	case "file":
+		if r.keepFiles {
+			r.refs = append(r.refs, ref)
+			return ref, nil
+		}
 		return "", fmt.Errorf("%s: a file is only read into a secret field (cfg.Secret), which re-reads it when it changes", ref)
 	}
 	v, err := r.scheme(scheme, rest)
@@ -163,11 +170,12 @@ var durationType = reflect.TypeFor[time.Duration]()
 func setText(v reflect.Value, s string, r *resolver) error {
 	if v.Kind() == reflect.Pointer {
 		p := reflect.New(v.Type().Elem())
-		if err := setText(p.Elem(), s, r); err != nil {
+		err := setText(p.Elem(), s, r)
+		if err != nil && !isPending(err) {
 			return err
 		}
 		v.Set(p)
-		return nil
+		return err
 	}
 	if sf, ok := v.Addr().Interface().(secretField); ok {
 		return sf.setSecret(s, r)

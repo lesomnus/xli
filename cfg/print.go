@@ -123,7 +123,7 @@ func (p *printer) tree() (*pnode, error) {
 		if o.Source == SourceUnset && v.IsZero() {
 			continue
 		}
-		val, err := p.leaf(f, v, name)
+		val, err := p.leaf(f, v, o)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", f.key, err)
 		}
@@ -151,10 +151,16 @@ func parentKey(key string) string {
 	return ""
 }
 
-func (p *printer) leaf(f *field, v reflect.Value, name string) (string, error) {
-	secret := f.secret || secretName(name)
-	if w, ok := p.written[f.key]; ok && !holdsSecret(f.typ) {
-		// Read through references: as written.
+func (p *printer) leaf(f *field, v reflect.Value, o Origin) (string, error) {
+	name := f.key[strings.LastIndexByte(f.key, '.')+1:]
+	secret := f.secret
+	for _, n := range strings.Split(f.key, ".") {
+		// Under a block named keys, as much as a field named key.
+		secret = secret || secretName(n)
+	}
+	if w, ok := p.written[f.key]; ok && o.Source == SourceFile && !holdsSecret(f.typ) {
+		// Read through references from the file, and not set over since:
+		// as written.
 		b := &strings.Builder{}
 		writeWritten(b, w, secret, name, false)
 		return b.String(), nil
@@ -180,6 +186,12 @@ func writeWritten(b *strings.Builder, v any, secret bool, name string, flow bool
 		default:
 			b.WriteString(scalar(v, flow))
 		}
+	case rawScalar:
+		if secret {
+			b.WriteString(redacted)
+			return
+		}
+		b.WriteString(string(v))
 	case map[string]any:
 		names := slices.Sorted(func(yield func(string) bool) {
 			for k := range v {
@@ -193,7 +205,7 @@ func writeWritten(b *strings.Builder, v any, secret bool, name string, flow bool
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			b.WriteString(scalar(k, true) + ": ")
+			b.WriteString(mapKey(k) + ": ")
 			writeWritten(b, v[k], secret || secretName(k), k, true)
 		}
 		b.WriteByte('}')
@@ -261,15 +273,19 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 		b.WriteString(time.Duration(v.Int()).String())
 		return nil
 	}
+	if (v.Kind() == reflect.Slice || v.Kind() == reflect.Map) && v.IsNil() {
+		b.WriteString("null")
+		return nil
+	}
 	if t == bytesType {
 		if secret {
 			b.WriteString(redacted)
 			return nil
 		}
-		b.WriteString("!!binary " + base64.StdEncoding.EncodeToString(v.Bytes()))
+		b.WriteString(`!!binary "` + base64.StdEncoding.EncodeToString(v.Bytes()) + `"`)
 		return nil
 	}
-	if tm, ok := v.Interface().(encoding.TextMarshaler); ok {
+	if tm, ok := addressable(v).Interface().(encoding.TextMarshaler); ok {
 		text, err := tm.MarshalText()
 		if err != nil {
 			return err
@@ -284,7 +300,7 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 	if readsItself(t) {
 		// A YAML marshaler: printed as it marshals, with the names that say
 		// what is secret redacted.
-		out, err := yaml.Marshal(v.Interface())
+		out, err := yaml.Marshal(addressable(v).Interface())
 		if err != nil {
 			return err
 		}
@@ -337,7 +353,7 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 			if i > 0 {
 				b.WriteString(", ")
 			}
-			b.WriteString(scalar(it.key, true) + ": ")
+			b.WriteString(mapKey(it.key) + ": ")
 			if err := writeValue(b, it.v, secret || secretName(it.key), it.key, true); err != nil {
 				return err
 			}
@@ -354,7 +370,7 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 			if n++; n > 1 {
 				b.WriteString(", ")
 			}
-			b.WriteString(scalar(f.name, true) + ": ")
+			b.WriteString(key(f.name) + ": ")
 			if err := writeValue(b, fv, secret || f.secret || secretName(f.name), f.name, true); err != nil {
 				return err
 			}
@@ -377,7 +393,7 @@ func writePlain(b *strings.Builder, v any, secret bool, name string, flow bool) 
 				b.WriteString(", ")
 			}
 			k := fmt.Sprint(it.Key)
-			b.WriteString(scalar(k, true) + ": ")
+			b.WriteString(mapKey(k) + ": ")
 			writePlain(b, it.Value, secret || secretName(k), k, true)
 		}
 		b.WriteByte('}')
@@ -467,33 +483,80 @@ func secretName(name string) bool {
 	return false
 }
 
-var (
-	dsnUserinfo = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9+.-]*://[^:/@]*:)([^@/]*)(@)`)
-	dsnPassword = regexp.MustCompile(`(?i)(password=)([^ &]*)`)
-)
+// dsnPassword is the password parameter of a DSN of key=value pairs, quoted or
+// not: password=x, password = 'a b'.
+var dsnPassword = regexp.MustCompile(`(?i)(\bpassword\s*=\s*)('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|[^\s&;]*)`)
 
-// redactDsn is a DSN with its password redacted, in either of the two shapes a
-// driver takes one: in the URL's user information, or as a password=
-// parameter. A password that is a reference is kept: it says where the
-// password is.
+// redactDsn is a DSN with its password redacted, in the shapes drivers take
+// one: in the user information of a URL (postgres://u:pw@h), before the
+// address of a MySQL DSN (u:pw@tcp(h)/db), or as a password= parameter. A
+// password that is a reference is kept: it says where the password is.
 func redactDsn(s string) string {
-	keep := func(re *regexp.Regexp) func(string) string {
-		return func(m string) string {
-			g := re.FindStringSubmatch(m)
-			if g[2] == "" || isRef(g[2]) {
-				return m
-			}
-			return g[1] + redacted + strings.Join(g[3:], "")
+	s = redactUserinfo(s)
+	return dsnPassword.ReplaceAllStringFunc(s, func(m string) string {
+		g := dsnPassword.FindStringSubmatch(m)
+		pw := strings.Trim(g[2], `'"`)
+		if pw == "" || isRef(pw) {
+			return m
+		}
+		return g[1] + redacted
+	})
+}
+
+// redactUserinfo redacts the password of user:password@ at the start of the
+// address of s. The user information ends at the last "@" of the address, as
+// net/url reads it, so a password may hold an "@".
+func redactUserinfo(s string) string {
+	start := 0
+	if i := strings.Index(s, "://"); i >= 0 {
+		start = i + 3
+	} else if strings.ContainsAny(s[:max(0, strings.IndexByte(s, '@'))], " =") {
+		// key=value pairs, not user:password@.
+		return s
+	}
+	end := len(s)
+	if i := strings.IndexAny(s[start:], "/?#"); i >= 0 && start > 0 {
+		end = start + i
+	}
+	if start == 0 {
+		// A MySQL DSN: the address is up to the protocol's "(".
+		if i := strings.IndexByte(s, '('); i >= 0 {
+			end = i
 		}
 	}
-	s = dsnUserinfo.ReplaceAllStringFunc(s, keep(dsnUserinfo))
-	return dsnPassword.ReplaceAllStringFunc(s, keep(dsnPassword))
+	at := strings.LastIndexByte(s[start:end], '@')
+	if at < 0 {
+		return s
+	}
+	at += start
+	colon := strings.IndexByte(s[start:at], ':')
+	if colon < 0 {
+		return s
+	}
+	colon += start
+	pw := s[colon+1 : at]
+	if pw == "" || isRef(pw) {
+		return s
+	}
+	return s[:colon+1] + redacted + s[at:]
 }
 
 // escapeRefs writes s so that the file reads it as it is: every "$" doubled.
 func escapeRefs(s string) string {
 	return strings.ReplaceAll(s, "$", "$$")
 }
+
+// rawScalar is a scalar as it was written, other than a string: 1.10, 0x1F.
+type rawScalar string
+
+// The places a scalar is written in the output.
+type place int
+
+const (
+	blockValue place = iota // after "k: ", followed by a comment
+	flowValue               // inside [...] or {...}
+	keyName                 // a key, in a block or in {...}
+)
 
 // scalar is s as a YAML scalar where it goes, after "k: " or, when flow is
 // set, inside [...] or {...}: plain where the parser reads that as the same
@@ -502,51 +565,103 @@ func scalar(s string, flow bool) string {
 	if s == redacted {
 		return s
 	}
-	if plainAs(s, flow) {
+	at := blockValue
+	if flow {
+		at = flowValue
+	}
+	if plainAt(s, at) {
 		return s
 	}
 	return quoted(s)
 }
 
-func plainAs(s string, flow bool) bool {
+// key is the name of a field as a key of the output.
+func key(name string) string {
+	if plainAt(name, keyName) {
+		return name
+	}
+	return quoted(name)
+}
+
+// mapKey is a key of a map, which the file reads references in.
+func mapKey(k string) string {
+	return key(escapeRefs(k))
+}
+
+// plainAt reports whether the parser reads s, written plain at the place, as
+// the string s.
+func plainAt(s string, at place) bool {
 	if s == "" || strings.ContainsAny(s, "\n\r\t\"'") || s != strings.TrimSpace(s) {
 		return false
 	}
-	src := "k: " + s
-	if flow {
-		src = "k: [" + s + "]"
+	switch at {
+	case blockValue:
+		return readsAs(s, "k: "+s+"  # c", func(n ast.Node) ast.Node { return valueOf(n, "k") })
+	case flowValue:
+		return readsAs(s, "k: ["+s+"]", func(n ast.Node) ast.Node {
+			if seq, ok := valueOf(n, "k").(*ast.SequenceNode); ok && len(seq.Values) == 1 {
+				return seq.Values[0]
+			}
+			return nil
+		}) && readsAs(s, "k: {x: "+s+"}", func(n ast.Node) ast.Node {
+			return valueOf(valueOf(n, "k"), "x")
+		})
+	default:
+		return readsAs(s, s+": v", keyOf) && readsAs(s, "{"+s+": v}", keyOf)
 	}
+}
+
+// readsAs parses src and reports whether the node pick picks of it is the
+// string s.
+func readsAs(s string, src string, pick func(ast.Node) ast.Node) bool {
 	f, err := parser.ParseBytes([]byte(src), 0)
 	if err != nil || len(f.Docs) != 1 {
 		return false
 	}
-	var v ast.Node
-	switch n := f.Docs[0].Body.(type) {
-	case *ast.MappingValueNode:
-		v = n.Value
-	case *ast.MappingNode:
-		if len(n.Values) != 1 {
-			return false
-		}
-		v = n.Values[0].Value
-	default:
-		return false
-	}
-	if flow {
-		seq, ok := v.(*ast.SequenceNode)
-		if !ok || len(seq.Values) != 1 {
-			return false
-		}
-		v = seq.Values[0]
-	}
-	sn, ok := v.(*ast.StringNode)
+	sn, ok := pick(f.Docs[0].Body).(*ast.StringNode)
 	return ok && sn.Value == s
 }
 
-// key is the name of a field as a key of the output.
-func key(name string) string {
-	if plainAs(name, true) {
-		return name
+// valueOf is the value of key k of the mapping n, if n is a mapping of it alone.
+func valueOf(n ast.Node, k string) ast.Node {
+	var mv *ast.MappingValueNode
+	switch v := n.(type) {
+	case *ast.MappingValueNode:
+		mv = v
+	case *ast.MappingNode:
+		if len(v.Values) != 1 {
+			return nil
+		}
+		mv = v.Values[0]
+	default:
+		return nil
 	}
-	return quoted(name)
+	if kn, ok := mv.Key.(*ast.StringNode); !ok || kn.Value != k {
+		return nil
+	}
+	return mv.Value
+}
+
+// keyOf is the key of the mapping n, if it has one key.
+func keyOf(n ast.Node) ast.Node {
+	switch v := n.(type) {
+	case *ast.MappingValueNode:
+		return v.Key
+	case *ast.MappingNode:
+		if len(v.Values) == 1 {
+			return v.Values[0].Key
+		}
+	}
+	return nil
+}
+
+// addressable is v, or a copy of it that has an address, for the methods of
+// its pointer type.
+func addressable(v reflect.Value) reflect.Value {
+	if v.CanAddr() {
+		return v.Addr()
+	}
+	c := reflect.New(v.Type())
+	c.Elem().Set(v)
+	return c
 }

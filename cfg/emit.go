@@ -96,8 +96,12 @@ func formatFloat(f float64) string {
 		return ".nan"
 	}
 	s := strconv.FormatFloat(f, 'g', -1, 64)
-	if !strings.ContainsAny(s, ".e") {
-		s += ".0"
+	if strings.Contains(s, ".") {
+		return s
 	}
-	return s
+	// 1 is read as an integer, and 1e+21 as a string.
+	if i := strings.IndexByte(s, 'e'); i >= 0 {
+		return s[:i] + ".0" + s[i:]
+	}
+	return s + ".0"
 }

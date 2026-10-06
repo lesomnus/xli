@@ -2,6 +2,7 @@ package cfg
 
 import (
 	"encoding"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -124,6 +125,9 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 			continue
 		}
 
+		if err := checkData(ft, map[reflect.Type]bool{}); err != nil {
+			return fmt.Errorf("cfg: %s.%s: %w", t, sf.Name, err)
+		}
 		f := &field{
 			key:    key,
 			index:  idx,
@@ -151,6 +155,74 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 		s.all = append(s.all, f)
 	}
 	return nil
+}
+
+// checkData refuses in a struct read in a list or a map (or as a leaf) what
+// walk refuses in the configuration's own: names the file cannot read, and a
+// pointer to a pointer.
+func checkData(t reflect.Type, seen map[reflect.Type]bool) error {
+	if seen[t] {
+		// A type that holds itself, as a tree does.
+		return nil
+	}
+	seen[t] = true
+
+	switch t.Kind() {
+	case reflect.Pointer:
+		if t.Elem().Kind() == reflect.Pointer {
+			return errors.New("a pointer to a pointer cannot be read")
+		}
+		return checkData(t.Elem(), seen)
+	case reflect.Slice, reflect.Array:
+		return checkData(t.Elem(), seen)
+	case reflect.Map:
+		if err := checkData(t.Key(), seen); err != nil {
+			return err
+		}
+		return checkData(t.Elem(), seen)
+	}
+	if t.Kind() != reflect.Struct || readsItself(t) {
+		return nil
+	}
+
+	names := map[string]bool{}
+	var walk func(t reflect.Type) error
+	walk = func(t reflect.Type) error {
+		for i := range t.NumField() {
+			sf := t.Field(i)
+			if !sf.IsExported() {
+				continue
+			}
+			tag, ok := parseTag(sf)
+			if !ok {
+				continue
+			}
+			if tag.inline {
+				st := sf.Type
+				if st.Kind() == reflect.Pointer {
+					st = st.Elem()
+				}
+				if st.Kind() == reflect.Struct {
+					if err := walk(st); err != nil {
+						return err
+					}
+				}
+				continue
+			}
+			switch {
+			case strings.HasPrefix(tag.name, "x-"):
+				return fmt.Errorf("%s.%s: %q is never read from a file, where x- keys are ignored", t, sf.Name, tag.name)
+			case names[tag.name]:
+				return fmt.Errorf("%s: two fields are named %q", t, tag.name)
+			}
+			names[tag.name] = true
+			if err := checkData(sf.Type, seen); err != nil {
+				return fmt.Errorf("%s.%s: %w", t, sf.Name, err)
+			}
+		}
+		return nil
+	}
+	return walk(t)
 }
 
 type tag struct {
