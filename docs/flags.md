@@ -186,7 +186,9 @@ the same default/parsed contract: `Get` reports only what the user provided;
 - Help shows the choices as the type: `--format json|yaml`.
 - Shell completion offers the choices for `--format=` without a handler.
 
-For a repeatable choice, use `flg.Multi[string, flg.ChoiceParser]`. Any custom
+The choices are always offered. An `OnTab` handler on the same flag adds its
+candidates to them rather than replacing them. For a repeatable choice, use
+`flg.Multi[string, flg.ChoiceParser]`. Any custom
 parser can offer completion candidates the same way by implementing
 `Complete(t tab.Tab)`.
 

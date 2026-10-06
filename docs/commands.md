@@ -56,7 +56,9 @@ subcommands and long flags get a "did you mean" suggestion when a close name
 exists. `ue.Cmd` is the command in question, so
 `ue.Cmd.PrintHelp(w)` prints its help. The sentinel errors (`ErrUnknownFlag`,
 `ErrUnknownCmd`, `ErrNeedArgs`, `ErrNeedCmd`, `ErrFlagRequired`, ...) still work
-with `errors.Is`. Errors returned by your handlers are passed through unchanged.
+with `errors.Is`. An error returned by a flag handler is treated as an invalid
+value for that flag and is also reported as a `UsageError`. Errors returned by
+command handlers are passed through unchanged.
 
 ### Keep constructors cheap
 
