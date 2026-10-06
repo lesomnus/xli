@@ -78,14 +78,14 @@ func TestPendingSecretOrigin(t *testing.T) {
 	x.NoError(err)
 	x.Len(s.Warnings, 1)
 	o, _ := l.Origin(&c.S)
-	x.Equal(cfg.File, o.Source, "the value is the file's even though it cannot be read yet")
+	x.Equal(cfg.SourceFile, o.Source, "the value is the file's even though it cannot be read yet")
 
 	c = C{}
 	l = cfg.New("app", &c)
 	_, err = l.Load(write(t, "s: from-file\n"), env("APP_S=${file:"+missing+"}"))
 	x.NoError(err)
 	o, _ = l.Origin(&c.S)
-	x.Equal(cfg.Env, o.Source, "the environment's reference overrode the file")
+	x.Equal(cfg.SourceEnv, o.Source, "the environment's reference overrode the file")
 	x.Equal([]string{"${file:" + missing + "}"}, o.Refs)
 }
 
@@ -114,7 +114,7 @@ func TestNullBlockClearsOrigins(t *testing.T) {
 	x.Equal("", c.Db.Dsn)
 
 	o, _ := l.Origin(&c.Db.Dsn)
-	x.Equal(cfg.File, o.Source)
+	x.Equal(cfg.SourceFile, o.Source)
 	x.True(o.Cleared)
 	x.Equal("db.dsn", o.Key)
 }

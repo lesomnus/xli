@@ -70,7 +70,7 @@ type Snapshot[T any] struct {
 	// when there was no file.
 	Revision string
 	// Unknown are the environment variables under the prefix that no field
-	// reads and nothing claims, which is what a typo looks like.
+	// reads and Reads does not declare, which is what a typo looks like.
 	Unknown []string
 	// Warnings are problems that do not stop the load: a secret file that
 	// cannot be read yet, which is read again when the secret is used.
@@ -85,7 +85,7 @@ type Snapshot[T any] struct {
 
 type options struct {
 	paths    []string
-	claims   []string
+	reads    []string
 	schemes  map[string]Resolver
 	environ  func() []string
 	interval time.Duration
@@ -101,12 +101,12 @@ func WithPaths(paths ...string) Option {
 	return func(o *options) { o.paths = append([]string{}, paths...) }
 }
 
-// Claims declares environment variables under the prefix that the application
-// reads itself, by what follows the prefix: Claims("LDAP_KEY_") for an
-// application "roster" claims every ROSTER_LDAP_KEY_*. They are not reported as
+// Reads declares environment variables under the prefix that the application
+// reads itself, by what follows the prefix: Reads("LDAP_KEY_") for an
+// application "roster" reads every ROSTER_LDAP_KEY_*. They are not reported as
 // unknown.
-func Claims(prefixes ...string) Option {
-	return func(o *options) { o.claims = append(o.claims, prefixes...) }
+func Reads(prefixes ...string) Option {
+	return func(o *options) { o.reads = append(o.reads, prefixes...) }
 }
 
 // WithScheme registers a reference scheme: `${name:...}` is resolved by f.
@@ -262,7 +262,7 @@ func (s *Snapshot[T]) originOf(f *field) Origin {
 	if o, ok := s.origins[f.key]; ok {
 		return o
 	}
-	return Origin{Source: Unset, Key: f.key}
+	return Origin{Source: SourceUnset, Key: f.key}
 }
 
 // Origins are the origins of every field, in the order of the fields.
@@ -407,11 +407,11 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 	rv.Set(clone(reflect.ValueOf(&l.base).Elem()))
 	for _, f := range l.schema.fields {
 		if v, ok := f.value(rv, false); ok && !v.IsZero() {
-			s.origins[f.key] = Origin{Source: Default, Key: f.key}
+			s.origins[f.key] = Origin{Source: SourceDefault, Key: f.key}
 		}
 	}
 	for _, b := range in.bound {
-		o := Origin{Source: Default, Key: b.field.key}
+		o := Origin{Source: SourceDefault, Key: b.field.key}
 		v := reflect.New(b.field.typ).Elem()
 		given.refs = nil
 		ok, err := b.applyDefault(v, given)
@@ -445,7 +445,7 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 		if b.flag.Count() == 0 {
 			continue
 		}
-		o := Origin{Source: Flag, Key: b.field.key, Name: "--" + b.name}
+		o := Origin{Source: SourceFlag, Key: b.field.key, Name: "--" + b.name}
 		v := reflect.New(b.field.typ).Elem()
 		given.refs = nil
 		cleared, err := b.apply(v, given)
@@ -504,7 +504,7 @@ func (l *Loader[T]) mark(s *Snapshot[T], f *field, o Origin) {
 func (l *Loader[T]) decodeFile(s *Snapshot[T], rv reflect.Value, r *resolver, path string, content []byte) (es errs) {
 	content = bytes.TrimPrefix(content, []byte{0xEF, 0xBB, 0xBF}) // a UTF-8 BOM
 	if documents(content) > 1 {
-		es.add(Origin{Source: File, Name: path}, errors.New("more than one document"))
+		es.add(Origin{Source: SourceFile, Name: path}, errors.New("more than one document"))
 		return es
 	}
 	f, err := parser.ParseBytes(content, 0)
@@ -514,13 +514,13 @@ func (l *Loader[T]) decodeFile(s *Snapshot[T], rv reflect.Value, r *resolver, pa
 			// is a syntax error rather than a value.
 			err = fmt.Errorf("%w\n(a reference inside [...] or {...} must be quoted, e.g. [\"${env:NAME}\"])", err)
 		}
-		es.add(Origin{Source: File, Name: path}, err)
+		es.add(Origin{Source: SourceFile, Name: path}, err)
 		return es
 	}
 	d := &decoder{r: r, file: path}
 	body, err := d.body(f)
 	if err != nil {
-		es.add(Origin{Source: File, Name: path}, err)
+		es.add(Origin{Source: SourceFile, Name: path}, err)
 		return es
 	}
 	if body == nil {
@@ -598,7 +598,7 @@ func (l *Loader[T]) applyEnv(s *Snapshot[T], rv reflect.Value, r *resolver, envi
 			continue
 		}
 
-		o := Origin{Source: Env, Key: f.key, Name: f.env}
+		o := Origin{Source: SourceEnv, Key: f.key, Name: f.env}
 		if val == "" {
 			o.Cleared = true
 			l.set(rv, f, reflect.Value{}, true)
@@ -640,7 +640,7 @@ func (l *Loader[T]) applyEnv(s *Snapshot[T], rv reflect.Value, r *resolver, envi
 var serviceLink = regexp.MustCompile(`_(SERVICE_HOST|SERVICE_PORT(_[A-Z0-9_]+)?|PORT|PORT_[0-9]+_(TCP|UDP)(_(ADDR|PORT|PROTO))?)$`)
 
 func (l *Loader[T]) claimed(name string) bool {
-	for _, p := range l.opts.claims {
+	for _, p := range l.opts.reads {
 		if strings.HasPrefix(name, l.prefix+"_"+p) {
 			return true
 		}

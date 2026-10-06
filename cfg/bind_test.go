@@ -103,12 +103,12 @@ func TestBind(t *testing.T) {
 		x.Equal("lit", key)
 
 		o, _ := l.Origin(&c.Ldap.Addr)
-		x.Equal(cfg.Flag, o.Source)
+		x.Equal(cfg.SourceFlag, o.Source)
 		x.Equal("--listen", o.Name)
 		o, _ = l.Origin(&c.Ldap.Insecure)
-		x.Equal(cfg.Env, o.Source)
+		x.Equal(cfg.SourceEnv, o.Source)
 		o, _ = l.Origin(&c.Ldap.Bind)
-		x.Equal(cfg.File, o.Source)
+		x.Equal(cfg.SourceFile, o.Source)
 	}))
 	t.Run("a flag's default is the lowest layer", x.F(func(x x.X) {
 		got := ServeConfig{}
@@ -119,7 +119,7 @@ func TestBind(t *testing.T) {
 		x.Equal(":389", got.Addr)
 
 		o, _ := l.Origin(&c.Ldap.Addr)
-		x.Equal(cfg.Default, o.Source)
+		x.Equal(cfg.SourceDefault, o.Source)
 
 		root, _ = app(&AppConfig{}, env("APP_LDAP_ADDR=env"), &got)
 		x.NoError(xlitest.Run(x.T, root, "ldap", "serve").Err)
@@ -201,7 +201,7 @@ func TestBind(t *testing.T) {
 		x.Equal(TlsConfig{Cert: "c.pem", Key: "k.pem"}, got.Tls)
 
 		o, _ := l.Origin(&c.Ldap.Tls.Key)
-		x.Equal(cfg.Flag, o.Source)
+		x.Equal(cfg.SourceFlag, o.Source)
 		x.Equal("--tls", o.Name)
 		x.Equal("ldap.tls.key", o.Key)
 	}))
@@ -244,7 +244,7 @@ func TestBind(t *testing.T) {
 		x.NoError(err)
 		x.Equal("", c.Ldap.Addr)
 		o, _ := l.Origin(&c.Ldap.Addr)
-		x.Equal(cfg.Flag, o.Source)
+		x.Equal(cfg.SourceFlag, o.Source)
 		x.True(o.Cleared)
 	}))
 	t.Run("an empty list flag clears", x.F(func(x x.X) {
@@ -280,7 +280,7 @@ func TestBind(t *testing.T) {
 		x.NoError(err)
 		x.Len(s.Warnings, 1)
 		o, _ := l.Origin(&c.Ldap.Key)
-		x.Equal(cfg.Default, o.Source)
+		x.Equal(cfg.SourceDefault, o.Source)
 		x.Equal([]string{missing}, o.Refs)
 	}))
 	t.Run("binding to something that is not a field panics", x.F(func(x x.X) {

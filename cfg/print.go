@@ -120,7 +120,7 @@ func (p *printer) tree() (*pnode, error) {
 		}
 
 		o := p.origin(f)
-		if o.Source == Unset && v.IsZero() {
+		if o.Source == SourceUnset && v.IsZero() {
 			continue
 		}
 		val, err := p.leaf(f, v, name)
@@ -136,7 +136,7 @@ func (p *printer) tree() (*pnode, error) {
 func (p *printer) clearedIn(g *field) (Origin, bool) {
 	for _, f := range p.schema.fields {
 		if g.covers(f) {
-			if o := p.origin(f); o.Source != Unset {
+			if o := p.origin(f); o.Source != SourceUnset {
 				return o, true
 			}
 		}

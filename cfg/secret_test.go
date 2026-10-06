@@ -300,7 +300,7 @@ func TestSecretPendingInCollections(t *testing.T) {
 		x.Len(c.Map, 2)
 
 		o, _ := l.Origin(&c.List)
-		x.Equal(cfg.Env, o.Source)
+		x.Equal(cfg.SourceEnv, o.Source)
 		x.Equal([]string{missing}, o.Refs)
 	}))
 	t.Run("an error beside one is not lost", x.F(func(x x.X) {
