@@ -141,7 +141,7 @@ func (s SecretOf[T, D]) MarshalText() ([]byte, error) {
 // reports it.
 func (s *SecretOf[T, D]) UnmarshalText(b []byte) error {
 	err := s.setSecret(string(b), &resolver{lookup: os.LookupEnv, verbatim: true})
-	if errors.As(err, new(*pendingError)) {
+	if isPending(err) {
 		return nil
 	}
 	return err

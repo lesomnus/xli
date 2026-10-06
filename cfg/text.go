@@ -265,7 +265,8 @@ func parseFloat(s string, bits int) (float64, error) {
 	return strconv.ParseFloat(s, bits)
 }
 
-// setFlow reads YAML flow syntax, e.g. `[a, "b,c"]` or `{k: v}`.
+// setFlow reads YAML flow syntax, e.g. `[a, "b,c"]` or `{k: v}`. Every error
+// is returned, each at the item it is about.
 func setFlow(v reflect.Value, s string, r *resolver) error {
 	f, err := parser.ParseBytes([]byte(s), 0)
 	if err != nil {
@@ -276,59 +277,79 @@ func setFlow(v reflect.Value, s string, r *resolver) error {
 	if err != nil {
 		return err
 	}
-	es := d.decode(body, v, "", false)
-	if len(es) > 0 {
-		return es[0]
+	vs := []error{}
+	for _, err := range d.decode(body, v, "", false) {
+		var fe *FieldError
+		if errors.As(err, &fe) {
+			// The value's own position in one line says little.
+			err = fe.Err
+			if fe.Origin.Key != "" {
+				err = within(fe.Origin.Key, err)
+			}
+		}
+		vs = append(vs, err)
 	}
-	return nil
+	return joinItems(vs)
 }
 
+// setPlainList reads a comma separated list. An item that fails is reported,
+// and the others are read; an item whose secret file is not there yet is kept.
 func setPlainList(v reflect.Value, s string, r *resolver) error {
 	items := splitEscaped(s, ',')
+	l := reflect.New(v.Type()).Elem()
 	if v.Kind() == reflect.Array {
 		if len(items) != v.Len() {
 			return fmt.Errorf("want %d values, got %d", v.Len(), len(items))
 		}
-		for i, item := range items {
-			if err := setText(v.Index(i), unescape(item), r); err != nil {
-				return fmt.Errorf("[%d]: %w", i, err)
-			}
-		}
-		return nil
+	} else {
+		l = reflect.MakeSlice(v.Type(), len(items), len(items))
 	}
 
-	l := reflect.MakeSlice(v.Type(), len(items), len(items))
+	es := []error{}
 	for i, item := range items {
 		if err := setText(l.Index(i), unescape(item), r); err != nil {
-			return fmt.Errorf("[%d]: %w", i, err)
+			es = append(es, within(fmt.Sprintf("[%d]", i), err))
 		}
 	}
+	if err := joinItems(es); err != nil && !isPending(err) {
+		return err
+	}
 	v.Set(l)
-	return nil
+	return joinItems(es)
 }
 
+// setPlainMap reads a comma separated list of key=value. As setPlainList.
 func setPlainMap(v reflect.Value, s string, r *resolver) error {
 	m := reflect.MakeMap(v.Type())
+	es := []error{}
 	for _, item := range splitEscaped(s, ',') {
 		kv := splitEscaped(item, '=')
 		if len(kv) < 2 {
-			return fmt.Errorf("%q: want key=value", unescape(item))
+			es = append(es, fmt.Errorf("%q: want key=value", unescape(item)))
+			continue
 		}
 		// The value is everything after the first "=".
 		key, val := unescape(kv[0]), unescape(item[len(kv[0])+1:])
 
 		k := reflect.New(v.Type().Key()).Elem()
 		if err := setText(k, key, r); err != nil {
-			return fmt.Errorf("key %q: %w", key, err)
+			es = append(es, within(fmt.Sprintf("key %q", key), err))
+			continue
 		}
 		e := reflect.New(v.Type().Elem()).Elem()
 		if err := setText(e, val, r); err != nil {
-			return fmt.Errorf("%s: %w", key, err)
+			es = append(es, within(key, err))
+			if !isPending(err) {
+				continue
+			}
 		}
 		m.SetMapIndex(k, e)
 	}
+	if err := joinItems(es); err != nil && !isPending(err) {
+		return err
+	}
 	v.Set(m)
-	return nil
+	return joinItems(es)
 }
 
 // splitEscaped splits s at every sep not escaped by a backslash. The parts keep

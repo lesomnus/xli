@@ -265,6 +265,41 @@ func TestSecretFile(t *testing.T) {
 	}))
 }
 
+func TestSecretPendingInCollections(t *testing.T) {
+	type Peer struct {
+		Key  cfg.Secret `yaml:"key"`
+		Port int        `yaml:"port"`
+	}
+	type C struct {
+		List  []cfg.Secret          `yaml:"list"`
+		Map   map[string]cfg.Secret `yaml:"map"`
+		Peers []Peer                `yaml:"peers"`
+	}
+	missing := "${file:" + filepath.Join(t.TempDir(), "missing") + "}"
+
+	t.Run("items are kept and read when used", x.F(func(x x.X) {
+		c := C{}
+		l := cfg.New("app", &c)
+		s, err := l.Load(write(x.T, "list: [from-file]\n"), env(
+			"APP_LIST="+missing+",lit",
+			"APP_MAP=a="+missing+",b=lit",
+		))
+		x.NoError(err)
+		x.Len(s.Warnings, 2)
+		x.Len(c.List, 2)
+		x.Equal(missing, c.List[0].Ref())
+		x.Len(c.Map, 2)
+
+		o, _ := l.Origin(&c.List)
+		x.Equal(cfg.Env, o.Source)
+		x.Equal([]string{missing}, o.Refs)
+	}))
+	t.Run("an error beside one is not lost", x.F(func(x x.X) {
+		_, err := cfg.New("app", &C{}, cfg.WithPaths()).Load("", env(`APP_PEERS=[{key: "`+missing+`"}, {port: notanint}]`))
+		x.ErrorContains(err, `APP_PEERS: [1].port: "notanint" is not an integer`)
+	}))
+}
+
 func TestSecretCustom(t *testing.T) {
 	x := x.New(t)
 	c, err := loadSecrets(t, "key: AQIDBA==\n")

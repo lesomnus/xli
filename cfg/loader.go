@@ -417,7 +417,7 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 
 	var fatal errs
 	for _, err := range es {
-		if errors.As(err, new(*pendingError)) {
+		if isPending(err) {
 			s.Warnings = append(s.Warnings, err)
 			continue
 		}

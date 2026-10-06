@@ -120,8 +120,75 @@ func (e *FieldError) Unwrap() error {
 // errs collects errors of one load.
 type errs []error
 
+// add adds err about the value o tells of; the errors of several items of a
+// list or a map are added one by one.
 func (es *errs) add(o Origin, err error) {
+	if j, ok := err.(joined); ok {
+		for _, err := range j {
+			es.add(o, err)
+		}
+		return
+	}
 	*es = append(*es, &FieldError{Origin: o, Err: err})
+}
+
+// joined are the errors of the items of one value, such as a list.
+type joined []error
+
+func (e joined) Error() string {
+	vs := make([]string, len(e))
+	for i, err := range e {
+		vs[i] = err.Error()
+	}
+	return strings.Join(vs, "; ")
+}
+
+func (e joined) Unwrap() []error {
+	return e
+}
+
+// joinItems is es as one error: nil, the one, or joined.
+func joinItems(es []error) error {
+	switch len(es) {
+	case 0:
+		return nil
+	case 1:
+		return es[0]
+	default:
+		return joined(es)
+	}
+}
+
+// within puts the errors of an item at where it is, e.g. "[1]: ...".
+func within(at string, err error) error {
+	if j, ok := err.(joined); ok {
+		vs := make(joined, len(j))
+		for i, err := range j {
+			vs[i] = within(at, err)
+		}
+		return vs
+	}
+	return fmt.Errorf("%s: %w", at, err)
+}
+
+// isPending reports whether err is a secret file not there yet, and nothing
+// else: every one of joined errors has to be.
+func isPending(err error) bool {
+	switch e := err.(type) {
+	case *pendingError:
+		return true
+	case interface{ Unwrap() []error }:
+		vs := e.Unwrap()
+		for _, err := range vs {
+			if !isPending(err) {
+				return false
+			}
+		}
+		return len(vs) > 0
+	case interface{ Unwrap() error }:
+		return isPending(e.Unwrap())
+	}
+	return false
 }
 
 func (es *errs) addf(o Origin, format string, vs ...any) {
