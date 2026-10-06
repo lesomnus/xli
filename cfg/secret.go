@@ -1,8 +1,10 @@
 package cfg
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -94,13 +96,18 @@ type secretField interface {
 	refs() []string
 }
 
-// Value is the secret as it is now.
+// Value is the secret as it is now. A []byte is a copy of its own, which the
+// caller may clear after use.
 func (s SecretOf[T, D]) Value() (T, error) {
 	if s.s == nil {
 		var z T
 		return z, nil
 	}
-	return s.s.get()
+	v, err := s.s.get()
+	if b, ok := any(v).([]byte); ok {
+		v = any(bytes.Clone(b)).(T)
+	}
+	return v, err
 }
 
 // IsZero reports whether the secret was not given.
@@ -300,11 +307,12 @@ func (st *secretState[T, D]) get() (T, error) {
 		return st.failed(err)
 	case st.seen != nil && st.unchanged(fi):
 		return st.value, nil
-	case fi.Size() > maxSecretFile:
-		return st.failed(fmt.Errorf("%d bytes, over the %d cap", fi.Size(), maxSecretFile))
+	case !fi.Mode().IsRegular():
+		// A FIFO or a device would block, or never end.
+		return st.failed(errors.New("not a regular file"))
 	}
 
-	b, err := os.ReadFile(st.path)
+	b, fi, err := readCapped(st.path)
 	if err != nil {
 		return st.failed(err)
 	}
@@ -314,6 +322,29 @@ func (st *secretState[T, D]) get() (T, error) {
 	}
 	st.value, st.seen = v, fi
 	return v, nil
+}
+
+// readCapped reads the file at path, of at most maxSecretFile bytes, and
+// describes the file it read.
+func readCapped(path string) ([]byte, os.FileInfo, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, nil, err
+	}
+	b, err := io.ReadAll(io.LimitReader(f, maxSecretFile+1))
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(b) > maxSecretFile {
+		return nil, nil, fmt.Errorf("over the %d byte cap", maxSecretFile)
+	}
+	return b, fi, nil
 }
 
 // failed is a read that gave no value: the one in hand if there is one.
