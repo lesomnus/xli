@@ -114,9 +114,11 @@ func WriteMan(w io.Writer, c *Command, section int) error {
 			}
 			for _, f := range fs {
 				info := f.Info()
-				p.printf(".TP\n.B %s", roff(flagLabel(info)))
+				// Inline font escapes rather than .B/.BI, whose quoted
+				// arguments would break on a '"' in the type.
+				p.printf(".TP\n\\fB%s\\fR", roff(flagLabel(info)))
 				if info.Type != "" {
-					p.printf(" \" %s\"", roff(info.Type))
+					p.printf(" \\fI%s\\fR", roff(info.Type))
 				}
 				p.printf("\n%s\n", roff(flagDesc(info)))
 			}
