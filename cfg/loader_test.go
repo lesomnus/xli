@@ -331,6 +331,14 @@ func TestUnknownEnv(t *testing.T) {
 	s, err = cfg.New("app", &c, cfg.KeepServiceLinks(), cfg.WithPaths()).Load("", env("APP_DATA_SERVICE_HOST=x"))
 	x.NoError(err)
 	x.Equal([]string{"APP_DATA_SERVICE_HOST"}, s.Unknown)
+
+	s, err = cfg.New("app", &c, cfg.WithPaths()).Load("", env(
+		"APP_SERVICE_HOST=10.0.0.1",
+		"APP_PORT=tcp://10.0.0.1:80",
+		"APP_DB_PORT=5432",
+	))
+	x.NoError(err)
+	x.Equal([]string{"APP_DB_PORT"}, s.Unknown, "of the shape, but there is no service APP_DB")
 }
 
 type Validated struct {
