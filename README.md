@@ -27,6 +27,10 @@ and context is nested as you go down the tree.
   suggest close matches ("did you mean …?").
 - **Generated help**, **shell completion** (zsh, bash, fish), and **Markdown /
   man page** generation. Commands and flags can be hidden from all three.
+- **Configuration (optional)** — the `cfg` module loads your own struct from a
+  YAML file, the environment and bound flags, records where every value came
+  from, re-reads rotated secret files and reloads the file
+  ([cfg/DESIGN.md](cfg/DESIGN.md)).
 - **Testing helpers** — the `xlitest` package runs a command against in-memory
   IO and decodes completion output, so tests assert on results, not wiring.
 
@@ -101,6 +105,9 @@ $ greet --help
 - [docs/testing.md](docs/testing.md) — testing your commands with the
   `xlitest` package: running, asserting output/errors/parsed values, stdin, and
   decoding shell completion.
+- [cfg/DESIGN.md](cfg/DESIGN.md) — the optional configuration module
+  (`github.com/lesomnus/xli/cfg`): layers and precedence, names, references and
+  secrets, binding flags, origins, validation and reload.
 
 ## Concepts
 
