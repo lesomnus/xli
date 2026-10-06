@@ -178,19 +178,35 @@ func TestSecretFile(t *testing.T) {
 		v, _ = c.Password.Value()
 		x.Equal("better", v)
 	}))
-	t.Run("a missing or empty file fails the load", x.F(func(x x.X) {
-		_, err := loadSecrets(x.T, "password: ${file:"+filepath.Join(dir, "nope")+"}\n")
-		x.True(errors.Is(err, os.ErrNotExist))
+	t.Run("a file not there yet is a warning, and read when used", x.F(func(x x.X) {
+		late := filepath.Join(dir, "late")
+		c := &Secrets{}
+		s, err := cfg.New("app", c).Load(write(x.T, "password: ${file:"+late+"}\n"), nil)
+		x.NoError(err)
+		x.Len(s.Warnings, 1)
+		x.ErrorContains(s.Warnings[0], "password: secret file "+late)
+		x.True(errors.Is(s.Warnings[0], os.ErrNotExist))
 
-		empty := filepath.Join(dir, "empty")
-		writeAt(x.T, empty, "\n")
-		_, err = loadSecrets(x.T, "password: ${file:"+empty+"}\n")
-		x.ErrorContains(err, "empty")
+		_, err = c.Password.Value()
+		x.True(errors.Is(err, os.ErrNotExist), "never read: an error")
+
+		writeAt(x.T, late, "\n")
+		_, err = c.Password.Value()
+		x.ErrorContains(err, "empty", "an empty file is a failed read")
+
+		rotate(x.T, late, "minted\n")
+		v, err := c.Password.Value()
+		x.NoError(err)
+		x.Equal("minted", v)
 	}))
 	t.Run("a file over the cap is refused", x.F(func(x x.X) {
 		big := filepath.Join(dir, "big")
 		writeAt(x.T, big, strings.Repeat("a", 64<<10+1))
-		_, err := loadSecrets(x.T, "password: ${file:"+big+"}\n")
+		c := &Secrets{}
+		s, err := cfg.New("app", c).Load(write(x.T, "password: ${file:"+big+"}\n"), nil)
+		x.NoError(err)
+		x.ErrorContains(s.Warnings[0], "over the")
+		_, err = c.Password.Value()
 		x.ErrorContains(err, "over the")
 	}))
 	t.Run("copies share the state", x.F(func(x x.X) {

@@ -222,6 +222,13 @@ func TestBind(t *testing.T) {
 		defer func() { x.NotNil(recover()) }()
 		cfg.Bind(l, &other, &flg.String{Name: "x"})
 	}))
+	t.Run("secret files not there yet are reported", x.F(func(x x.X) {
+		root, _ := app(&AppConfig{}, env("APP_LDAP_KEY=${file:/does/not/exist}"), &ServeConfig{})
+		res := xlitest.Run(x.T, root, "ldap", "serve")
+		x.NoError(res.Err)
+		x.Contains(res.Stderr, "app: APP_LDAP_KEY: secret file /does/not/exist: ")
+		x.Contains(res.Stderr, "; it is read again when used\n")
+	}))
 	t.Run("unknown variables are reported", x.F(func(x x.X) {
 		root, _ := app(&AppConfig{}, env("APP_LDAP_ADRR=x"), &ServeConfig{})
 		res := xlitest.Run(x.T, root, "ldap", "serve")
