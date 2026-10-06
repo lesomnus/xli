@@ -31,7 +31,11 @@ func TestOf(t *testing.T) {
 		x.Equal([]string{"serve"}, Of("serv", []string{"serve", "serve", "serv"}))
 	}))
 	t.Run("closest first", x.F(func(x x.X) {
-		x.Equal([]string{"pot", "port"}, Of("prot", []string{"port", "pot"}))
+		x.Equal([]string{"serve", "server"}, Of("serv", []string{"server", "serve"}))
+	}))
+	t.Run("a swap is one edit", x.F(func(x x.X) {
+		x.Equal([]string{"port", "pot"}, Of("prot", []string{"port", "pot"}))
+		x.Equal([]string{"dsn"}, Of("dns", []string{"dsn", "addr"}))
 	}))
 }
 
@@ -39,7 +43,9 @@ func TestDistance(t *testing.T) {
 	x := x.New(t)
 	x.Equal(0, distance("abc", "abc"))
 	x.Equal(3, distance("", "abc"))
-	x.Equal(2, distance("deplyo", "deploy"))
+	x.Equal(1, distance("deplyo", "deploy"))
+	x.Equal(1, distance("dns", "dsn"))
+	x.Equal(2, distance("abc", "bca"))
 	x.Equal(1, distance("한글", "한굴"))
 }
 
