@@ -18,7 +18,7 @@ import (
 type decoder struct {
 	r       *resolver
 	file    string
-	anchors map[string]ast.Node
+	anchors map[string][]anchor
 
 	// leaf, when set, is called for every field of the root struct that is a
 	// leaf of the schema, with the node its value was read from.
@@ -38,14 +38,40 @@ func (d *decoder) body(f *ast.File) (ast.Node, error) {
 		body = doc.Body
 	}
 
-	d.anchors = map[string]ast.Node{}
+	d.anchors = map[string][]anchor{}
 	if body != nil {
 		for _, n := range ast.Filter(ast.AnchorType, body) {
 			a := n.(*ast.AnchorNode)
-			d.anchors[a.Name.GetToken().Value] = a.Value
+			name := a.Name.GetToken().Value
+			d.anchors[name] = append(d.anchors[name], anchor{offset(a), a.Value})
 		}
 	}
 	return body, nil
+}
+
+// anchor is a node an alias may name, and where it is defined.
+type anchor struct {
+	at   int
+	node ast.Node
+}
+
+func offset(n ast.Node) int {
+	if t := n.GetToken(); t != nil && t.Position != nil {
+		return t.Position.Offset
+	}
+	return 0
+}
+
+// anchored is the node the alias at `at` names: the nearest anchor of that
+// name defined before it, as an anchor may be defined again.
+func (d *decoder) anchored(name string, at int) (ast.Node, bool) {
+	var found ast.Node
+	for _, a := range d.anchors[name] {
+		if a.at < at {
+			found = a.node
+		}
+	}
+	return found, found != nil
 }
 
 // resolve follows anchors, aliases and tags to the node that holds the value.
@@ -57,7 +83,7 @@ func (d *decoder) resolve(n ast.Node) (_ ast.Node, str bool, err error) {
 			n = v.Value
 		case *ast.AliasNode:
 			name := v.Value.GetToken().Value
-			a, ok := d.anchors[name]
+			a, ok := d.anchored(name, offset(v))
 			if !ok {
 				return nil, false, fmt.Errorf("alias *%s names no anchor", name)
 			}
@@ -98,7 +124,8 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 	leaf := root && isLeaf(v.Type())
 	if _, ok := n.(*ast.NullNode); ok || n == nil {
 		v.SetZero()
-		if leaf && d.leaf != nil {
+		if root && d.leaf != nil {
+			// A leaf, or a block whose leaves are all cleared.
 			d.leaf(key, n, nil, true)
 		}
 		return nil
@@ -115,7 +142,7 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 	if leaf && d.leaf != nil {
 		d.r.refs = nil
 		defer func() {
-			if len(es) == 0 {
+			if onlyPending(es) {
 				d.leaf(key, n, refs, false)
 			}
 		}()
@@ -160,8 +187,21 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 	case reflect.Map:
 		es = d.decodeMap(n, v, key)
 	case reflect.Interface:
-		if err := yaml.NodeToValue(n, ptr); err != nil {
+		if v.NumMethod() != 0 {
+			if err := yaml.NodeToValue(n, ptr); err != nil {
+				es.add(d.at(n, key), err)
+			}
+			break
+		}
+		a, err := d.anyOf(n, str, 0)
+		if err != nil {
 			es.add(d.at(n, key), err)
+			break
+		}
+		if a == nil {
+			v.SetZero()
+		} else {
+			v.Set(reflect.ValueOf(a))
 		}
 	default:
 		text, err := d.text(n, str)
@@ -222,6 +262,13 @@ type entry struct {
 // entries are the keys and values of a mapping, those of merge keys (`<<`)
 // first so the mapping's own override them.
 func (d *decoder) entries(n ast.Node) ([]entry, error) {
+	return d.entriesAt(n, 0)
+}
+
+func (d *decoder) entriesAt(n ast.Node, depth int) ([]entry, error) {
+	if depth > 64 {
+		return nil, errors.New("merge keys nest too deeply (a merge that includes itself?)")
+	}
 	var mvs []*ast.MappingValueNode
 	switch v := n.(type) {
 	case *ast.MappingNode:
@@ -253,7 +300,7 @@ func (d *decoder) entries(n ast.Node) ([]entry, error) {
 			if err != nil {
 				return nil, err
 			}
-			es, err := d.entries(s)
+			es, err := d.entriesAt(s, depth+1)
 			if err != nil {
 				return nil, fmt.Errorf("<<: %w", err)
 			}
@@ -421,4 +468,75 @@ func (d *decoder) decodeMap(n ast.Node, v reflect.Value, key string) (es errs) {
 	}
 	v.Set(m)
 	return es
+}
+
+// anyOf is a node as plain Go values (map[string]any, []any, string, numbers,
+// bool, nil) with the references in its strings resolved.
+func (d *decoder) anyOf(n ast.Node, str bool, depth int) (any, error) {
+	if depth > 64 {
+		return nil, errors.New("nests too deeply")
+	}
+	n, s, err := d.resolve(n)
+	if err != nil {
+		return nil, err
+	}
+	str = str || s
+
+	switch v := n.(type) {
+	case nil, *ast.NullNode:
+		return nil, nil
+	case *ast.MappingNode, *ast.MappingValueNode:
+		es, err := d.entries(v)
+		if err != nil {
+			return nil, err
+		}
+		m := map[string]any{}
+		for _, e := range es {
+			k, str, err := d.resolve(e.key)
+			if err != nil {
+				return nil, err
+			}
+			name, err := d.text(k, str)
+			if err != nil {
+				return nil, err
+			}
+			val, err := d.anyOf(e.value, false, depth+1)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			m[name] = val
+		}
+		return m, nil
+	case *ast.SequenceNode:
+		l := make([]any, len(v.Values))
+		for i, e := range v.Values {
+			val, err := d.anyOf(e, false, depth+1)
+			if err != nil {
+				return nil, fmt.Errorf("[%d]: %w", i, err)
+			}
+			l[i] = val
+		}
+		return l, nil
+	case *ast.StringNode, *ast.LiteralNode:
+		return d.text(n, true)
+	}
+	if str {
+		return d.text(n, true)
+	}
+	var a any
+	if err := yaml.NodeToValue(n, &a); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+// onlyPending reports whether es holds nothing but warnings about secret files
+// not there yet.
+func onlyPending(es errs) bool {
+	for _, err := range es {
+		if !errors.As(err, new(*pendingError)) {
+			return false
+		}
+	}
+	return true
 }

@@ -22,7 +22,7 @@ var validatorType = reflect.TypeFor[Validator]()
 // validate calls Validate on every value of v's tree that implements it.
 func validate[T any](v reflect.Value, s *Snapshot[T]) errs {
 	var es errs
-	walkValidate(v, "", s.originFor, &es)
+	walkValidate(v, "", s.originFor, &es, false)
 	return es
 }
 
@@ -33,12 +33,14 @@ func (s *Snapshot[T]) originFor(key string) Origin {
 	return Origin{Key: key}
 }
 
-func walkValidate(v reflect.Value, key string, origin func(string) Origin, es *errs) {
+// walkValidate validates v and what it holds. promoted reports that v is an
+// embedded field whose Validate was already called as its holder's.
+func walkValidate(v reflect.Value, key string, origin func(string) Origin, es *errs, promoted bool) {
 	if v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
 		if v.IsNil() {
 			return
 		}
-		walkValidate(v.Elem(), key, origin, es)
+		walkValidate(v.Elem(), key, origin, es, promoted)
 		return
 	}
 
@@ -48,9 +50,13 @@ func walkValidate(v reflect.Value, key string, origin func(string) Origin, es *e
 		c.Set(v)
 		v = c
 	}
+	called := false
 	if p := v.Addr(); p.Type().Implements(validatorType) {
-		if err := p.Interface().(Validator).Validate(); err != nil {
-			es.add(origin(key), err)
+		called = true
+		if !promoted {
+			if err := p.Interface().(Validator).Validate(); err != nil {
+				es.add(origin(key), err)
+			}
 		}
 	}
 
@@ -74,16 +80,16 @@ func walkValidate(v reflect.Value, key string, origin func(string) Origin, es *e
 			if !tag.inline {
 				sub = join(key, tag.name)
 			}
-			walkValidate(v.Field(i), sub, origin, es)
+			walkValidate(v.Field(i), sub, origin, es, sf.Anonymous && called)
 		}
 	case reflect.Slice, reflect.Array:
 		for i := range v.Len() {
-			walkValidate(v.Index(i), key+"["+itoa(i)+"]", origin, es)
+			walkValidate(v.Index(i), key+"["+itoa(i)+"]", origin, es, false)
 		}
 	case reflect.Map:
 		it := v.MapRange()
 		for it.Next() {
-			walkValidate(it.Value(), join(key, textOf(it.Key())), origin, es)
+			walkValidate(it.Value(), join(key, textOf(it.Key())), origin, es, false)
 		}
 	}
 }

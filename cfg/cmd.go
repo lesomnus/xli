@@ -106,7 +106,7 @@ func (s *Snapshot[T]) Print(w io.Writer) error {
 }
 
 func printValue(f *field, v reflect.Value, ok bool) (string, error) {
-	if !ok {
+	if !ok || (v.Kind() == reflect.Pointer && v.IsNil()) {
 		return "null", nil
 	}
 	if f.secret {
