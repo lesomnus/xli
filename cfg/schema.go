@@ -34,8 +34,10 @@ type schema struct {
 	root   reflect.Type
 	fields []*field
 	groups []*field
-	byKey  map[string]*field
-	byEnv  map[string]*field
+	// all are the groups and the fields, a group before what is in it.
+	all   []*field
+	byKey map[string]*field
+	byEnv map[string]*field
 }
 
 func newSchema(t reflect.Type, prefix string) (*schema, error) {
@@ -48,15 +50,16 @@ func newSchema(t reflect.Type, prefix string) (*schema, error) {
 		byKey: map[string]*field{},
 		byEnv: map[string]*field{},
 	}
-	if err := s.walk(t, prefix, nil, nil, map[reflect.Type]bool{}, map[string]bool{}); err != nil {
+	if err := s.walk(t, prefix, nil, nil, false, map[reflect.Type]bool{}, map[string]bool{}); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-// walk adds the fields of t to s. taken are the keys of the fields and the
+// walk adds the fields of t to s. secret is set in a block tagged secret,
+// which makes every field in it one. taken are the keys of the fields and the
 // blocks so far, which two inlined structs may both have.
-func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int, seen map[reflect.Type]bool, taken map[string]bool) error {
+func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int, secret bool, seen map[reflect.Type]bool, taken map[string]bool) error {
 	if seen[t] {
 		// A recursive type has no finite set of leaves.
 		return fmt.Errorf("cfg: %s refers to itself", t)
@@ -94,7 +97,7 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 			if st.Kind() != reflect.Struct {
 				return fmt.Errorf("cfg: %s.%s: only a struct can be inlined", t, sf.Name)
 			}
-			if err := s.walk(st, prefix, path, idx, seen, taken); err != nil {
+			if err := s.walk(st, prefix, path, idx, secret || tag.secret, seen, taken); err != nil {
 				return err
 			}
 			continue
@@ -112,8 +115,10 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 			if st.Kind() == reflect.Pointer {
 				st = st.Elem()
 			}
-			s.groups = append(s.groups, &field{key: key, index: idx, typ: ft, group: true})
-			if err := s.walk(st, prefix, p, idx, seen, taken); err != nil {
+			g := &field{key: key, index: idx, typ: ft, group: true}
+			s.groups = append(s.groups, g)
+			s.all = append(s.all, g)
+			if err := s.walk(st, prefix, p, idx, secret || tag.secret, seen, taken); err != nil {
 				return err
 			}
 			continue
@@ -123,7 +128,7 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 			key:    key,
 			index:  idx,
 			typ:    ft,
-			secret: tag.secret || isSecret(ft),
+			secret: secret || tag.secret || isSecret(ft),
 		}
 		switch tag.env {
 		case "-":
@@ -143,6 +148,7 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 		}
 		s.byKey[f.key] = f
 		s.fields = append(s.fields, f)
+		s.all = append(s.all, f)
 	}
 	return nil
 }
