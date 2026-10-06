@@ -3,13 +3,15 @@ package tab
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/lesomnus/xli/internal/comp"
 )
 
 // Each emitted line is one of:
 //
-//	v<sep><group><sep><entry>   a candidate ("value" or "value:desc")
+//	v<sep><group><sep><entry>   a candidate ("value" or "value:desc"; a ":" in
+//	                            the value is escaped as "\:", as zsh expects)
 //	f<sep><pattern>             request file completion (pattern may be empty)
 //	d<sep>                      request directory completion
 type ZshTab struct {
@@ -22,11 +24,17 @@ func NewZshTab(w io.Writer) *ZshTab {
 }
 
 func (t *ZshTab) Value(v string) {
-	t.candidate(v)
+	t.candidate(escapeValue(v))
 }
 
 func (t *ZshTab) ValueD(v string, desc string) {
-	t.candidate(fmt.Sprintf("%s:%s", v, desc))
+	t.candidate(fmt.Sprintf("%s:%s", escapeValue(v), desc))
+}
+
+// escapeValue escapes ":" so it is not taken as the value/description
+// separator.
+func escapeValue(v string) string {
+	return strings.ReplaceAll(v, ":", `\:`)
 }
 
 func (t *ZshTab) Group(name string) Tab {

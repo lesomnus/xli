@@ -15,26 +15,29 @@ ___XLI_PROG___bash() {
 
 	# The trigger tag and separator below mirror internal/comp (TagPrefix+"bash"
 	# and Sep); keep them in sync with that package.
-	IFS=$'\n'
 	local -a lines
-	lines=($("${words[0]}" "${words[@]:1}" '$$xli_completion_bash' "${curr}" "${curr}" 2>/dev/null))
+	mapfile -t lines < <("${words[0]}" "${words[@]:1}" '$$xli_completion_bash' "${curr}" "${curr}" 2>/dev/null)
 
 	# Each line is one of:
-	#   v<sep><group><sep><entry>   a candidate ("value" or "value:desc")
+	#   v<sep><group><sep><entry>   a candidate ("value" or "value:desc";
+	#                               ":" in the value is escaped as "\:")
 	#   f<sep><pattern>             request file completion
 	#   d<sep>                      request directory completion
 	# bash cannot show groups or descriptions, so only the values are used.
 	local sep=$'\x1f'
 	local -a values globs
 	local want_files=0 want_dirs=0
-	local l kind rest entry
+	local l kind rest entry esc=$'\x1e'
 	for l in "${lines[@]}"; do
 		kind=${l%%"${sep}"*}
 		rest=${l#*"${sep}"}
 		case ${kind} in
 		v)
 			entry=${rest#*"${sep}"}
-			[[ -n ${entry} ]] && values+=("${entry%%:*}")
+			[[ -z ${entry} ]] && continue
+			entry=${entry//'\:'/${esc}}
+			entry=${entry%%:*}
+			values+=("${entry//${esc}/:}")
 			;;
 		f)
 			want_files=1
@@ -55,23 +58,34 @@ ___XLI_PROG___bash() {
 		[[ ${COMP_WORDBREAKS} != *=* ]] && prefix=${curr%%=*}=
 	fi
 
+	# With "-o filenames" readline quotes every candidate itself; otherwise
+	# values are quoted here so spaces and quotes survive insertion.
+	local quote=1
+	if ((want_dirs || want_files)); then
+		compopt -o filenames 2>/dev/null && quote=0
+	fi
+
 	COMPREPLY=()
 	local v
 	for v in "${values[@]}"; do
-		[[ ${v} == "${match}"* ]] && COMPREPLY+=("${prefix}${v}")
+		[[ ${v} == "${match}"* ]] || continue
+		v=${prefix}${v}
+		((quote)) && printf -v v '%q' "${v}"
+		COMPREPLY+=("${v}")
 	done
 
-	((want_dirs || want_files)) && compopt -o filenames 2>/dev/null
+	# mapfile (not $(...) word splitting) keeps names with spaces or glob
+	# characters intact regardless of nullglob/failglob.
 	if ((want_files)) && ((${#globs[@]} == 0)); then
 		# Any file; this includes directories.
-		COMPREPLY+=($(compgen -f -- "${match}"))
-	else
+		mapfile -t -O "${#COMPREPLY[@]}" COMPREPLY < <(compgen -f -- "${match}")
+	elif ((want_dirs || want_files)); then
 		# Directories are offered alongside globbed files so the user can
 		# descend into them.
-		((want_dirs || want_files)) && COMPREPLY+=($(compgen -d -- "${match}"))
+		mapfile -t -O "${#COMPREPLY[@]}" COMPREPLY < <(compgen -d -- "${match}")
 		local g
 		for g in "${globs[@]}"; do
-			COMPREPLY+=($(compgen -f -X "!${g}" -- "${match}"))
+			mapfile -t -O "${#COMPREPLY[@]}" COMPREPLY < <(compgen -f -X "!${g}" -- "${match}")
 		done
 	fi
 }
