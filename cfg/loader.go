@@ -64,6 +64,9 @@ type Snapshot[T any] struct {
 
 	schema  *schema
 	origins map[string]Origin
+	// written are the values of the file read through references, as
+	// written, for Print.
+	written map[string]any
 }
 
 type options struct {
@@ -359,6 +362,7 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 		Path:    path,
 		schema:  l.schema,
 		origins: map[string]Origin{},
+		written: map[string]any{},
 	}
 
 	var es errs
@@ -496,6 +500,9 @@ func (l *Loader[T]) decodeFile(s *Snapshot[T], rv reflect.Value, r *resolver, pa
 		o.Cleared = cleared
 		if _, ok := l.schema.byKey[key]; ok {
 			s.origins[key] = o
+			if len(refs) > 0 {
+				s.written[key] = d.asWritten(n)
+			}
 			return
 		}
 		// A block given as null: every leaf in it is cleared.

@@ -290,6 +290,17 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 	return es
 }
 
+// asWritten is n as plain values with its references not resolved: what the
+// file says, for Print.
+func (d *decoder) asWritten(n ast.Node) any {
+	w := &decoder{r: &resolver{verbatim: true}, anchors: d.anchors}
+	a, err := w.anyOf(n, false, 0)
+	if err != nil {
+		return nil
+	}
+	return a
+}
+
 // unmarshal decodes n into ptr, a type that decodes itself, by handing it n as
 // plain values: with the references in its strings resolved, and its aliases
 // and merges expanded.
@@ -444,14 +455,17 @@ func (d *decoder) keyOf(n ast.Node) (string, bool) {
 	return text, ok
 }
 
-// fieldOf is a struct field by the name it has in the configuration, through
-// inlined structs.
+// structField is a field of a struct by the name it has in the configuration,
+// through inlined structs.
 type structField struct {
-	index []int
+	name   string
+	index  []int
+	secret bool // tagged `cfg:",secret"`
 }
 
-func structFields(t reflect.Type) map[string]structField {
-	fs := map[string]structField{}
+// fieldsOf are the fields of t in order.
+func fieldsOf(t reflect.Type) []structField {
+	fs := []structField{}
 	var walk func(t reflect.Type, index []int)
 	walk = func(t reflect.Type, index []int) {
 		for i := range t.NumField() {
@@ -474,13 +488,21 @@ func structFields(t reflect.Type) map[string]structField {
 				}
 				continue
 			}
-			if _, ok := fs[tag.name]; !ok {
-				fs[tag.name] = structField{index: idx}
-			}
+			fs = append(fs, structField{name: tag.name, index: idx, secret: tag.secret})
 		}
 	}
 	walk(t, nil)
 	return fs
+}
+
+func structFields(t reflect.Type) map[string]structField {
+	m := map[string]structField{}
+	for _, f := range fieldsOf(t) {
+		if _, ok := m[f.name]; !ok {
+			m[f.name] = f
+		}
+	}
+	return m
 }
 
 // fieldByIndex is the field at index, allocating pointers to inlined structs.
