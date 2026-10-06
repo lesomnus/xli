@@ -208,6 +208,27 @@ details (with defaults and `(required)` markers), and subcommands grouped by
 category. `Synop` is shown as a `Description:` section. The template is built in
 and not currently overridable.
 
+## Generating documentation
+
+`xli.WriteMarkdown(w, root)` writes a Markdown reference for the whole tree. Each
+command gets a section with its usage line, description, and tables of arguments,
+options, and subcommands, and subcommands link to their own sections.
+`xli.WriteMan(w, root, 1)` writes the same content as one roff man page (section
+1), with subcommands under `COMMANDS`. Hidden commands and flags are left out of
+both.
+
+A common setup is a hidden subcommand that you run at build time:
+
+```go
+&xli.Command{
+	Name:   "gen-docs",
+	Hidden: true,
+	Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+		return xli.WriteMarkdown(cmd, cmd.Root())
+	}),
+}
+```
+
 ## Version
 
 There is no built-in `--version`. Add your own — typically a `version`

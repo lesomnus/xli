@@ -19,11 +19,14 @@ and context is nested as you go down the tree.
 - **Strict flag/arg positioning** — a command owns only its own flags and args;
   flags must come before args. This keeps parsing unambiguous across deep trees.
 - **Typed flags and arguments** — `string`, `bool` (switch), `int`/`uint`
-  families, `float32`/`float64`, and `time.Duration`, plus variadic arguments
-  and repeatable (`[]string`) flags.
-- **Defaults & required flags** — a clear contract between the configured default
-  and the value the user actually provided.
-- **Generated help** and **shell completion** (zsh, bash, fish).
+  families, `float32`/`float64`, `time.Duration`, and choices (enums), plus
+  variadic arguments and repeatable (`[]string`) flags.
+- **Defaults, required & mutually exclusive flags** — a clear contract between
+  the configured default and the value the user actually provided.
+- **Helpful errors** — usage errors name the command they occurred on and
+  suggest close matches ("did you mean …?").
+- **Generated help**, **shell completion** (zsh, bash, fish), and **Markdown /
+  man page** generation. Commands and flags can be hidden from all three.
 - **Testing helpers** — the `xlitest` package runs a command against in-memory
   IO and decodes completion output, so tests assert on results, not wiring.
 
