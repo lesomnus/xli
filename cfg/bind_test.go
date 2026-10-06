@@ -138,6 +138,10 @@ func TestBind(t *testing.T) {
 		x.NoError(xlitest.Run(x.T, root, "ldap", "serve", "--deployment-key=${env:KEY}").Err)
 		key, _ := got.Key.Value()
 		x.Equal("from-env", key)
+
+		x.NoError(xlitest.Run(x.T, root, "ldap", "serve", "--deployment-key=Pa$$${w0rd").Err)
+		key, _ = got.Key.Value()
+		x.Equal("Pa$$${w0rd", key, "anything else is taken as it is")
 	}))
 	t.Run("conversion errors name the flag", x.F(func(x x.X) {
 		got := ServeConfig{}

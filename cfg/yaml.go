@@ -208,8 +208,6 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 			es.add(d.at(n, key), err)
 		}
 		refs = sf.refs()
-		// A secret in a list or a map: the references of the field it is in.
-		d.r.refs = append(d.r.refs, refs...)
 		return es
 	}
 	if tag == "!!binary" && v.Type() == bytesType {

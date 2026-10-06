@@ -126,6 +126,49 @@ func TestSecretFromEnvironment(t *testing.T) {
 	x.True(c.Password.IsZero(), "an empty variable clears a secret")
 }
 
+func TestSecretAsGiven(t *testing.T) {
+	t.Run("the environment's value is taken as it is", x.F(func(x x.X) {
+		for _, pw := range []string{"Pa$$w0rd", "ab${cd", "x}${"} {
+			c, err := loadSecrets(x.T, "", "APP_PASSWORD="+pw)
+			x.NoError(err)
+			v, _ := c.Password.Value()
+			x.Equal(pw, v)
+		}
+	}))
+	t.Run("but for exactly one reference", x.F(func(x x.X) {
+		c, err := loadSecrets(x.T, "", "APP_PASSWORD=${env:PW}", "PW=from-env")
+		x.NoError(err)
+		v, _ := c.Password.Value()
+		x.Equal("from-env", v)
+	}))
+	t.Run("in a list from the environment", x.F(func(x x.X) {
+		type C struct {
+			Peers []struct {
+				Key cfg.Secret `yaml:"key"`
+			} `yaml:"peers"`
+		}
+		c := C{}
+		_, err := cfg.New("app", &c, cfg.WithPaths()).Load("", env(`APP_PEERS=[{key: "${env:K}"}, {key: "a$$b"}]`, "K=k"))
+		x.NoError(err)
+		k0, _ := c.Peers[0].Key.Value()
+		k1, _ := c.Peers[1].Key.Value()
+		x.Equal("k", k0)
+		x.Equal("a$$b", k1)
+	}))
+	t.Run("UnmarshalText takes a value as the environment gives it", x.F(func(x x.X) {
+		var s cfg.Secret
+		x.NoError(s.UnmarshalText([]byte("Pa$$w0rd")))
+		v, _ := s.Value()
+		x.Equal("Pa$$w0rd", v)
+	}))
+	t.Run("a reference written without ${} is an error", x.F(func(x x.X) {
+		_, err := loadSecrets(x.T, "password: file:/run/pw\n")
+		x.ErrorContains(err, `"file:/run/pw" would be taken as it is; a reference is written ${file:/run/pw}`)
+		_, err = loadSecrets(x.T, "", "APP_PASSWORD=env:PW")
+		x.ErrorContains(err, "APP_PASSWORD: \"env:PW\" would be taken as it is")
+	}))
+}
+
 func TestSecretFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "pw")

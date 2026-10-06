@@ -260,9 +260,14 @@ func TestLoadLayers(t *testing.T) {
 	}))
 	t.Run("environment values are not expanded", x.F(func(x x.X) {
 		c := Config{}
-		_, err := newLoader(&c).Load(p, env("APP_NAME=${env:X}"))
+		l := newLoader(&c)
+		_, err := l.Load(p, env("APP_NAME=${env:X}", `APP_LDAP_HOSTS=["${env:X}", "a$$b", "${env:NOPE}"]`, "X=x"))
 		x.NoError(err)
 		x.Equal("${env:X}", c.Name)
+		x.Equal([]string{"${env:X}", "a$$b", "${env:NOPE}"}, c.Ldap.Hosts, "nor in flow syntax")
+
+		o, _ := l.Origin(&c.Ldap.Hosts)
+		x.Len(o.Refs, 0)
 	}))
 }
 

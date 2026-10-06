@@ -359,6 +359,8 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 
 	var es errs
 	r := &resolver{lookup: lookupIn(in.environ), schemes: l.opts.schemes}
+	// Values from the environment and flags are taken as they are.
+	given := r.asGiven()
 
 	// Defaults.
 	if l.opts.defaults != nil {
@@ -371,7 +373,7 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 	}
 	for _, b := range in.bound {
 		v, _ := b.field.value(rv, true)
-		ok, err := b.applyDefault(v, r)
+		ok, err := b.applyDefault(v, given)
 		switch {
 		case err != nil:
 			es.add(Origin{Source: Default, Key: b.field.key}, fmt.Errorf("default of --%s: %w", b.name, err))
@@ -388,7 +390,7 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 
 	// The environment.
 	if l.prefix != "" {
-		es = append(es, l.applyEnv(s, rv, r, in.environ)...)
+		es = append(es, l.applyEnv(s, rv, given, in.environ)...)
 	}
 
 	// The flags.
@@ -398,8 +400,8 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 		}
 		o := Origin{Source: Flag, Key: b.field.key, Name: "--" + b.name}
 		v, _ := b.field.value(rv, true)
-		r.refs = nil
-		cleared, err := b.apply(v, r)
+		given.refs = nil
+		cleared, err := b.apply(v, given)
 		if err != nil {
 			es.add(o, err)
 			if !onlyPending(errs{err}) {
@@ -407,7 +409,7 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 			}
 		}
 		o.Cleared = cleared
-		o.Refs = refsOf(v, r)
+		o.Refs = refsOf(v, given)
 		l.mark(s, b.field, o)
 	}
 

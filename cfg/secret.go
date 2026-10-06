@@ -134,12 +134,13 @@ func (s SecretOf[T, D]) MarshalText() ([]byte, error) {
 	return []byte(s.String()), nil
 }
 
-// UnmarshalText reads a literal or a reference, resolving `${env:}` against
-// the process environment. Schemes registered with WithScheme are known only
-// to a Loader. A `${file:}` that cannot be read yet is not an error; Value
+// UnmarshalText reads a secret as the environment gives one: exactly one
+// reference, `${env:}` resolved against the process environment, or else a
+// literal taken as it is. Schemes registered with WithScheme are known only to
+// a Loader. A `${file:}` that cannot be read yet is not an error; Value
 // reports it.
 func (s *SecretOf[T, D]) UnmarshalText(b []byte) error {
-	err := s.setSecret(string(b), &resolver{lookup: os.LookupEnv})
+	err := s.setSecret(string(b), &resolver{lookup: os.LookupEnv, verbatim: true})
 	if errors.As(err, new(*pendingError)) {
 		return nil
 	}
@@ -173,13 +174,28 @@ func (s *SecretOf[T, D]) setSecret(text string, r *resolver) error {
 		return nil
 	}
 
-	ref, lit, err := splitSecret(text)
-	if err != nil {
-		return err
+	var ref, lit string
+	if r.verbatim {
+		// From the environment or a flag: a reference only as the whole
+		// value, so that a password with a "$$" or a "${" in it, as a
+		// Kubernetes Secret may hand over, is taken as it is.
+		if isRef(text) {
+			ref = text
+		} else {
+			lit = text
+		}
+	} else {
+		var err error
+		if ref, lit, err = splitSecret(text); err != nil {
+			return err
+		}
 	}
 
 	st := &secretState[T, D]{ref: ref}
 	if ref == "" {
+		if p, ok := bareRef(lit); ok {
+			return fmt.Errorf("%q would be taken as it is; a reference is written ${%s}", lit, p)
+		}
 		v, err := decode[T, D]([]byte(lit))
 		if err != nil {
 			return err
@@ -188,6 +204,7 @@ func (s *SecretOf[T, D]) setSecret(text string, r *resolver) error {
 		s.s = st
 		return nil
 	}
+	r.refs = append(r.refs, ref)
 
 	scheme, rest, err := parseRef(ref)
 	if err != nil {
@@ -232,10 +249,24 @@ func decode[T any, D Decoder[T]](raw []byte) (T, error) {
 	return d.Decode(raw)
 }
 
-// splitSecret reads a secret as written: exactly one reference, or a literal in
-// which `$$` is a `$`.
+// isRef reports whether text is exactly one reference.
+func isRef(text string) bool {
+	return strings.HasPrefix(text, "${") && strings.IndexByte(text, '}') == len(text)-1
+}
+
+// bareRef reports whether a literal looks like a reference written as roster
+// and shale used to, `file:/path` or `env:NAME`; p is it as the body of one.
+func bareRef(lit string) (p string, ok bool) {
+	if strings.HasPrefix(lit, "file:") || strings.HasPrefix(lit, "env:") {
+		return lit, true
+	}
+	return "", false
+}
+
+// splitSecret reads a secret as written in the file: exactly one reference, or
+// a literal in which `$$` is a `$`.
 func splitSecret(text string) (ref string, lit string, err error) {
-	if strings.HasPrefix(text, "${") && strings.IndexByte(text, '}') == len(text)-1 {
+	if isRef(text) {
 		return text, "", nil
 	}
 

@@ -23,14 +23,23 @@ type Resolver func(ref string) ([]byte, error)
 type resolver struct {
 	lookup  func(string) (string, bool)
 	schemes map[string]Resolver
+	// verbatim is set for values from the environment and flags, which are
+	// taken as they are: only a secret given as exactly one reference reads
+	// it.
+	verbatim bool
 	// refs collects the references the current value was read through.
 	refs []string
+}
+
+// asGiven is r for values from the environment and flags.
+func (r *resolver) asGiven() *resolver {
+	return &resolver{lookup: r.lookup, schemes: r.schemes, verbatim: true}
 }
 
 // expand resolves the references in s, a string from the configuration file
 // going into a field that is not a secret.
 func (r *resolver) expand(s string) (string, error) {
-	if !strings.Contains(s, "$") {
+	if r.verbatim || !strings.Contains(s, "$") {
 		return s, nil
 	}
 
