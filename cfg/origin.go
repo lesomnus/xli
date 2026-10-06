@@ -74,14 +74,24 @@ func (o Origin) String() string {
 	}
 }
 
-// describe is the origin as the start of an error message about the field.
+// describe is the origin as the start of an error message about the field:
+// "/etc/app.yaml:3:5: db.dsn", "/etc/app.yaml" for the file as a whole,
+// "APP_DB_DSN" or "--dsn".
 func (o Origin) describe() string {
 	switch o.Source {
 	case File:
+		at := o.Name
 		if o.Line > 0 {
-			return fmt.Sprintf("%s:%d:%d: %s", o.Name, o.Line, o.Column, o.Key)
+			at += fmt.Sprintf(":%d:%d", o.Line, o.Column)
 		}
-		return fmt.Sprintf("%s: %s", o.Name, o.Key)
+		switch {
+		case o.Key == "":
+			return at
+		case at == "":
+			return o.Key
+		default:
+			return at + ": " + o.Key
+		}
 	case Env, Flag:
 		return o.Name
 	default:
@@ -96,10 +106,11 @@ type FieldError struct {
 }
 
 func (e *FieldError) Error() string {
-	if e.Origin.Key == "" && e.Origin.Name == "" {
+	d := e.Origin.describe()
+	if d == "" {
 		return e.Err.Error()
 	}
-	return fmt.Sprintf("%s: %s", e.Origin.describe(), e.Err)
+	return d + ": " + e.Err.Error()
 }
 
 func (e *FieldError) Unwrap() error {

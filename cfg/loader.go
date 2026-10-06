@@ -1,6 +1,7 @@
 package cfg
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -14,8 +15,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/lexer"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/goccy/go-yaml/token"
 	"github.com/lesomnus/xli/flg"
 )
 
@@ -434,9 +438,14 @@ func (l *Loader[T]) mark(s *Snapshot[T], f *field, o Origin) {
 }
 
 func (l *Loader[T]) decodeFile(s *Snapshot[T], rv reflect.Value, r *resolver, path string, content []byte) (es errs) {
+	content = bytes.TrimPrefix(content, []byte{0xEF, 0xBB, 0xBF}) // a UTF-8 BOM
+	if documents(content) > 1 {
+		es.add(Origin{Source: File, Name: path}, errors.New("more than one document"))
+		return es
+	}
 	f, err := parser.ParseBytes(content, 0)
 	if err != nil {
-		if strings.Contains(string(content), "${") {
+		if unquotedRef(content, err) {
 			// "{" and "}" end a flow mapping, so an unquoted reference in one
 			// is a syntax error rather than a value.
 			err = fmt.Errorf("%w\n(a reference inside [...] or {...} must be quoted, e.g. [\"${env:NAME}\"])", err)
@@ -470,6 +479,45 @@ func (l *Loader[T]) decodeFile(s *Snapshot[T], rv reflect.Value, r *resolver, pa
 		}
 	}
 	return d.decode(body, rv, "", true)
+}
+
+// documents counts the document markers (`---`) of content. The parser keeps
+// one document of `---` twice and drops what follows, so they are counted
+// before parsing.
+func documents(content []byte) int {
+	n := 0
+	for _, t := range lexer.Tokenize(string(content)) {
+		if t.Type == token.DocumentHeaderType {
+			n++
+		}
+	}
+	return n
+}
+
+// unquotedRef reports whether the line a syntax error is on holds a reference
+// that is not quoted.
+func unquotedRef(content []byte, err error) bool {
+	var se *yaml.SyntaxError
+	if !errors.As(err, &se) || se.Token == nil || se.Token.Position == nil {
+		return false
+	}
+	lines := strings.Split(string(content), "\n")
+	i := se.Token.Position.Line - 1
+	if i < 0 || i >= len(lines) {
+		return false
+	}
+	line := lines[i]
+	for at := strings.Index(line, "${"); at >= 0; {
+		if at == 0 || (line[at-1] != '"' && line[at-1] != '\'') {
+			return true
+		}
+		next := strings.Index(line[at+2:], "${")
+		if next < 0 {
+			break
+		}
+		at += 2 + next
+	}
+	return false
 }
 
 func (l *Loader[T]) applyEnv(s *Snapshot[T], rv reflect.Value, r *resolver, environ []string) (es errs) {
