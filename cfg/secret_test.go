@@ -252,6 +252,15 @@ func TestSecretFile(t *testing.T) {
 		_, err = c.Password.Value()
 		x.ErrorContains(err, "over the")
 	}))
+	t.Run("bytes are a copy of their own", x.F(func(x x.X) {
+		writeAt(x.T, path, "key")
+		c, err := loadSecrets(x.T, "raw: ${file:"+path+"}\n")
+		x.NoError(err)
+		b, _ := c.Raw.Value()
+		clear(b)
+		b, _ = c.Raw.Value()
+		x.Equal([]byte("key"), b)
+	}))
 	t.Run("copies share the state", x.F(func(x x.X) {
 		writeAt(x.T, path, "a\n")
 		c, err := loadSecrets(x.T, "password: ${file:"+path+"}\n")
