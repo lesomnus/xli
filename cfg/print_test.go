@@ -39,6 +39,7 @@ func TestPrintRedacts(t *testing.T) {
 		Keys     map[string]string `yaml:"keys"`
 		Seed     map[string]string `yaml:"seed"`
 		Dsn      string            `yaml:"dsn"`
+		DevDsn   string            `yaml:"dev_dsn"`
 		Pg       struct {
 			Dsn string `yaml:"dsn"`
 		} `yaml:"pg"`
@@ -56,6 +57,7 @@ client:
 keys: {contoso: rt_ALSOSECRET}
 seed: {password: admin123, holder: admin}
 dsn: postgres://khala:PGSECRET@khala-db:5432/khala?sslmode=disable
+dev_dsn: postgres://khala:DEVSECRET@khala-dev:5432/dev
 pg:
   dsn: host=db user=khala password=PGSECRET2 dbname=khala
 creds: {user: admin_SECRET}
@@ -67,10 +69,10 @@ creds: {user: admin_SECRET}
 	c.Backends[0].Hidden = "hidden_VALUE"
 
 	out := printed(t, s)
-	for _, secret := range []string{"hunter2", "rt_LISTSECRET", "rt_REVIEWSECRET", "oidc_SECRET", "rt_ALSOSECRET", "admin123", "PGSECRET", "PGSECRET2", "admin_SECRET", "hidden_VALUE"} {
+	for _, secret := range []string{"hunter2", "rt_LISTSECRET", "rt_REVIEWSECRET", "oidc_SECRET", "rt_ALSOSECRET", "admin123", "PGSECRET", "PGSECRET2", "DEVSECRET", "admin_SECRET", "hidden_VALUE"} {
 		x.NotContains(out, secret)
 	}
-	for _, kept := range []string{"roster:8080", "/etc/tls/key.pem", "holder: admin", "khala-db:5432", "user=khala", "token: <redacted>", "{name: a, password: <redacted>, token: <redacted>}"} {
+	for _, kept := range []string{"roster:8080", "/etc/tls/key.pem", "holder: admin", "khala-db:5432", "khala-dev:5432", "user=khala", "token: <redacted>", "{name: a, password: <redacted>, token: <redacted>}"} {
 		x.Contains(out, kept)
 	}
 }

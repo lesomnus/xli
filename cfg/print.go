@@ -29,7 +29,8 @@ import (
 //     token, password, secret(s), seal, key(s), credential(s), and names
 //     ending in _token, _password, _secret, _key or _keys; a tag is what
 //     somebody forgets on the one field that matters;
-//   - the password of a value named dsn, in a URL or as password=.
+//   - the password of a value named dsn, or with a name ending in _dsn
+//     (dev_dsn), in a URL or as password=.
 //
 // A value read through references, such as `postgres://u:${env:PW}@h`, prints
 // as it was written: it says where the secret is, not what it is.
@@ -181,7 +182,7 @@ func writeWritten(b *strings.Builder, v any, secret bool, name string, flow bool
 		switch {
 		case secret && !isRef(v):
 			b.WriteString(redacted)
-		case strings.EqualFold(name, "dsn"):
+		case dsnName(name):
 			b.WriteString(scalar(redactDsn(v), flow))
 		default:
 			b.WriteString(scalar(v, flow))
@@ -315,7 +316,7 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 	switch v.Kind() {
 	case reflect.String:
 		s := v.String()
-		if strings.EqualFold(name, "dsn") {
+		if dsnName(name) {
 			s = redactDsn(s)
 		}
 		b.WriteString(scalar(escapeRefs(s), flow))
@@ -410,7 +411,7 @@ func writePlain(b *strings.Builder, v any, secret bool, name string, flow bool) 
 		switch {
 		case secret && v != "":
 			b.WriteString(redacted)
-		case strings.EqualFold(name, "dsn"):
+		case dsnName(name):
 			b.WriteString(scalar(escapeRefs(redactDsn(v)), flow))
 		default:
 			b.WriteString(scalar(escapeRefs(v), flow))
@@ -481,6 +482,13 @@ func secretName(name string) bool {
 		}
 	}
 	return false
+}
+
+// dsnName reports whether a value named name is a data source name, whose
+// password is redacted: dsn, or a name ending in _dsn, as dev_dsn does.
+func dsnName(name string) bool {
+	k := strings.ToLower(name)
+	return k == "dsn" || strings.HasSuffix(k, "_dsn")
 }
 
 // dsnPassword is the password parameter of a DSN of key=value pairs, quoted or
