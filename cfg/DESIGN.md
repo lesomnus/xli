@@ -92,8 +92,13 @@ it to a YAML decoder. This is what gives it:
 - positions for the origin record;
 - references resolved per value (below).
 
-Anchors, aliases and merge keys (`<<`) are supported. Types implementing
-goccy/go-yaml's unmarshaler interfaces are handed their node.
+Anchors, aliases and merge keys (`<<`) are supported; an alias names the
+nearest anchor of that name before it. `any` fields get plain Go values with
+references resolved. Types implementing goccy/go-yaml's unmarshaler interfaces
+are handed their node as written, without references resolved.
+
+Integers are read as YAML 1.2 reads them: decimal, or `0x`/`0o`/`0b` prefixed
+(`010` is ten), and floats accept `.inf` and `.nan`.
 
 Unknown environment variables under the prefix are only warnings: the
 environment is shared with the orchestrator (Kubernetes service links put
@@ -111,7 +116,10 @@ This replaces the three spellings the downstream applications used
 
 - `${env:}` is resolved once, inside any string value of the file, also in the
   middle of a string (`postgres://u:${env:PW}@h`). Unset without a default is
-  an error.
+  an error. Inside YAML flow syntax (`[...]`, `{...}`) a reference must be
+  quoted (`["${env:A}"]`), because `{` and `}` delimit a flow mapping there;
+  payday substituted the text before parsing and did not need that. The
+  parse error says so.
 - `${file:}` is only allowed in secret fields (below), because a file is how a
   credential gets rotated and only a secret field re-reads it.
 - References are resolved per value after parsing, not by substituting text
@@ -211,6 +219,9 @@ Kubernetes ConfigMap update, a rotated Secret). So reload covers files only:
   when its content hash changed builds a new snapshot with the same
   environment and flags. A snapshot that fails to load or validate is reported
   once per content, and the previous one stays in force.
+- Watch keeps to the file the first load found. If it disappears, that is
+  reported and the snapshot in force stays; it does not fall back to the
+  defaults or switch to another default path (`.yml` for `.yaml`).
 - A file written in place can be read half-written. New content is therefore
   applied only once it read the same on two checks in a row, and an empty file
   is skipped during reload (an empty file is valid at the first load). Neither

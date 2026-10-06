@@ -398,7 +398,9 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 		cleared, err := b.apply(v, r)
 		if err != nil {
 			es.add(o, err)
-			continue
+			if !onlyPending(errs{err}) {
+				continue
+			}
 		}
 		o.Cleared = cleared
 		o.Refs = refsOf(v, r)
@@ -434,6 +436,11 @@ func (l *Loader[T]) mark(s *Snapshot[T], f *field, o Origin) {
 func (l *Loader[T]) decodeFile(s *Snapshot[T], rv reflect.Value, r *resolver, path string, content []byte) (es errs) {
 	f, err := parser.ParseBytes(content, 0)
 	if err != nil {
+		if strings.Contains(string(content), "${") {
+			// "{" and "}" end a flow mapping, so an unquoted reference in one
+			// is a syntax error rather than a value.
+			err = fmt.Errorf("%w\n(a reference inside [...] or {...} must be quoted, e.g. [\"${env:NAME}\"])", err)
+		}
 		es.add(Origin{Source: File, Name: path}, err)
 		return es
 	}
@@ -450,7 +457,17 @@ func (l *Loader[T]) decodeFile(s *Snapshot[T], rv reflect.Value, r *resolver, pa
 		o := d.at(n, key)
 		o.Refs = slices.Clone(refs)
 		o.Cleared = cleared
-		s.origins[key] = o
+		if _, ok := l.schema.byKey[key]; ok {
+			s.origins[key] = o
+			return
+		}
+		// A block given as null: every leaf in it is cleared.
+		for _, f := range l.schema.fields {
+			if key == "" || strings.HasPrefix(f.key, key+".") {
+				o.Key = f.key
+				s.origins[f.key] = o
+			}
+		}
 	}
 	return d.decode(body, rv, "", true)
 }
@@ -477,7 +494,9 @@ func (l *Loader[T]) applyEnv(s *Snapshot[T], rv reflect.Value, r *resolver, envi
 		r.refs = nil
 		if err := setText(v, val, r); err != nil {
 			es.add(o, err)
-			continue
+			if !onlyPending(errs{err}) {
+				continue
+			}
 		}
 		o.Refs = refsOf(v, r)
 		s.origins[f.key] = o

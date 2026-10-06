@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -199,19 +200,19 @@ func setScalar(v reflect.Value, s string) error {
 			v.SetInt(int64(d))
 			return nil
 		}
-		n, err := strconv.ParseInt(s, 0, v.Type().Bits())
+		n, err := strconv.ParseInt(s, intBase(s), v.Type().Bits())
 		if err != nil {
 			return fmt.Errorf("%q is not an integer of %d bits", s, v.Type().Bits())
 		}
 		v.SetInt(n)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		n, err := strconv.ParseUint(s, 0, v.Type().Bits())
+		n, err := strconv.ParseUint(s, intBase(s), v.Type().Bits())
 		if err != nil {
 			return fmt.Errorf("%q is not an unsigned integer of %d bits", s, v.Type().Bits())
 		}
 		v.SetUint(n)
 	case reflect.Float32, reflect.Float64:
-		n, err := strconv.ParseFloat(s, v.Type().Bits())
+		n, err := parseFloat(s, v.Type().Bits())
 		if err != nil {
 			return fmt.Errorf("%q is not a number", s)
 		}
@@ -225,6 +226,30 @@ func setScalar(v reflect.Value, s string) error {
 		return fmt.Errorf("cannot read text into %s", v.Type())
 	}
 	return nil
+}
+
+// intBase is the base an integer is written in, as YAML 1.2 reads it: decimal,
+// or hexadecimal, octal or binary with a 0x, 0o or 0b prefix. A leading zero
+// does not make a number octal: 010 is ten.
+func intBase(s string) int {
+	t := strings.TrimLeft(s, "+-")
+	if len(t) > 2 && t[0] == '0' && strings.ContainsRune("xXoObB", rune(t[1])) {
+		return 0
+	}
+	return 10
+}
+
+// parseFloat is strconv.ParseFloat that also reads YAML's .inf and .nan.
+func parseFloat(s string, bits int) (float64, error) {
+	switch strings.ToLower(s) {
+	case ".inf", "+.inf":
+		return math.Inf(1), nil
+	case "-.inf":
+		return math.Inf(-1), nil
+	case ".nan":
+		return math.NaN(), nil
+	}
+	return strconv.ParseFloat(s, bits)
 }
 
 // setFlow reads YAML flow syntax, e.g. `[a, "b,c"]` or `{k: v}`.

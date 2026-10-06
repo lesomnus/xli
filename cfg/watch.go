@@ -26,10 +26,18 @@ import (
 // with no arguments).
 func (l *Loader[T]) Watch(ctx context.Context, f func(s *Snapshot[T], err error)) error {
 	l.mu.Lock()
-	in := l.in
+	in, first := l.in, l.first
 	l.mu.Unlock()
 	if in == nil {
 		return errors.New("cfg: Watch before the first Load")
+	}
+	if l.file == "" && in.path == "" && first.Path != "" {
+		// Keep to the file the first load found: one that disappears is an
+		// error, not a reason to fall back to the defaults or to another of
+		// the default paths.
+		c := *in
+		c.path = first.Path
+		in = &c
 	}
 
 	var (

@@ -172,7 +172,13 @@ func parseTag(sf reflect.StructField) (tag, bool) {
 		}
 	}
 	if t.name == "" {
-		if sf.Anonymous {
+		st := sf.Type
+		if st.Kind() == reflect.Pointer {
+			st = st.Elem()
+		}
+		if sf.Anonymous && st.Kind() == reflect.Struct && !readsItself(st) {
+			// As encoding/json does: an embedded struct's fields are the
+			// holder's; anything else embedded is a field named after its type.
 			t.inline = true
 		}
 		t.name = snake(sf.Name)
