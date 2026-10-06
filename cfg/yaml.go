@@ -147,7 +147,7 @@ func isNull(n ast.Node) bool {
 
 // at is the origin of a node in the file, for an error about it.
 func (d *decoder) at(n ast.Node, key string) Origin {
-	o := Origin{Source: File, Key: key, Name: d.file}
+	o := Origin{Source: SourceFile, Key: key, Name: d.file}
 	if n != nil {
 		if t := n.GetToken(); t != nil && t.Position != nil {
 			o.Line, o.Column = t.Position.Line, t.Position.Column

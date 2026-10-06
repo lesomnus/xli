@@ -9,30 +9,31 @@ import (
 type Source int
 
 const (
-	// Unset is a field nothing said anything about; it holds its zero value.
-	Unset Source = iota
-	// Default is a value the root held when the loader was made, or the
+	// SourceUnset is a field nothing said anything about; it holds its zero
+	// value.
+	SourceUnset Source = iota
+	// SourceDefault is a value the root held when the loader was made, or the
 	// Default of a bound flag on the command path.
-	Default
-	// File is a value from the configuration file.
-	File
-	// Env is a value from an environment variable.
-	Env
-	// Flag is a value from a command-line flag.
-	Flag
+	SourceDefault
+	// SourceFile is a value from the configuration file.
+	SourceFile
+	// SourceEnv is a value from an environment variable.
+	SourceEnv
+	// SourceFlag is a value from a command-line flag.
+	SourceFlag
 )
 
 func (s Source) String() string {
 	switch s {
-	case Unset:
+	case SourceUnset:
 		return "unset"
-	case Default:
+	case SourceDefault:
 		return "default"
-	case File:
+	case SourceFile:
 		return "file"
-	case Env:
+	case SourceEnv:
 		return "env"
-	case Flag:
+	case SourceFlag:
 		return "flag"
 	default:
 		return fmt.Sprintf("Source(%d)", int(s))
@@ -45,9 +46,10 @@ type Origin struct {
 	// Key is the field's dotted path, e.g. "ldap.addr".
 	Key string
 	// Name is the file path, the environment variable or the flag ("--listen")
-	// the value came from; empty for Unset and Default.
+	// the value came from; empty for SourceUnset and SourceDefault.
 	Name string
-	// Line and Column locate the value in the file; zero unless Source is File.
+	// Line and Column locate the value in the file; zero unless Source is
+	// SourceFile.
 	Line, Column int
 	// Refs are the references the value was read through, as written, e.g.
 	// "${env:DB_PASSWORD}".
@@ -59,16 +61,16 @@ type Origin struct {
 // IsSet reports whether the value was given by the file, the environment or a
 // flag.
 func (o Origin) IsSet() bool {
-	return o.Source >= File
+	return o.Source >= SourceFile
 }
 
 // String names where the value came from, for messages: "--listen",
 // "ROSTER_LDAP_ADDR", "/etc/roster.yaml:12 (ldap.addr)", "default" or "unset".
 func (o Origin) String() string {
 	switch o.Source {
-	case File:
+	case SourceFile:
 		return fmt.Sprintf("%s:%d (%s)", o.Name, o.Line, o.Key)
-	case Env, Flag:
+	case SourceEnv, SourceFlag:
 		return o.Name
 	default:
 		return o.Source.String()
@@ -80,7 +82,7 @@ func (o Origin) String() string {
 // "APP_DB_DSN" or "--dsn".
 func (o Origin) describe() string {
 	switch o.Source {
-	case File:
+	case SourceFile:
 		at := o.Name
 		if o.Line > 0 {
 			at += fmt.Sprintf(":%d:%d", o.Line, o.Column)
@@ -93,7 +95,7 @@ func (o Origin) describe() string {
 		default:
 			return at + ": " + o.Key
 		}
-	case Env, Flag:
+	case SourceEnv, SourceFlag:
 		return o.Name
 	default:
 		return o.Key

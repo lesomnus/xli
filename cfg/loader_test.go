@@ -103,7 +103,7 @@ name: *name
 
 		o, ok := l.Origin(&c.Name)
 		x.True(ok)
-		x.Equal(cfg.File, o.Source)
+		x.Equal(cfg.SourceFile, o.Source)
 		x.True(o.Cleared)
 	}))
 	t.Run("type errors", x.F(func(x x.X) {
@@ -210,14 +210,14 @@ func TestLoadLayers(t *testing.T) {
 		x.Equal(DbConfig{Dsn: "env", MaxConn: 1}, c.Db)
 
 		o, _ := l.Origin(&c.Version)
-		x.Equal(cfg.Default, o.Source)
+		x.Equal(cfg.SourceDefault, o.Source)
 		x.False(o.IsSet())
 		o, _ = l.Origin(&c.Name)
-		x.Equal(cfg.File, o.Source)
+		x.Equal(cfg.SourceFile, o.Source)
 		x.Equal(1, o.Line)
 		x.Equal(p+":1 (name)", o.String())
 		o, _ = l.Origin(&c.Db.Dsn)
-		x.Equal(cfg.Env, o.Source)
+		x.Equal(cfg.SourceEnv, o.Source)
 		x.Equal("APP_DB_DSN", o.Name)
 		x.True(o.IsSet())
 	}))
@@ -231,7 +231,7 @@ func TestLoadLayers(t *testing.T) {
 		x.Equal("file", c.Db.Dsn)
 
 		o, _ := l.Origin(&c.Name)
-		x.Equal(cfg.Env, o.Source)
+		x.Equal(cfg.SourceEnv, o.Source)
 		x.True(o.Cleared)
 	}))
 	t.Run("lists and maps from the environment", x.F(func(x x.X) {
@@ -278,7 +278,7 @@ func TestDefaults(t *testing.T) {
 		x.Same(&c, s.Config, "the first load is the root")
 
 		o, _ := l.Origin(&c.Db.MaxConn)
-		x.Equal(cfg.Default, o.Source)
+		x.Equal(cfg.SourceDefault, o.Source)
 	}))
 	t.Run("are never written into", x.F(func(x x.X) {
 		c := Config{Ldap: sharedLdap}
@@ -315,7 +315,7 @@ func TestDefaults(t *testing.T) {
 
 func TestUnknownEnv(t *testing.T) {
 	c := Config{}
-	l := cfg.New("app", &c, cfg.Claims("KEY_"), cfg.WithPaths())
+	l := cfg.New("app", &c, cfg.Reads("KEY_"), cfg.WithPaths())
 	s, err := l.Load("", env(
 		"APP_DB_DNS=typo",
 		"APP_KEY_ALICE=claimed",
@@ -394,7 +394,7 @@ func TestOrigin(t *testing.T) {
 
 	o, ok = l.Origin(&c.Version)
 	x.True(ok)
-	x.Equal(cfg.Unset, o.Source)
+	x.Equal(cfg.SourceUnset, o.Source)
 	x.Equal("unset", o.String())
 
 	copied := c.Db
@@ -406,7 +406,7 @@ func TestOrigin(t *testing.T) {
 	s := l.Current()
 	o, ok = s.Origin(&s.Config.Name)
 	x.True(ok)
-	x.Equal(cfg.Env, o.Source)
+	x.Equal(cfg.SourceEnv, o.Source)
 	x.Len(s.Origins(), 8)
 }
 

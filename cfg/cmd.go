@@ -84,11 +84,11 @@ func newCmdConfigEnv[T any](l *Loader[T]) *xli.Command {
 func (o Origin) comment() string {
 	var c string
 	switch o.Source {
-	case File:
+	case SourceFile:
 		c = fmt.Sprintf("%s:%d", o.Name, o.Line)
-	case Env, Flag:
+	case SourceEnv, SourceFlag:
 		c = o.Name
-	case Default:
+	case SourceDefault:
 		c = "default"
 	default:
 		return ""
