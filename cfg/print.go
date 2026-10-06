@@ -79,13 +79,25 @@ func (n *pnode) render(b *strings.Builder, depth int) {
 				b.WriteString("  # " + c.comment)
 			}
 			b.WriteByte('\n')
-		case len(c.children) > 0:
+		case c.holds():
 			b.WriteString(indent + key(c.name) + ":\n")
 			c.render(b, depth+1)
 		case c.empty != "":
 			b.WriteString(indent + key(c.name) + ": " + c.empty + "\n")
 		}
 	}
+}
+
+// holds reports whether a block has a line to print under it. A block whose
+// blocks hold nothing printed as "client:" alone, which reads back as null and
+// clears it.
+func (n *pnode) holds() bool {
+	for _, c := range n.children {
+		if c.value != "" || c.empty != "" || c.holds() {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *printer) tree() (*pnode, error) {

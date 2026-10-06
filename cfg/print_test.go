@@ -150,3 +150,27 @@ func TestPrintReadsBack(t *testing.T) {
 	x.NoError(err, out)
 	x.Equal(want, got, out)
 }
+
+func TestPrintLeavesOutBlocksWithNothingInThem(t *testing.T) {
+	type Tls struct {
+		Cert string `yaml:"cert"`
+	}
+	type Client struct {
+		Addr string `yaml:"addr"`
+		Tls  Tls    `yaml:"tls"`
+	}
+	type C struct {
+		Name   string `yaml:"name"`
+		Client Client `yaml:"client"`
+	}
+	c := C{Client: Client{Addr: "default"}}
+	s, err := cfg.New("app", &c, cfg.WithPaths()).Load("", env("APP_NAME=n", "APP_CLIENT_ADDR="))
+	x := x.New(t)
+	x.NoError(err)
+	x.Equal("name: n  # APP_NAME\nclient:\n  addr: \"\"  # APP_CLIENT_ADDR (cleared)\n", printed(t, s))
+
+	c = C{}
+	s, err = cfg.New("app", &c, cfg.WithPaths()).Load("", env("APP_NAME=n"))
+	x.NoError(err)
+	x.Equal("name: n  # APP_NAME\n", printed(t, s), "not client: alone, which reads back as null")
+}
