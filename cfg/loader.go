@@ -611,6 +611,10 @@ func (l *Loader[T]) applyEnv(s *Snapshot[T], rv reflect.Value, r *resolver, envi
 		s.origins[f.key] = o
 	}
 
+	services := map[string]bool{}
+	if !l.opts.links {
+		services = serviceNames(environ)
+	}
 	for _, kv := range environ {
 		name, _, _ := strings.Cut(kv, "=")
 		if !strings.HasPrefix(name, l.prefix+"_") {
@@ -619,7 +623,7 @@ func (l *Loader[T]) applyEnv(s *Snapshot[T], rv reflect.Value, r *resolver, envi
 		if _, ok := l.schema.byEnv[name]; ok {
 			continue
 		}
-		if l.claimed(name) {
+		if l.declared(name) || serviceLink(name, services) {
 			continue
 		}
 		s.Unknown = append(s.Unknown, name)
@@ -629,17 +633,49 @@ func (l *Loader[T]) applyEnv(s *Snapshot[T], rv reflect.Value, r *resolver, envi
 	return es
 }
 
-// serviceLink matches the variables Kubernetes sets for every service in a
-// namespace, named after the service.
-var serviceLink = regexp.MustCompile(`_(SERVICE_HOST|SERVICE_PORT(_[A-Z0-9_]+)?|PORT|PORT_[0-9]+_(TCP|UDP)(_(ADDR|PORT|PROTO))?)$`)
-
-func (l *Loader[T]) claimed(name string) bool {
+// declared reports whether name is under a prefix the application declared
+// with Reads.
+func (l *Loader[T]) declared(name string) bool {
 	for _, p := range l.opts.reads {
 		if strings.HasPrefix(name, l.prefix+"_"+p) {
 			return true
 		}
 	}
-	return !l.opts.links && serviceLink.MatchString(name)
+	return false
+}
+
+// serviceNames are the services Kubernetes gave variables for in environ: it
+// gives every one <SERVICE>_SERVICE_HOST.
+func serviceNames(environ []string) map[string]bool {
+	m := map[string]bool{}
+	for _, kv := range environ {
+		name, _, _ := strings.Cut(kv, "=")
+		if svc, ok := strings.CutSuffix(name, "_SERVICE_HOST"); ok && svc != "" {
+			m[svc] = true
+		}
+	}
+	return m
+}
+
+// serviceLinkSuffix is what follows the service's name in the variables
+// Kubernetes sets for it.
+var serviceLinkSuffix = regexp.MustCompile(`^(SERVICE_HOST|SERVICE_PORT(_[A-Z0-9_]+)?|PORT|PORT_[0-9]+_(TCP|UDP|SCTP)(_(ADDR|PORT|PROTO))?)$`)
+
+// serviceLink reports whether name is a variable Kubernetes sets for one of
+// services, such as ROSTER_PORT for a service named roster. A name of that
+// shape for no such service is a typo like any other.
+func serviceLink(name string, services map[string]bool) bool {
+	for i := strings.IndexByte(name, '_'); i > 0; {
+		if services[name[:i]] && serviceLinkSuffix.MatchString(name[i+1:]) {
+			return true
+		}
+		j := strings.IndexByte(name[i+1:], '_')
+		if j < 0 {
+			break
+		}
+		i += 1 + j
+	}
+	return false
 }
 
 // refsOf are the references the value v was read through.
