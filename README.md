@@ -23,7 +23,7 @@ and context is nested as you go down the tree.
   and repeatable (`[]string`) flags.
 - **Defaults & required flags** — a clear contract between the configured default
   and the value the user actually provided.
-- **Generated help** and **shell completion** (zsh).
+- **Generated help** and **shell completion** (zsh, bash, fish).
 - **Testing helpers** — the `xlitest` package runs a command against in-memory
   IO and decodes completion output, so tests assert on results, not wiring.
 
@@ -185,7 +185,9 @@ Commands: xli.Commands{
 ```
 
 ```sh
-source <(app completion zsh)
+source <(app completion zsh)    # zsh  (~/.zshrc)
+source <(app completion bash)   # bash (~/.bashrc)
+app completion fish | source    # fish (~/.config/fish/config.fish)
 ```
 
 ## License

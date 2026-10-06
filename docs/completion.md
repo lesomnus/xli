@@ -1,8 +1,7 @@
 # Shell completion
 
 `xli` generates shell completion and lets commands contribute their own
-candidates. Only **zsh** is implemented today; the API is shell-agnostic so other
-shells can be added later.
+candidates. **zsh**, **bash**, and **fish** are supported.
 
 ## How it works
 
@@ -26,11 +25,16 @@ Commands: xli.Commands{
 },
 ```
 
-Then source the generated script (e.g. in `~/.zshrc`):
+Then load the generated script in your shell's startup file:
 
 ```sh
-source <(app completion zsh)
+source <(app completion zsh)    # zsh  (~/.zshrc)
+source <(app completion bash)   # bash (~/.bashrc)
+app completion fish | source    # fish (~/.config/fish/config.fish)
 ```
+
+The scripts are keyed on the root command's name, so they apply to the program
+as invoked by that name.
 
 ## What is completed automatically
 
@@ -98,9 +102,23 @@ Candidate emission does not return errors (a broken completion pipe should not
 fail your command); `flg.OnTab` returns `error` only so it can surface failures
 from work it does to compute candidates.
 
+## Shell differences
+
+All three scripts decode the same candidate stream, but not every shell can show
+everything:
+
+| | zsh | fish | bash |
+| --- | --- | --- | --- |
+| Descriptions (`ValueD`) | ✅ | ✅ | — |
+| Groups (`Group`) | ✅ headings | — (flattened) | — (flattened) |
+| Files / Dirs / globs | ✅ | ✅ | ✅ |
+
+The bash script splits the command line itself rather than relying on
+`COMP_WORDS`, so `--flag=value` completes correctly whether or not `=` is in
+`COMP_WORDBREAKS`. It does not need the bash-completion package.
+
 ## Other shells
 
 `tab.Tab` is an interface and the shell is selected by the completion request, so
 support for additional shells can be added by implementing a new `Tab` and
-emitting the corresponding script. Currently `NewCmdCompletion` provides `zsh`
-only.
+emitting the corresponding script.

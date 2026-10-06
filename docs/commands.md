@@ -235,7 +235,9 @@ Commands: xli.Commands{ xli.NewCmdCompletion() },
 ```
 
 ```sh
-source <(app completion zsh)
+source <(app completion zsh)    # zsh  (~/.zshrc)
+source <(app completion bash)   # bash (~/.bashrc)
+app completion fish | source    # fish (~/.config/fish/config.fish)
 ```
 
 See [completion.md](completion.md) for the completion model and the `tab.Tab`

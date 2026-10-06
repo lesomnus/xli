@@ -235,4 +235,21 @@ func TestCompletionScript(t *testing.T) {
 		x.NoError(err)
 		x.Contains(b.String(), "#compdef app")
 	}))
+	t.Run("bash and fish scripts are keyed on the root command name", x.F(func(x x.X) {
+		for shell, want := range map[string]string{
+			"bash": "complete -F _app_bash app",
+			"fish": "complete -c app -f -a '(_app_fish)'",
+		} {
+			c := &xli.Command{
+				Name:     "app",
+				Commands: xli.Commands{xli.NewCmdCompletion()},
+			}
+
+			b := &strings.Builder{}
+			c.Writer = b
+			err := c.Run(context.Background(), []string{"completion", shell})
+			x.NoError(err)
+			x.Contains(b.String(), want)
+		}
+	}))
 }
