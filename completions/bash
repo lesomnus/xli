@@ -1,0 +1,79 @@
+# bash completion for __XLI_PROG__
+# This is a generated code by "github.com/lesomnus/xli".
+
+___XLI_PROG___bash() {
+	# Split the line up to the cursor ourselves rather than using COMP_WORDS,
+	# which bash breaks at "=" and ":" (COMP_WORDBREAKS).
+	local line=${COMP_LINE:0:COMP_POINT}
+	local -a words
+	local IFS=$' \t\n'
+	read -ra words <<<"${line}"
+	local curr=""
+	if [[ -n ${line} && ${line} != *[[:space:]] ]]; then
+		curr=${words[${#words[@]}-1]}
+	fi
+
+	# The trigger tag and separator below mirror internal/comp (TagPrefix+"bash"
+	# and Sep); keep them in sync with that package.
+	IFS=$'\n'
+	local -a lines
+	lines=($("${words[0]}" "${words[@]:1}" '$$xli_completion_bash' "${curr}" "${curr}" 2>/dev/null))
+
+	# Each line is one of:
+	#   v<sep><group><sep><entry>   a candidate ("value" or "value:desc")
+	#   f<sep><pattern>             request file completion
+	#   d<sep>                      request directory completion
+	# bash cannot show groups or descriptions, so only the values are used.
+	local sep=$'\x1f'
+	local -a values globs
+	local want_files=0 want_dirs=0
+	local l kind rest entry
+	for l in "${lines[@]}"; do
+		kind=${l%%"${sep}"*}
+		rest=${l#*"${sep}"}
+		case ${kind} in
+		v)
+			entry=${rest#*"${sep}"}
+			[[ -n ${entry} ]] && values+=("${entry%%:*}")
+			;;
+		f)
+			want_files=1
+			[[ -n ${rest} ]] && globs+=("${rest}")
+			;;
+		d)
+			want_dirs=1
+			;;
+		esac
+	done
+
+	# For "--flag=val" the candidates are values for the flag. bash replaces
+	# only the text after "=" when "=" is a word break; otherwise the
+	# candidates must carry the "--flag=" part.
+	local match=${curr} prefix=""
+	if [[ ${curr} == -*=* ]]; then
+		match=${curr#*=}
+		[[ ${COMP_WORDBREAKS} != *=* ]] && prefix=${curr%%=*}=
+	fi
+
+	COMPREPLY=()
+	local v
+	for v in "${values[@]}"; do
+		[[ ${v} == "${match}"* ]] && COMPREPLY+=("${prefix}${v}")
+	done
+
+	((want_dirs || want_files)) && compopt -o filenames 2>/dev/null
+	if ((want_files)) && ((${#globs[@]} == 0)); then
+		# Any file; this includes directories.
+		COMPREPLY+=($(compgen -f -- "${match}"))
+	else
+		# Directories are offered alongside globbed files so the user can
+		# descend into them.
+		((want_dirs || want_files)) && COMPREPLY+=($(compgen -d -- "${match}"))
+		local g
+		for g in "${globs[@]}"; do
+			COMPREPLY+=($(compgen -f -X "!${g}" -- "${match}"))
+		done
+	fi
+}
+
+complete -F ___XLI_PROG___bash __XLI_PROG__

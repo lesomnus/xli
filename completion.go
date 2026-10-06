@@ -3,26 +3,34 @@ package xli
 import (
 	"context"
 	"embed"
+	"fmt"
 	"strings"
 )
 
 //go:embed completions
 var completions embed.FS
 
+// NewCmdCompletion returns a "completion" command whose subcommands ("zsh",
+// "bash", "fish") print the completion script for the root command.
 func NewCmdCompletion() *Command {
 	return &Command{
-		Name: "completion",
+		Name:    "completion",
+		Brief:   "print a shell completion script",
+		Handler: RequireSubcommand(),
 		Commands: Commands{
-			newCmdZshCompletion(),
+			newCmdShellCompletion("zsh"),
+			newCmdShellCompletion("bash"),
+			newCmdShellCompletion("fish"),
 		},
 	}
 }
 
-func newCmdZshCompletion() *Command {
+func newCmdShellCompletion(shell string) *Command {
 	return &Command{
-		Name: "zsh",
+		Name:  shell,
+		Brief: fmt.Sprintf("print the %s completion script", shell),
 		Handler: OnRun(func(ctx context.Context, cmd *Command, next Next) error {
-			b, err := completions.ReadFile("completions/zsh")
+			b, err := completions.ReadFile("completions/" + shell)
 			if err != nil {
 				return err
 			}

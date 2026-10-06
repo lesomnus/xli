@@ -139,7 +139,9 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 
 			var t tab.Tab
 			switch sh {
-			case "zsh":
+			case "zsh", "bash", "fish":
+				// The line format written by ZshTab is shell-agnostic; each
+				// generated script decodes it with what its shell supports.
 				t = tab.NewZshTab(w)
 			default:
 				return errors.New("unknown shell of completion")

@@ -1,0 +1,75 @@
+# fish completion for __XLI_PROG__
+# This is a generated code by "github.com/lesomnus/xli".
+
+function ___XLI_PROG___fish
+    set -l tokens (commandline -opc)
+    set -l curr (commandline -ct)
+    # Like zsh's $words, the arguments include the word being completed.
+    set -l args $tokens[2..-1]
+    test -n "$curr"; and set -a args $curr
+
+    # For "--flag=val" the candidates are values for the flag; fish matches
+    # them against the whole token, so they must carry the "--flag=" part.
+    set -l prefix ""
+    set -l match $curr
+    if string match -qr -- '^-[^=]*=' $curr
+        set prefix (string match -r -- '^-[^=]*=' $curr)
+        set match (string replace -r -- '^-[^=]*=' '' $curr)
+    end
+
+    # The trigger tag and separator below mirror internal/comp (TagPrefix+"fish"
+    # and Sep); keep them in sync with that package.
+    set -l sep \x1f
+    set -l want_files 0
+    set -l want_dirs 0
+    set -l globs
+
+    # Each line is one of:
+    #   v<sep><group><sep><entry>   a candidate ("value" or "value:desc")
+    #   f<sep><pattern>             request file completion
+    #   d<sep>                      request directory completion
+    # fish cannot show groups, so only values and descriptions are used.
+    for line in ($tokens[1] $args '$$xli_completion_fish' "$curr" "$curr" 2>/dev/null)
+        set -l parts (string split -m 2 -- $sep $line)
+        switch $parts[1]
+            case v
+                test -n "$parts[3]"; or continue
+                set -l kv (string split -m 1 -- : $parts[3])
+                if test (count $kv) -gt 1
+                    printf '%s%s\t%s\n' $prefix $kv[1] $kv[2]
+                else
+                    printf '%s%s\n' $prefix $kv[1]
+                end
+            case f
+                set want_files 1
+                test -n "$parts[2]"; and set -a globs $parts[2]
+            case d
+                set want_dirs 1
+        end
+    end
+
+    if test $want_files = 1; and test (count $globs) -eq 0
+        # Any file; this includes directories.
+        for p in (__fish_complete_path $match)
+            printf '%s%s\n' $prefix $p
+        end
+    else if test $want_files = 1; or test $want_dirs = 1
+        # Directories are offered alongside globbed files so the user can
+        # descend into them.
+        for p in (__fish_complete_path $match)
+            set -l path (string split -m 1 -- \t $p)[1]
+            if string match -q -- '*/' $path
+                printf '%s%s\n' $prefix $p
+                continue
+            end
+            for g in $globs
+                if string match -q -- $g (path basename -- $path)
+                    printf '%s%s\n' $prefix $p
+                    break
+                end
+            end
+        end
+    end
+end
+
+complete -c __XLI_PROG__ -f -a '(___XLI_PROG___fish)'
