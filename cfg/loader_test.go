@@ -424,14 +424,23 @@ func TestNewPanics(t *testing.T) {
 }
 
 func TestNewFile(t *testing.T) {
-	p := write(t, "name: policy\n")
-	l := cfg.NewFile[Config](p)
-	s, err := l.Load("", env("APP_NAME=ignored"))
+	p := write(t, "name: ${env:NAME}\n")
+	f := cfg.NewFile[Config](p, cfg.WithEnviron(func() []string { return env("NAME=policy", "APP_NAME=ignored") }))
 	x := x.New(t)
+	x.Equal(p, f.Path())
+	x.Nil(f.Current())
+
+	s, err := f.Read()
+	x.NoError(err)
+	x.Equal("policy", s.Config.Name, "references are resolved against the environment")
+	x.Nil(f.Current(), "Read does not make it current")
+
+	s, err = f.Load()
 	x.NoError(err)
 	x.Equal("policy", s.Config.Name)
-	x.Equal([]string(nil), s.Unknown)
+	x.Equal([]string(nil), s.Unknown, "no variables are read over it")
+	x.Same(s, f.Current())
 
-	_, err = cfg.NewFile[Config](filepath.Join(t.TempDir(), "nope.yaml")).Load("", nil)
+	_, err = cfg.NewFile[Config](filepath.Join(t.TempDir(), "nope.yaml")).Load()
 	x.True(errors.Is(err, os.ErrNotExist))
 }

@@ -35,7 +35,7 @@ type Loader[T any] struct {
 	// base is what root held when the loader was made: the defaults.
 	base T
 
-	// file is the fixed path of a loader made by NewFile.
+	// file is the path of a File's loader, which reads nothing else.
 	file string
 
 	cur atomic.Pointer[Snapshot[T]]
@@ -43,8 +43,15 @@ type Loader[T any] struct {
 	mu sync.Mutex
 	// first is the snapshot of the first load, whose Config is root.
 	first *Snapshot[T]
-	// in is what the first load read, for Watch.
+	// in is what the last load read, for Reload.
 	in *inputs
+	// at is the file the snapshot in force was read from, which Reload keeps
+	// to; "" when there was none.
+	at string
+
+	// reloading is held by Reload; pending is the content it read once.
+	reloading sync.Mutex
+	pending   string
 
 	// skip are commands the Load handler does not load the configuration
 	// for, and tolerant those it runs even when the configuration fails to
@@ -169,19 +176,6 @@ func New[T any](name string, root *T, opts ...Option) *Loader[T] {
 	if l.opts.paths == nil {
 		l.opts.paths = []string{name + ".yaml", name + ".yml"}
 	}
-	return l
-}
-
-// NewFile is a loader for a file of its own, such as a policy file beside the
-// configuration: the file at path, which must exist, and no environment
-// variables or flags.
-func NewFile[T any](path string, opts ...Option) *Loader[T] {
-	if path == "" {
-		panic("cfg: NewFile needs a path")
-	}
-	l := newLoader[T]("", opts)
-	l.file = path
-	l.root = new(T)
 	return l
 }
 
@@ -310,7 +304,7 @@ func (l *Loader[T]) load(in *inputs) (*Snapshot[T], error) {
 	defer l.mu.Unlock()
 	*l.root = *s.Config
 	s.Config = l.root
-	l.first, l.in = s, in
+	l.first, l.in, l.at = s, in, s.Path
 	l.cur.Store(s)
 	return s, nil
 }

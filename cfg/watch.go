@@ -6,46 +6,116 @@ import (
 	"time"
 )
 
-// Watch keeps the configuration current with its file until ctx is done.
+// check is what came of one check of the file.
+type check int
+
+const (
+	// unchanged: the file reads as the snapshot in force.
+	unchanged check = iota
+	// waiting: new content, read once; it is loaded when it reads the same at
+	// the next check.
+	waiting
+	// reloaded: new content was loaded, and is the snapshot in force.
+	reloaded
+)
+
+// Reload checks the file once, as Watch does every interval. New content is
+// loaded once it reads the same at two checks in a row, so that a file caught
+// while it is being written is not taken for the configuration; a file
+// replaced by renaming a new one into place, as Kubernetes does with a mounted
+// ConfigMap, is loaded at the second check too. The new snapshot keeps the
+// environment and the flags of the last Load: those cannot change under a
+// running process.
 //
-// Every interval (WithInterval, 5 seconds by default) it reads the file. New
-// content is loaded once it has read the same on two checks in a row, and an
-// empty file is skipped, so that a file caught while it is being written is not
-// taken for the configuration. Replacing the file by renaming a new one into
-// place, as Kubernetes does with a mounted ConfigMap, avoids the question.
-// The new snapshot keeps the environment and the flags of the first load:
-// those cannot change under a running process. A snapshot that loads is made
-// Current and passed to f; one that fails to load or validate is reported to f
-// as an error, once per content, and the snapshot in force stays.
+// s is the snapshot in force after the check, and changed reports that it is a
+// new one. err is why the file could not be read, or its content did not load
+// or validate; the snapshot in force stays, and the content is tried again at
+// the next check.
 //
-// A reload never writes into the root: it is the first load, for the life of
-// the process. Read Current, or keep what f is given, for the live values.
-// Secrets read from files need no Watch; they re-read their file on use.
+// It keeps to the file a load found: one that disappears is an error, not a
+// reason to fall back to the defaults or to another of the default paths.
 //
-// It must be called after the first Load (for a loader made by NewFile, Load
-// with no arguments).
+// A reload never writes into the root, which holds the first load for the life
+// of the process: read Current, or keep s, for the live values. Secrets read
+// from files need no reload; they re-read their file on use.
+func (l *Loader[T]) Reload() (s *Snapshot[T], changed bool, err error) {
+	s, c, err := l.reload()
+	return s, c == reloaded, err
+}
+
+func (l *Loader[T]) reload() (*Snapshot[T], check, error) {
+	l.mu.Lock()
+	in, at := l.in, l.at
+	l.mu.Unlock()
+	if in == nil {
+		return nil, unchanged, errors.New("cfg: reload before the first Load")
+	}
+
+	l.reloading.Lock()
+	defer l.reloading.Unlock()
+
+	cur := l.cur.Load()
+	if at != "" {
+		c := *in
+		c.path = at
+		in = &c
+	}
+	path, content, err := l.readFile(in)
+	if err != nil {
+		l.pending = ""
+		return cur, unchanged, err
+	}
+
+	id := path + "\x00" + revision(path, content)
+	if cur.Path+"\x00"+cur.Revision == id {
+		l.pending = ""
+		return cur, unchanged, nil
+	}
+	if id != l.pending {
+		l.pending = id
+		return cur, waiting, nil
+	}
+
+	s, err := l.build(in, path, content)
+	if err != nil {
+		// Still pending: tried again at the next check, as what failed may
+		// be a scheme's server, or a file a Validate looks at.
+		return cur, unchanged, err
+	}
+	l.pending = ""
+	if path != "" {
+		l.mu.Lock()
+		l.at = path
+		l.mu.Unlock()
+	}
+	l.cur.Store(s)
+	return s, reloaded, nil
+}
+
+// Watch reloads the configuration every interval (WithInterval, 5 seconds by
+// default) until ctx is done; see Reload. f is called
+//
+//   - with a new snapshot, made Current, when the file's content changed;
+//   - with an error when the file cannot be read, or its content does not
+//     load or validate: once for each error, though the content is tried
+//     again at every check;
+//   - with the snapshot in force when the file reads as it again after an
+//     error, so that what reported the error can tell it is over.
+//
+// It must be called after the first Load.
 func (l *Loader[T]) Watch(ctx context.Context, f func(s *Snapshot[T], err error)) error {
 	l.mu.Lock()
-	in, first := l.in, l.first
+	in := l.in
 	l.mu.Unlock()
 	if in == nil {
 		return errors.New("cfg: Watch before the first Load")
 	}
-	if l.file == "" && in.path == "" && first.Path != "" {
-		// Keep to the file the first load found: one that disappears is an
-		// error, not a reason to fall back to the defaults or to another of
-		// the default paths.
-		c := *in
-		c.path = first.Path
-		in = &c
-	}
 
-	var (
-		pending string // a new content seen once
-		failed  string // the content that last failed
-	)
 	t := time.NewTicker(l.opts.interval)
 	defer t.Stop()
+
+	// failed is the error last reported, until the file reads well again.
+	failed := ""
 	for {
 		select {
 		case <-ctx.Done():
@@ -53,42 +123,19 @@ func (l *Loader[T]) Watch(ctx context.Context, f func(s *Snapshot[T], err error)
 		case <-t.C:
 		}
 
-		path, content, err := l.readFile(in)
-		if err != nil {
-			id := "error:" + err.Error()
-			if id != failed {
-				failed = id
+		s, c, err := l.reload()
+		switch {
+		case err != nil:
+			if msg := err.Error(); msg != failed {
+				failed = msg
 				f(nil, err)
 			}
-			continue
+		case c == reloaded:
+			failed = ""
+			f(s, nil)
+		case c == unchanged && failed != "":
+			failed = ""
+			f(s, nil)
 		}
-
-		if path != "" && len(content) == 0 {
-			// Truncated and not yet written.
-			continue
-		}
-
-		id := path + "\x00" + revision(path, content)
-		if cur := l.cur.Load(); cur != nil && cur.Path+"\x00"+cur.Revision == id {
-			pending, failed = "", ""
-			continue
-		}
-		if id != pending {
-			pending = id
-			continue
-		}
-		if id == failed {
-			continue
-		}
-
-		s, err := l.build(in, path, content)
-		if err != nil {
-			failed = id
-			f(nil, err)
-			continue
-		}
-		pending, failed = "", ""
-		l.cur.Store(s)
-		f(s, nil)
 	}
 }
