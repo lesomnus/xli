@@ -687,7 +687,7 @@ func scalarOf(n ast.Node, text string) any {
 // not there yet.
 func onlyPending(es errs) bool {
 	for _, err := range es {
-		if !errors.As(err, new(*pendingError)) {
+		if !isPending(err) {
 			return false
 		}
 	}
