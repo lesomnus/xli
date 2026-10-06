@@ -44,26 +44,33 @@ func Of(s string, candidates []string) []string {
 	return vs
 }
 
-// distance is the Levenshtein distance between a and b, counted in runes.
+// distance is the edit distance between a and b, counted in runes: the
+// insertions, deletions, substitutions and swaps of two adjacent runes it takes
+// to turn one into the other (optimal string alignment). A swap counts once,
+// so "dsn" is one edit from "dns".
 func distance(a, b string) int {
 	ra, rb := []rune(a), []rune(b)
-	prev := make([]int, len(rb)+1)
-	curr := make([]int, len(rb)+1)
-	for j := range prev {
-		prev[j] = j
+	d := make([][]int, len(ra)+1)
+	for i := range d {
+		d[i] = make([]int, len(rb)+1)
+		d[i][0] = i
+	}
+	for j := range d[0] {
+		d[0][j] = j
 	}
 	for i := 1; i <= len(ra); i++ {
-		curr[0] = i
 		for j := 1; j <= len(rb); j++ {
 			cost := 1
 			if ra[i-1] == rb[j-1] {
 				cost = 0
 			}
-			curr[j] = min(prev[j]+1, curr[j-1]+1, prev[j-1]+cost)
+			d[i][j] = min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+cost)
+			if i > 1 && j > 1 && ra[i-1] == rb[j-2] && ra[i-2] == rb[j-1] {
+				d[i][j] = min(d[i][j], d[i-2][j-2]+1)
+			}
 		}
-		prev, curr = curr, prev
 	}
-	return prev[len(rb)]
+	return d[len(ra)][len(rb)]
 }
 
 // Hint renders suggestions as a parenthesized hint, e.g.
