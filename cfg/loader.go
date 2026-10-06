@@ -126,8 +126,9 @@ func WithScheme(name string, f Resolver) Option {
 	}
 }
 
-// WithEnviron sets where the environment is read from; the default is
-// os.Environ. It is for tests.
+// WithEnviron sets where the environment is read from by the Load handler,
+// `config env` and a File's references; the default is os.Environ. Loader.Load
+// takes the environment it reads as an argument.
 func WithEnviron(f func() []string) Option {
 	return func(o *options) { o.environ = f }
 }
@@ -302,8 +303,11 @@ func (l *Loader[T]) load(in *inputs) (*Snapshot[T], error) {
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	*l.root = *s.Config
-	s.Config = l.root
+	if l.file == "" {
+		// A File has no root: every snapshot has a Config of its own.
+		*l.root = *s.Config
+		s.Config = l.root
+	}
 	l.first, l.in, l.at = s, in, s.Path
 	l.cur.Store(s)
 	return s, nil

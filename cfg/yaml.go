@@ -25,6 +25,9 @@ type decoder struct {
 	// ordered makes anyOf give a mapping as a yaml.MapSlice, its keys in order
 	// and of their own types, for a type that decodes itself.
 	ordered bool
+	// raw makes anyOf give a scalar other than a string as written, a
+	// rawScalar, for Print.
+	raw bool
 
 	// active are the nodes being read: an alias to one of them is an alias to
 	// a value it is in, which has no end.
@@ -293,7 +296,7 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 // asWritten is n as plain values with its references not resolved: what the
 // file says, for Print.
 func (d *decoder) asWritten(n ast.Node) any {
-	w := &decoder{r: &resolver{verbatim: true}, anchors: d.anchors}
+	w := &decoder{r: &resolver{verbatim: true}, anchors: d.anchors, raw: true}
 	a, err := w.anyOf(n, false, 0)
 	if err != nil {
 		return nil
@@ -305,10 +308,10 @@ func (d *decoder) asWritten(n ast.Node) any {
 // plain values: with the references in its strings resolved, and its aliases
 // and merges expanded.
 func (d *decoder) unmarshal(n ast.Node, str bool, ptr any) error {
-	prev := d.ordered
-	d.ordered = true
+	prev, keep := d.ordered, d.r.keepFiles
+	d.ordered, d.r.keepFiles = true, true
 	a, err := d.anyValue(n, str, 0)
-	d.ordered = prev
+	d.ordered, d.r.keepFiles = prev, keep
 	if err != nil {
 		return err
 	}
@@ -364,6 +367,8 @@ func nodeKind(n ast.Node) string {
 type entry struct {
 	key   ast.Node
 	value ast.Node
+	// merged reports an entry of a merge key's mapping.
+	merged bool
 }
 
 // entries are the keys and values of a mapping, with those of its merge keys
@@ -395,7 +400,7 @@ func (d *decoder) entriesAt(n ast.Node, depth int) ([]entry, error) {
 	own := []entry{}
 	for _, mv := range mvs {
 		if _, ok := mv.Key.(*ast.MergeKeyNode); !ok {
-			own = append(own, entry{mv.Key, mv.Value})
+			own = append(own, entry{key: mv.Key, value: mv.Value})
 			continue
 		}
 
@@ -438,6 +443,7 @@ func (d *decoder) entriesAt(n ast.Node, depth int) ([]entry, error) {
 				}
 				seen[k] = true
 			}
+			e.merged = true
 			es = append(es, e)
 		}
 	}
@@ -597,6 +603,7 @@ func (d *decoder) decodeMap(n ast.Node, v reflect.Value, key string) (es errs) {
 	}
 
 	m := reflect.MakeMapWithSize(v.Type(), len(entries))
+	merged := map[any]bool{}
 	for _, e := range entries {
 		kn, tag, err := d.resolve(e.key)
 		if err != nil {
@@ -616,9 +623,16 @@ func (d *decoder) decodeMap(n ast.Node, v reflect.Value, key string) (es errs) {
 			continue
 		}
 		if m.MapIndex(k).IsValid() {
-			// Keys written differently that read the same, e.g. 1 and 01.
-			es.addf(d.at(e.key, sub), "given twice")
-			continue
+			// Keys written differently that read the same, e.g. 1 and 01:
+			// as the merge key is specified, the mapping's own over a
+			// merged one, and an earlier merged one over a later one.
+			switch {
+			case e.merged:
+				continue
+			case !merged[k.Interface()]:
+				es.addf(d.at(e.key, sub), "given twice")
+				continue
+			}
 		}
 		val := reflect.New(v.Type().Elem()).Elem()
 		if sub := d.decode(e.value, val, sub, false); len(sub) > 0 {
@@ -628,6 +642,7 @@ func (d *decoder) decodeMap(n ast.Node, v reflect.Value, key string) (es errs) {
 			}
 		}
 		m.SetMapIndex(k, val)
+		merged[k.Interface()] = e.merged
 	}
 	v.Set(m)
 	return es
@@ -708,6 +723,9 @@ func (d *decoder) anyValue(n ast.Node, str bool, depth int) (any, error) {
 		return d.text(n, true)
 	}
 	if text, _, ok := scalarText(n); ok {
+		if d.raw {
+			return rawScalar(text), nil
+		}
 		return scalarOf(n, text), nil
 	}
 	var a any
