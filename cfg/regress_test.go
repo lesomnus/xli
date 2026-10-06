@@ -105,8 +105,8 @@ func TestPrintNilSecret(t *testing.T) {
 }
 
 func TestNullBlockClearsOrigins(t *testing.T) {
-	c := Config{}
-	l := cfg.New("app", &c, cfg.WithDefaults(func(c *Config) { c.Db.Dsn = "def" }))
+	c := Config{Db: DbConfig{Dsn: "def"}}
+	l := cfg.New("app", &c)
 	p := write(t, "db:\n")
 	_, err := l.Load(p, nil)
 	x := x.New(t)
@@ -132,8 +132,8 @@ func TestPromotedValidateRunsOnce(t *testing.T) {
 	type Outer struct {
 		Inner `yaml:",inline"`
 	}
-	c := Outer{}
-	_, err := cfg.New("app", &c, cfg.WithPaths(), cfg.WithDefaults(func(c *Outer) { c.Bad = true })).Load("", nil)
+	c := Outer{Inner: Inner{Bad: true}}
+	_, err := cfg.New("app", &c, cfg.WithPaths()).Load("", nil)
 	x := x.New(t)
 	var le *cfg.LoadError
 	x.True(errors.As(err, &le))

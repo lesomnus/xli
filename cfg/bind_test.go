@@ -219,6 +219,70 @@ func TestBind(t *testing.T) {
 		res := xlitest.Run(x.T, root)
 		x.ErrorContains(res.Err, "--tls and --cert are both bound to ldap.tls.cert")
 	}))
+	t.Run("a flag not given does not make the block it is bound into", x.F(func(x x.X) {
+		type C struct {
+			Ldap *ServeConfig `yaml:"ldap"`
+		}
+		c := C{}
+		l := cfg.New("app", &c, cfg.WithPaths())
+		// Made after the loader, so that the default stays nil.
+		c.Ldap = &ServeConfig{}
+		f := cfg.Bind(l, &c.Ldap.Addr, &flg.String{Name: "listen"})
+
+		_, err := l.Load("", nil, f)
+		x.NoError(err)
+		x.Nil(c.Ldap)
+	}))
+	t.Run("an empty flag clears", x.F(func(x x.X) {
+		p := write(x.T, "ldap:\n  addr: file\n")
+		c := AppConfig{}
+		l := cfg.New("app", &c, cfg.WithPaths())
+		addr := cfg.Bind(l, &c.Ldap.Addr, &flg.String{Name: "listen"})
+		root := &xli.Command{Name: "app", Flags: flg.Flags{addr}, Handler: cfg.Load(l)}
+		x.NoError(xlitest.Run(x.T, root, "--listen=").Err)
+		_, err := l.Load(p, nil, addr)
+		x.NoError(err)
+		x.Equal("", c.Ldap.Addr)
+		o, _ := l.Origin(&c.Ldap.Addr)
+		x.Equal(cfg.Flag, o.Source)
+		x.True(o.Cleared)
+	}))
+	t.Run("an empty list flag clears", x.F(func(x x.X) {
+		type C struct {
+			Hosts []string `yaml:"hosts"`
+		}
+		c := C{Hosts: []string{"default"}}
+		l := cfg.New("app", &c, cfg.WithPaths())
+		hosts := cfg.Bind(l, &c.Hosts, &flg.Strings{Name: "host"})
+		root := &xli.Command{Name: "app", Flags: flg.Flags{hosts}, Handler: cfg.Load(l)}
+		x.NoError(xlitest.Run(x.T, root, "--host=").Err)
+		x.Nil(c.Hosts)
+	}))
+	t.Run("the configuration's list is not the flag's", x.F(func(x x.X) {
+		type C struct {
+			Hosts []string `yaml:"hosts"`
+		}
+		c := C{}
+		l := cfg.New("app", &c, cfg.WithPaths())
+		f := &flg.Strings{Name: "host"}
+		root := &xli.Command{Name: "app", Flags: flg.Flags{cfg.Bind(l, &c.Hosts, f)}, Handler: cfg.Load(l)}
+		x.NoError(xlitest.Run(x.T, root, "--host=a", "--host=b").Err)
+		c.Hosts[0] = "changed"
+		v, _ := f.Get()
+		x.Equal([]string{"a", "b"}, v)
+	}))
+	t.Run("a default whose secret file is not there yet", x.F(func(x x.X) {
+		missing := "${file:/does/not/exist}"
+		c := AppConfig{}
+		l := cfg.New("app", &c, cfg.WithPaths())
+		f := cfg.BindText(l, &c.Ldap.Key, &flg.String{Name: "key", Default: &missing})
+		s, err := l.Load("", nil, f)
+		x.NoError(err)
+		x.Len(s.Warnings, 1)
+		o, _ := l.Origin(&c.Ldap.Key)
+		x.Equal(cfg.Default, o.Source)
+		x.Equal([]string{missing}, o.Refs)
+	}))
 	t.Run("binding to something that is not a field panics", x.F(func(x x.X) {
 		c := AppConfig{}
 		l := cfg.New("app", &c)

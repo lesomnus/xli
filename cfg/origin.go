@@ -11,7 +11,8 @@ type Source int
 const (
 	// Unset is a field nothing said anything about; it holds its zero value.
 	Unset Source = iota
-	// Default is a value from WithDefaults or a bound flag's Default.
+	// Default is a value the root held when the loader was made, or the
+	// Default of a bound flag on the command path.
 	Default
 	// File is a value from the configuration file.
 	File

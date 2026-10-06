@@ -94,11 +94,8 @@ name: *name
 	}))
 	t.Run("null clears", x.F(func(x x.X) {
 		p := write(x.T, "name:\ndb: null\n")
-		c := Config{}
-		l := cfg.New("app", &c, cfg.WithDefaults(func(c *Config) {
-			c.Name = "default"
-			c.Db.Dsn = "default"
-		}))
+		c := Config{Name: "default", Db: DbConfig{Dsn: "default"}}
+		l := cfg.New("app", &c)
 		_, err := l.Load(p, nil)
 		x.NoError(err)
 		x.Equal("", c.Name)
@@ -198,11 +195,9 @@ version: $${env:LITERAL}
 func TestLoadLayers(t *testing.T) {
 	p := write(t, "name: file\ndb:\n  dsn: file\n  max_conn: 1\n")
 	newLoader := func(c *Config) *cfg.Loader[Config] {
-		return cfg.New("app", c, cfg.WithDefaults(func(c *Config) {
-			c.Name = "default"
-			c.Version = "default"
-			c.Db.MaxConn = 9
-		}))
+		// What the root holds when the loader is made is the defaults.
+		*c = Config{Name: "default", Version: "default", Db: DbConfig{MaxConn: 9}}
+		return cfg.New("app", c)
 	}
 
 	t.Run("default < file < env", x.F(func(x x.X) {
@@ -268,6 +263,53 @@ func TestLoadLayers(t *testing.T) {
 
 		o, _ := l.Origin(&c.Ldap.Hosts)
 		x.Len(o.Refs, 0)
+	}))
+}
+
+var sharedLdap = &LdapConfig{Addr: ":389", Hosts: []string{"default"}}
+
+func TestDefaults(t *testing.T) {
+	t.Run("what the root holds when the loader is made", x.F(func(x x.X) {
+		c := Config{Name: "default", Db: DbConfig{Dsn: "default", MaxConn: 3}}
+		l := cfg.New("app", &c)
+		s, err := l.Load(write(x.T, "db:\n  dsn: file\n"), nil)
+		x.NoError(err)
+		x.Equal(Config{Name: "default", Db: DbConfig{Dsn: "file", MaxConn: 3}}, c)
+		x.Same(&c, s.Config, "the first load is the root")
+
+		o, _ := l.Origin(&c.Db.MaxConn)
+		x.Equal(cfg.Default, o.Source)
+	}))
+	t.Run("are never written into", x.F(func(x x.X) {
+		c := Config{Ldap: sharedLdap}
+		l := cfg.New("app", &c)
+		_, err := l.Load(write(x.T, "ldap:\n  addr: file\n  hosts: [file]\n"), env("APP_LDAP_INSECURE=true"))
+		x.NoError(err)
+		x.Equal(&LdapConfig{Addr: "file", Insecure: true, Hosts: []string{"file"}}, c.Ldap)
+		x.Equal(&LdapConfig{Addr: ":389", Hosts: []string{"default"}}, sharedLdap)
+
+		s, err := l.Read("", nil)
+		x.NoError(err)
+		x.Equal(":389", s.Config.Ldap.Addr, "every load starts from them")
+	}))
+	t.Run("nor is the root but by Load", x.F(func(x x.X) {
+		c := Config{Ldap: &LdapConfig{Addr: "default"}}
+		l := cfg.New("app", &c)
+		p := write(x.T, "ldap:\n  addr: one\n")
+		_, err := l.Load(p, nil)
+		x.NoError(err)
+		ldap := c.Ldap
+
+		_, err = l.Read(write(x.T, "ldap:\n  addr: two\n"), nil)
+		x.NoError(err)
+		x.Equal("one", ldap.Addr)
+		x.Same(ldap, c.Ldap)
+	}))
+	t.Run("a nil block stays nil when a variable clears a field in it", x.F(func(x x.X) {
+		c := Config{}
+		_, err := cfg.New("app", &c, cfg.WithPaths()).Load("", env("APP_LDAP_ADDR="))
+		x.NoError(err)
+		x.Nil(c.Ldap)
 	}))
 }
 

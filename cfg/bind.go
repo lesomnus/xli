@@ -74,17 +74,27 @@ func bindingOf(f flg.Flag) *binding {
 // dst may also point to a struct of fields, such as a TLS block, which the flag
 // then sets whole; that is mostly for BindFunc.
 //
+// A field in a block behind a pointer has an address only once the block is
+// made. Make it after New, so that the default stays nil: what the root holds
+// when the loader is made is the defaults.
+//
 // The returned flag is f, reporting the field's environment variable for help.
 // It panics if dst is not a field of the root.
 func Bind[T any, F TypedFlag[T], C any](l *Loader[C], dst *T, f F) flg.Flag {
-	set := func(v reflect.Value, u T) {
-		v.Set(reflect.ValueOf(&u).Elem())
+	set := func(v reflect.Value, u T) (cleared bool) {
+		uv := reflect.ValueOf(&u).Elem()
+		if emptyText(uv) {
+			v.SetZero()
+			return true
+		}
+		// A copy: the flag's own list must not be the configuration's.
+		v.Set(clone(uv))
+		return false
 	}
 	return bind(l, dst, f, &binding{
 		apply: func(v reflect.Value, _ *resolver) (bool, error) {
 			u, _ := f.Get()
-			set(v, u)
-			return false, nil
+			return set(v, u), nil
 		},
 		applyDefault: func(v reflect.Value, _ *resolver) (bool, error) {
 			u, ok := f.GetDefault()
@@ -106,7 +116,7 @@ func BindFunc[T, U any, F TypedFlag[U], C any](l *Loader[C], dst *T, f F, conv f
 		if err != nil {
 			return err
 		}
-		v.Set(reflect.ValueOf(&t).Elem())
+		v.Set(clone(reflect.ValueOf(&t).Elem()))
 		return nil
 	}
 	return bind(l, dst, f, &binding{
@@ -152,6 +162,18 @@ func BindText[T any, PT interface {
 			return true, err
 		},
 	})
+}
+
+// emptyText reports whether a flag's value is what `--x=` gives: an empty
+// string, or a list of one.
+func emptyText(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.String:
+		return v.Len() == 0
+	case reflect.Slice:
+		return v.Len() == 1 && v.Index(0).Kind() == reflect.String && v.Index(0).Len() == 0
+	}
+	return false
 }
 
 func bind[T any, U any, F TypedFlag[U], C any](l *Loader[C], dst *T, f F, b *binding) flg.Flag {

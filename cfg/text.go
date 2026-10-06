@@ -172,12 +172,21 @@ func setText(v reflect.Value, s string, r *resolver) error {
 	if sf, ok := v.Addr().Interface().(secretField); ok {
 		return sf.setSecret(s, r)
 	}
-	if tu, ok := v.Addr().Interface().(encoding.TextUnmarshaler); ok {
-		return tu.UnmarshalText([]byte(s))
-	}
 	if readsItself(v.Type()) {
-		// A YAML unmarshaler: read the text as a YAML value.
-		return yaml.Unmarshal([]byte(s), v.Addr().Interface())
+		// Read whole, into a new value, as from the file.
+		fresh := reflect.New(v.Type())
+		var err error
+		if tu, ok := fresh.Interface().(encoding.TextUnmarshaler); ok {
+			err = tu.UnmarshalText([]byte(s))
+		} else {
+			// A YAML unmarshaler: read the text as a YAML value.
+			err = yaml.Unmarshal([]byte(s), fresh.Interface())
+		}
+		if err != nil {
+			return err
+		}
+		v.Set(fresh.Elem())
+		return nil
 	}
 
 	switch v.Kind() {

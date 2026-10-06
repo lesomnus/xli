@@ -31,13 +31,16 @@ type Loader[T any] struct {
 	schema *schema
 	opts   options
 
+	// base is what root held when the loader was made: the defaults.
+	base T
+
 	// file is the fixed path of a loader made by NewFile.
 	file string
 
 	cur atomic.Pointer[Snapshot[T]]
 
 	mu sync.Mutex
-	// first is the snapshot root holds.
+	// first is the snapshot of the first load, whose Config is root.
 	first *Snapshot[T]
 	// in is what the first load read, for Watch.
 	in *inputs
@@ -65,7 +68,6 @@ type Snapshot[T any] struct {
 
 type options struct {
 	paths    []string
-	defaults func(any)
 	claims   []string
 	schemes  map[string]Resolver
 	environ  func() []string
@@ -77,17 +79,9 @@ type options struct {
 type Option func(*options)
 
 // WithPaths sets the files tried, in order, when no file is named. The default
-// is "<name>.yaml" and "<name>.yml".
+// is "<name>.yaml" and "<name>.yml"; WithPaths() tries none.
 func WithPaths(paths ...string) Option {
-	return func(o *options) { o.paths = paths }
-}
-
-// WithDefaults sets the defaults, the lowest layer: f is called on the zero
-// configuration before anything else is read into it.
-func WithDefaults[T any](f func(*T)) Option {
-	return func(o *options) {
-		o.defaults = func(v any) { f(v.(*T)) }
-	}
+	return func(o *options) { o.paths = append([]string{}, paths...) }
 }
 
 // Claims declares environment variables under the prefix that the application
@@ -131,7 +125,15 @@ func KeepServiceLinks() Option {
 //
 // The name gives the files tried when none is named ("<name>.yaml",
 // "<name>.yml") and the prefix of every environment variable: "go-app" reads
-// GO_APP_*. root is filled by the first load, and is what Bind and Origin take
+// GO_APP_*.
+//
+// What root holds now is the defaults, the lowest layer: every load starts
+// from a copy of it.
+//
+//	c := Config{Db: DbConfig{MaxConn: 10}}
+//	l := cfg.New("roster", &c)
+//
+// The first load is read into root, and root is what Bind and Origin take
 // pointers into.
 //
 // It panics if T is not a struct, if two fields end up with the same name or
@@ -146,6 +148,7 @@ func New[T any](name string, root *T, opts ...Option) *Loader[T] {
 	l := newLoader[T](envPrefix(name), opts)
 	l.name = name
 	l.root = root
+	l.base = clone(reflect.ValueOf(root).Elem()).Interface().(T)
 	if l.opts.paths == nil {
 		l.opts.paths = []string{name + ".yaml", name + ".yml"}
 	}
@@ -217,12 +220,11 @@ func (l *Loader[T]) Current() *Snapshot[T] {
 // ok is false if ptr is not a leaf field of the root, or before the first load.
 func (l *Loader[T]) Origin(ptr any) (Origin, bool) {
 	l.mu.Lock()
-	first := l.first
-	l.mu.Unlock()
-	if first == nil {
+	defer l.mu.Unlock()
+	if l.first == nil {
 		return Origin{}, false
 	}
-	return first.origin(reflect.ValueOf(l.root).Elem(), ptr)
+	return l.first.Origin(ptr)
 }
 
 // Origin is where the value of the field ptr points to in s.Config came from.
@@ -264,8 +266,8 @@ type inputs struct {
 
 // Load reads the configuration from the file at path (or the first of the
 // default paths that exists, when path is empty), the environment environ (in
-// the form of os.Environ) and the bound flags among flags, and makes it the
-// root's. It is what the Load handler calls.
+// the form of os.Environ) and the bound flags among flags, into the root: the
+// snapshot's Config is the root. It is what the Load handler calls.
 func (l *Loader[T]) Load(path string, environ []string, flags ...flg.Flag) (*Snapshot[T], error) {
 	bound, err := l.bindings(flags)
 	if err != nil {
@@ -280,12 +282,14 @@ func (l *Loader[T]) Load(path string, environ []string, flags ...flg.Flag) (*Sna
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	*l.root = *s.Config
+	s.Config = l.root
 	l.first, l.in = s, in
 	l.cur.Store(s)
 	return s, nil
 }
 
-// Read is Load without touching the root or the loader's state.
+// Read is Load without touching the root or the loader's state: the snapshot
+// has a Config of its own.
 func (l *Loader[T]) Read(path string, environ []string, flags ...flg.Flag) (*Snapshot[T], error) {
 	bound, err := l.bindings(flags)
 	if err != nil {
@@ -362,24 +366,31 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 	// Values from the environment and flags are taken as they are.
 	given := r.asGiven()
 
-	// Defaults.
-	if l.opts.defaults != nil {
-		l.opts.defaults(cfg)
-		for _, f := range l.schema.fields {
-			if v, ok := f.value(rv, false); ok && !v.IsZero() {
-				s.origins[f.key] = Origin{Source: Default, Key: f.key}
-			}
+	// The defaults: a copy of what the root held when the loader was made, so
+	// that reading into the configuration never writes into them.
+	rv.Set(clone(reflect.ValueOf(&l.base).Elem()))
+	for _, f := range l.schema.fields {
+		if v, ok := f.value(rv, false); ok && !v.IsZero() {
+			s.origins[f.key] = Origin{Source: Default, Key: f.key}
 		}
 	}
 	for _, b := range in.bound {
-		v, _ := b.field.value(rv, true)
+		o := Origin{Source: Default, Key: b.field.key}
+		v := reflect.New(b.field.typ).Elem()
+		given.refs = nil
 		ok, err := b.applyDefault(v, given)
-		switch {
-		case err != nil:
-			es.add(Origin{Source: Default, Key: b.field.key}, fmt.Errorf("default of --%s: %w", b.name, err))
-		case ok:
-			l.mark(s, b.field, Origin{Source: Default})
+		if err != nil {
+			es.add(o, fmt.Errorf("default of --%s: %w", b.name, err))
+			if !isPending(err) {
+				continue
+			}
 		}
+		if !ok {
+			continue
+		}
+		o.Refs = refsOf(v, given)
+		l.set(rv, b.field, v, false)
+		l.mark(s, b.field, o)
 	}
 
 	// The file.
@@ -399,17 +410,18 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 			continue
 		}
 		o := Origin{Source: Flag, Key: b.field.key, Name: "--" + b.name}
-		v, _ := b.field.value(rv, true)
+		v := reflect.New(b.field.typ).Elem()
 		given.refs = nil
 		cleared, err := b.apply(v, given)
 		if err != nil {
 			es.add(o, err)
-			if !onlyPending(errs{err}) {
+			if !isPending(err) {
 				continue
 			}
 		}
 		o.Cleared = cleared
 		o.Refs = refsOf(v, given)
+		l.set(rv, b.field, v, cleared)
 		l.mark(s, b.field, o)
 	}
 
@@ -427,6 +439,20 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 		return nil, err
 	}
 	return s, nil
+}
+
+// set sets the field f of root to v. A field cleared is set to its zero value
+// without making the blocks on the way to it: a nil block stays nil until a
+// value is read into it.
+func (l *Loader[T]) set(root reflect.Value, f *field, v reflect.Value, cleared bool) {
+	if cleared {
+		if fv, ok := f.value(root, false); ok {
+			fv.SetZero()
+		}
+		return
+	}
+	fv, _ := f.value(root, true)
+	fv.Set(v)
 }
 
 // mark records o as the origin of f, or of every leaf in f if it is a group.
@@ -534,17 +560,17 @@ func (l *Loader[T]) applyEnv(s *Snapshot[T], rv reflect.Value, r *resolver, envi
 		}
 
 		o := Origin{Source: Env, Key: f.key, Name: f.env}
-		v, _ := f.value(rv, true)
 		if val == "" {
-			v.SetZero()
 			o.Cleared = true
+			l.set(rv, f, reflect.Value{}, true)
 			s.origins[f.key] = o
 			continue
 		}
+		v, _ := f.value(rv, true)
 		r.refs = nil
 		if err := setText(v, val, r); err != nil {
 			es.add(o, err)
-			if !onlyPending(errs{err}) {
+			if !isPending(err) {
 				continue
 			}
 		}
