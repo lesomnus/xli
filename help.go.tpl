@@ -57,6 +57,7 @@ Options:
 			{{ printf "\n    %-20s %s" .String .Brief -}}
 			{{ if .Required }}{{ print " (required)" -}}{{ end -}}
 			{{ if .HasDefault }}{{ printf " (default: %s)" .Default -}}{{ end -}}
+			{{ if .Env }}{{ printf " [$%s]" .Env -}}{{ end -}}
 		{{ end -}}{{ end -}}
 	{{ end -}}
 

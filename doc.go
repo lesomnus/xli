@@ -184,6 +184,9 @@ func flagDesc(info *flg.Info) string {
 	if info.HasDefault {
 		vs = append(vs, fmt.Sprintf("(default: %s)", info.Default))
 	}
+	if info.Env != "" {
+		vs = append(vs, fmt.Sprintf("[$%s]", info.Env))
+	}
 	return strings.Join(vs, " ")
 }
 
