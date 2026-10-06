@@ -136,7 +136,10 @@ The rules come from cr's `blob.SecretFile`, which gantry and bosun copy:
   rename a rotation does) or a different size or modification time;
 - a read that fails after a good one keeps the value in hand: a rotation
   renames first and fixes permissions after;
-- the first read happens at load, so a missing file fails the start;
+- the first read happens at load, but a file that cannot be read yet is a
+  warning, not a failure: a credential may be minted after the process starts
+  (cr's provisioning case). `Value` fails until the file has been read once,
+  so a wrong path still shows on first use;
 - an empty file is a failed read, and the file is capped at 64 KiB.
 
 Only the trailing newline is removed from a string secret: whitespace inside or

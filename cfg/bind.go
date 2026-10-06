@@ -216,6 +216,9 @@ func Load[T any](l *Loader[T]) xli.Handler {
 		for _, name := range s.Unknown {
 			fmt.Fprintf(w, "%s: %s is set and nothing reads it%s\n", l.name, name, hint(name, l.EnvNames()))
 		}
+		for _, err := range s.Warnings {
+			fmt.Fprintf(w, "%s: %s\n", l.name, err)
+		}
 		return next(ctx)
 	})
 }

@@ -51,6 +51,9 @@ type Snapshot[T any] struct {
 	// Unknown are the environment variables under the prefix that no field
 	// reads and nothing claims, which is what a typo looks like.
 	Unknown []string
+	// Warnings are problems that do not stop the load: a secret file that
+	// cannot be read yet, which is read again when the secret is used.
+	Warnings []error
 
 	schema  *schema
 	origins map[string]Origin
@@ -403,7 +406,16 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 	}
 
 	es = append(es, validate(rv, s)...)
-	if err := es.join(); err != nil {
+
+	var fatal errs
+	for _, err := range es {
+		if errors.As(err, new(*pendingError)) {
+			s.Warnings = append(s.Warnings, err)
+			continue
+		}
+		fatal = append(fatal, err)
+	}
+	if err := fatal.join(); err != nil {
 		return nil, err
 	}
 	return s, nil

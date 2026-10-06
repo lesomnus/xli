@@ -54,8 +54,11 @@ type SecretBytes = SecretOf[[]byte, BytesDecoder]
 // `${env:NAME:-default}`, `${file:/path}`, or `${scheme:...}` for a scheme
 // registered with WithScheme. `$$` is a literal `$`.
 //
-// A `${file:}` secret is read when the configuration is loaded, so a missing
-// file fails the start, and Value checks the file again on every call:
+// A `${file:}` secret is read when the configuration is loaded. A file that
+// cannot be read yet is not an error then, only a warning: a credential may be
+// minted after the process starts. Value tries again on every call, and fails
+// until the file has been read once. After that it checks the file on every
+// call:
 //
 //   - the file changed if the path names a different file (a rotation renames
 //     a new one into place) or its size or modification time differ;
@@ -133,9 +136,28 @@ func (s SecretOf[T, D]) MarshalText() ([]byte, error) {
 
 // UnmarshalText reads a literal or a reference, resolving `${env:}` against
 // the process environment. Schemes registered with WithScheme are known only
-// to a Loader.
+// to a Loader. A `${file:}` that cannot be read yet is not an error; Value
+// reports it.
 func (s *SecretOf[T, D]) UnmarshalText(b []byte) error {
-	return s.setSecret(string(b), &resolver{lookup: os.LookupEnv})
+	err := s.setSecret(string(b), &resolver{lookup: os.LookupEnv})
+	if errors.As(err, new(*pendingError)) {
+		return nil
+	}
+	return err
+}
+
+// pendingError is a secret file that could not be read at load. It is a
+// warning, not an error: Value keeps trying.
+type pendingError struct {
+	err error
+}
+
+func (e *pendingError) Error() string {
+	return e.err.Error() + "; it is read again when used"
+}
+
+func (e *pendingError) Unwrap() error {
+	return e.err
 }
 
 func (s *SecretOf[T, D]) refs() []string {
@@ -178,10 +200,10 @@ func (s *SecretOf[T, D]) setSecret(text string, r *resolver) error {
 			return fmt.Errorf("%s: names no file", ref)
 		}
 		st.path = rest
-		if _, err := st.get(); err != nil {
-			return err
-		}
 		s.s = st
+		if _, err := st.get(); err != nil {
+			return &pendingError{err}
+		}
 		return nil
 	case "env":
 		v, err := r.env(rest)
