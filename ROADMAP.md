@@ -151,13 +151,14 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] 상호배타 그룹: `Command.Exclusive [][]string` → `ErrFlagConflict` (Run 모드에서만 검사).
 - [x] env-var 바인딩 → flag 단위가 아니라 **선택적 설정 계층 `cfg` 모듈**로 해결 (`github.com/lesomnus/xli/cfg`, 별도 모듈). payday 의 범용 로더를 옮겨와 확장: 기본값(`New` 시점 root 의 값) < 파일 < env < flag, struct 경로 기반 이름, 엄격한 파일 key, `${env:}`/`${file:}`/`$$` 참조(env/flag 값은 그대로), `cfg.Secret`(파일 회전 재확인), `cfg.Bind`, 출처 기록, 모아서 보고하는 에러 + `Validate`, `Reload`/`Watch`, `cfg.File`, 비밀을 가리는 `config`. 결정과 근거는 [cfg/DESIGN.md](cfg/DESIGN.md).
   - [x] 머지 후: `cfg/go.mod` 의 `replace ../` 를 제거하고 머지된 xli 버전(`v0.0.0-20261006051808-dadaa2417a76`)을 require → `cfg/v0.1.0` 태그. xli 와 cfg 를 함께 고칠 때는 `go work` 로 묶는다.
-  - [ ] payday 이전(한 번에), 이어서 roster/shale/cr 이전. 이전 시 바뀌는 동작:
-    - cr 은 `auth.password`/`auth.token` 을 `cfg.Secret` 으로 (차등 비교에서 확인된 유일한 차이). cr 비밀값의 앞뒤 공백 제거는 커스텀 `Decoder` 로 유지.
-    - 빈 플래그 값(`--x=`)이 값을 지움(지금은 무시): shale `--addr=`, roster `--base=`. Switch 로 파일의 true 를 끌 수 있음.
-    - roster `--key`/`--base` 는 지금 파일 맵에 병합 → `BindFunc` 는 교체. `--HAL`(`yaml:"-"`), 조건부 기본값(`:389`), shale `--dev` 는 수동 유지.
-    - roster/shale 의 bare `file:`/`env:` 는 `${file:}`/`${env:}` 로 (Secret 에 bare 접두는 에러).
+  - [x] cfg 후속 릴리스: `v0.1.1` (이름이 `_dsn` 으로 끝나는 값의 비밀번호도 가림), `v0.1.2` (값이 하나도 없는 블록을 `config` 출력에서 뺌 — 헤더만 찍히면 다시 읽을 때 null 로 지워짐).
+  - [x] payday 이전(한 번에): payday#28 (`6bb6d9c`) — `config.For`/`pdcmd.Load` 등을 지우고 `pd new` 템플릿·`internal/apptest` 를 cfg 로. `docs/migrating.md` 에 대응표.
+  - [x] 앱 이전: roster#90, shale#121, cr#71, Holiday-Robot/khala#36, Holiday-Robot/kamino#25. 공통으로 `cli.Cmd` 에서 `cfg.New`/`cfg.Load(l, version, …)`/`cfg.NewCmdConfig`, `cmd.Loader` 제거, `version` 은 설정을 읽지 않음. 저장소의 설정 파일과 운영 설정(khala.deploy, kamino.deploy)을 미리 cfg 로 읽어 확인. 그때 바뀐 동작:
+    - cr 은 `auth.password`/`auth.token` 을 `cmd.Secret` (`cfg.SecretOf` + 앞뒤 공백 제거 `Decoder`) 으로, `strictAuth` 제거(파일 전체가 엄격).
+    - 파일에 아무도 읽지 않는 키가 있으면 에러(지금까지는 무시).
     - 태그 없는 필드는 snake_case(payday 는 소문자), env 의 `010` 은 10(payday 는 8), `config env` 는 필드 순서(payday 는 정렬).
-    - `Validate` 에는 모든 명령에 공통인 검사만; serve 전용 필수값은 지금처럼 사용 시점에. `completion` 은 `cfg.Load(l, comp)` 로 예외.
+    - `Validate` 에는 모든 명령에 공통인 검사만; serve 전용 필수값은 지금처럼 사용 시점에. 설정이 필요 없는 명령은 `cfg.Load(l, …)` 의 except 로(khala 의 `pki`).
+  - [x] 손으로 덮어쓰던 플래그를 `cfg.Bind` 로: roster#93 (37개 — account/ldap/login/scim serve, login doctor `--hydra`, resources `--file`, trail `--in`), shale#125 (`--as`/`--addr`/`--cluster-addr`, serve 의 `--cp`/`--state`, `--demo`, push `--to`). 빈 값(`--x=`)이 값을 지우고 Switch 로 파일의 true 를 끌 수 있게 됨. roster `--key`/`--base`(맵 병합), `--HAL`(`yaml:"-"`), 조건부 기본값(`:389`), `trail prune --to`, shale `--dev` 는 수동 유지.
 - [ ] (nice-to-have, post-1.0) repeatable 다른 원소 타입(`Multi[int,...]` 등)은 `flg.Multi` 로 사소하게 추가 가능.
 
 ### Phase 4 — API 동결 & 폴리시 → `v1.0` (진행 중)
