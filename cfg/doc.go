@@ -1,24 +1,26 @@
 // Package cfg loads an xli application's configuration: its own struct, read
 // from a YAML file, the environment and command-line flags, in that order of
-// precedence over defaults.
+// precedence over the defaults the struct holds when the loader is made.
 //
 //	type Config struct {
 //		Db   DbConfig   `yaml:"db"`
 //		Ldap LdapConfig `yaml:"ldap"`
 //	}
 //
-//	var c Config
-//	var l = cfg.New("roster", &c) // roster.yaml, ROSTER_*
+//	var c = Config{Ldap: LdapConfig{Addr: ":389"}} // the defaults
+//	var l = cfg.New("roster", &c)                  // roster.yaml, ROSTER_*
 //
-//	root := &xli.Command{
-//		Flags:    flg.Flags{cfg.ConfigFlag()},
-//		Commands: xli.Commands{serve, cfg.NewCmdConfig(l)},
-//		Handler:  xli.Chain(cfg.Load(l), xli.RequireSubcommand()),
-//	}
 //	serve := &xli.Command{
+//		Name: "serve",
 //		Flags: flg.Flags{
 //			cfg.Bind(l, &c.Ldap.Addr, &flg.String{Name: "listen"}),
 //		},
+//	}
+//	comp := xli.NewCmdCompletion()
+//	root := &xli.Command{
+//		Flags:    flg.Flags{cfg.ConfigFlag()},
+//		Commands: xli.Commands{serve, comp, cfg.NewCmdConfig(l)},
+//		Handler:  xli.Chain(cfg.Load(l, comp), xli.RequireSubcommand()),
 //	}
 //
 // Every field is named after its path (`ldap.addr` in the file,
