@@ -63,7 +63,9 @@ func (e *ArgError) Unwrap() error {
 //		ue.Cmd.PrintHelp(os.Stderr)
 //	}
 //
-// Errors returned by handlers are passed through as is and are not wrapped.
+// Errors returned by flag handlers are treated as invalid flag values and
+// reported as UsageErrors too. Errors returned by command handlers are passed
+// through as is.
 type UsageError struct {
 	// Cmd is the command whose flags, arguments, or subcommands were misused.
 	Cmd *Command

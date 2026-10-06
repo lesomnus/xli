@@ -151,7 +151,9 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 			if w == nil {
 				err := &FlagError{flag: v, err: ErrUnknownFlag}
 				if !v.IsShort() {
-					err.suggestions = suggest.Of("--"+v.Name(), flagNames(cmd.Flags))
+					for _, s := range suggest.Of(v.Name(), flagNames(cmd.Flags)) {
+						err.suggestions = append(err.suggestions, "--"+s)
+					}
 				}
 				return f, err
 			} else if w.NoValue() {
@@ -334,11 +336,11 @@ func (f *frame) execute(ctx context.Context) error {
 	})
 }
 
-// flagNames lists the long forms ("--name") of fs, for suggestions.
+// flagNames lists the long names of fs, for suggestions.
 func flagNames(fs flg.Flags) []string {
 	vs := make([]string, 0, len(fs))
 	for _, f := range fs.Visible() {
-		vs = append(vs, "--"+f.Info().Name)
+		vs = append(vs, f.Info().Name)
 	}
 	return vs
 }

@@ -72,6 +72,12 @@ func TestUsageError(t *testing.T) {
 		err := newCmd().Run(context.Background(), []string{"deploy", "--prot=1", "web"})
 		x.ErrorContains(err, `--prot: unknown flag (did you mean "--port"?)`)
 	}))
+	t.Run("dashes do not count toward flag similarity", x.F(func(x x.X) {
+		c := &xli.Command{Name: "app", Flags: flg.Flags{&flg.Switch{Name: "xy"}}}
+		err := c.Run(context.Background(), []string{"--ab"})
+		x.ErrorContains(err, "--ab: unknown flag")
+		x.NotContains(err.Error(), "did you mean")
+	}))
 	t.Run("nothing close means no suggestion", x.F(func(x x.X) {
 		err := newCmd().Run(context.Background(), []string{"xyz"})
 		x.ErrorContains(err, "xyz: unknown subcommand")
