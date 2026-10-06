@@ -48,13 +48,15 @@ func newSchema(t reflect.Type, prefix string) (*schema, error) {
 		byKey: map[string]*field{},
 		byEnv: map[string]*field{},
 	}
-	if err := s.walk(t, prefix, nil, nil, map[reflect.Type]bool{}); err != nil {
+	if err := s.walk(t, prefix, nil, nil, map[reflect.Type]bool{}, map[string]bool{}); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int, seen map[reflect.Type]bool) error {
+// walk adds the fields of t to s. taken are the keys of the fields and the
+// blocks so far, which two inlined structs may both have.
+func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int, seen map[reflect.Type]bool, taken map[string]bool) error {
 	if seen[t] {
 		// A recursive type has no finite set of leaves.
 		return fmt.Errorf("cfg: %s refers to itself", t)
@@ -74,6 +76,15 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 		}
 
 		ft := sf.Type
+		if ft.Kind() == reflect.Pointer && ft.Elem().Kind() == reflect.Pointer {
+			return fmt.Errorf("cfg: %s.%s: a pointer to a pointer cannot be read", t, sf.Name)
+		}
+		if strings.HasPrefix(tag.name, "x-") {
+			return fmt.Errorf("cfg: %s.%s: %q is never read from a file, where x- keys are ignored", t, sf.Name, tag.name)
+		}
+		if tag.env != "" && tag.env != "-" && !validEnvName(tag.env) {
+			return fmt.Errorf("cfg: %s.%s: env:%q is not a variable name", t, sf.Name, tag.env)
+		}
 		idx := append(append([]int{}, index...), i)
 		if tag.inline {
 			st := ft
@@ -83,27 +94,33 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 			if st.Kind() != reflect.Struct {
 				return fmt.Errorf("cfg: %s.%s: only a struct can be inlined", t, sf.Name)
 			}
-			if err := s.walk(st, prefix, path, idx, seen); err != nil {
+			if err := s.walk(st, prefix, path, idx, seen, taken); err != nil {
 				return err
 			}
 			continue
 		}
 
 		p := append(append([]string{}, path...), tag.name)
+		key := strings.Join(p, ".")
+		if taken[key] {
+			return fmt.Errorf("cfg: %s: two fields are named %q", t, key)
+		}
+		taken[key] = true
+
 		if !isLeaf(ft) {
 			st := ft
 			if st.Kind() == reflect.Pointer {
 				st = st.Elem()
 			}
-			s.groups = append(s.groups, &field{key: strings.Join(p, "."), index: idx, typ: ft, group: true})
-			if err := s.walk(st, prefix, p, idx, seen); err != nil {
+			s.groups = append(s.groups, &field{key: key, index: idx, typ: ft, group: true})
+			if err := s.walk(st, prefix, p, idx, seen, taken); err != nil {
 				return err
 			}
 			continue
 		}
 
 		f := &field{
-			key:    strings.Join(p, "."),
+			key:    key,
 			index:  idx,
 			typ:    ft,
 			secret: tag.secret || isSecret(ft),
@@ -118,9 +135,6 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 			f.env = tag.env
 		}
 
-		if g, ok := s.byKey[f.key]; ok {
-			return fmt.Errorf("cfg: %s: two fields are named %q", t, g.key)
-		}
 		if f.env != "" {
 			if g, ok := s.byEnv[f.env]; ok {
 				return fmt.Errorf("cfg: %s and %s are both read from %s", g.key, f.key, f.env)

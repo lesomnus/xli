@@ -95,6 +95,58 @@ func TestSchemaErrors(t *testing.T) {
 		_, err := newSchema(reflect.TypeFor[C](), "APP")
 		x.ErrorContains(err, `two fields are named "a"`)
 	}))
+	t.Run("two inlined structs with one block", x.F(func(x x.X) {
+		type A struct {
+			Db struct {
+				Dsn string `yaml:"dsn"`
+			} `yaml:"db"`
+		}
+		type B struct {
+			Db struct {
+				MaxConn int `yaml:"max_conn"`
+			} `yaml:"db"`
+		}
+		type C struct {
+			A `yaml:",inline"`
+			B `yaml:",inline"`
+		}
+		_, err := newSchema(reflect.TypeFor[C](), "APP")
+		x.ErrorContains(err, `two fields are named "db"`)
+	}))
+	t.Run("a field and a block with one name", x.F(func(x x.X) {
+		type A struct {
+			Db string `yaml:"db"`
+		}
+		type C struct {
+			A  `yaml:",inline"`
+			Db struct {
+				Dsn string `yaml:"dsn"`
+			} `yaml:"db"`
+		}
+		_, err := newSchema(reflect.TypeFor[C](), "APP")
+		x.ErrorContains(err, `two fields are named "db"`)
+	}))
+	t.Run("a name a file cannot give", x.F(func(x x.X) {
+		type C struct {
+			Key string `yaml:"x-api-key"`
+		}
+		_, err := newSchema(reflect.TypeFor[C](), "APP")
+		x.ErrorContains(err, `"x-api-key" is never read from a file`)
+	}))
+	t.Run("an environment variable that is not a name", x.F(func(x x.X) {
+		type C struct {
+			Dsn string `env:"DB_DSN,required"`
+		}
+		_, err := newSchema(reflect.TypeFor[C](), "APP")
+		x.ErrorContains(err, `env:"DB_DSN,required" is not a variable name`)
+	}))
+	t.Run("a pointer to a pointer", x.F(func(x x.X) {
+		type C struct {
+			P **struct{ A string }
+		}
+		_, err := newSchema(reflect.TypeFor[C](), "APP")
+		x.ErrorContains(err, "a pointer to a pointer")
+	}))
 	t.Run("a recursive type", x.F(func(x x.X) {
 		type Node struct {
 			Next *Node
