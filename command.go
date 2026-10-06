@@ -302,10 +302,15 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		need_val = true
 		need_arg = false
 	}
+	// NormalizeCompletionArgs turns a flag name being typed into "--", so any
+	// other token starting with "-" is a flag that is already complete and the
+	// cursor is on the next word.
+	typing_flag := last == "--"
+
 	// Treat an optional argument as "being completed" so its values are offered
-	// even with nothing typed — but not when the token is a flag ("-"/"--"),
-	// which must still complete flag names rather than the optional arg.
-	if !need_val && !strings.HasPrefix(last, "-") {
+	// even with nothing typed — but not when a flag name is being typed, which
+	// must still complete flag names rather than the optional arg.
+	if !need_val && !typing_flag {
 		need_arg = need_arg || slices.ContainsFunc(c.Args, func(a arg.Arg) bool {
 			return a.IsOptional()
 		})
@@ -315,8 +320,8 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	case need_val || need_arg:
 		// A flag value or an argument is being completed; handled below.
 
-	case strings.HasPrefix(last, "-"):
-		// "--" or "-": suggest flag names, grouped by category.
+	case typing_flag:
+		// Suggest flag names, grouped by category.
 		completeFlagNames(tab, c)
 		return nil
 
