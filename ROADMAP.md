@@ -149,9 +149,15 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] ~~lazy command initialization (이슈 #2)~~ → **not planned**. 측정: 커맨드 210개(각 flag 5개) eager 생성 ≈ 112µs / 253KB / 2.5k allocs — Go 런타임 기동 비용 대비 무시 가능. 실제 병목은 생성자 내부 작업(→ Handler 로 옮기라는 가이드로 해결)이나 의존성 `init()`(lazy 로 해결 불가). 필요해지면 post-1.0 에 additive 하게 `Command.Init func(*Command)` (헤더 eager, body 는 선택 시 1회 채움) 로 추가 가능.
 - [x] enum/choice: `flg.Choice`/`arg.Choice` (+`ChoiceParser`). 파서가 `Complete(tab.Tab)` 를 구현하면 Tab 모드에서 후보 자동 제공.
 - [x] 상호배타 그룹: `Command.Exclusive [][]string` → `ErrFlagConflict` (Run 모드에서만 검사).
-- [x] env-var 바인딩 → flag 단위가 아니라 **선택적 설정 계층 `cfg` 모듈**로 해결 (`github.com/lesomnus/xli/cfg`, 별도 모듈). payday 의 범용 로더를 옮겨와 확장: 기본값 < 파일 < env < flag, struct 경로 기반 이름, 엄격한 파일 key, `${env:}`/`${file:}`/`$$` 참조, `cfg.Secret`(파일 회전 재확인), `cfg.Bind`, 출처 기록, 모아서 보고하는 에러 + `Validate`, `Watch` reload. 결정과 근거는 [cfg/DESIGN.md](cfg/DESIGN.md).
+- [x] env-var 바인딩 → flag 단위가 아니라 **선택적 설정 계층 `cfg` 모듈**로 해결 (`github.com/lesomnus/xli/cfg`, 별도 모듈). payday 의 범용 로더를 옮겨와 확장: 기본값(`New` 시점 root 의 값) < 파일 < env < flag, struct 경로 기반 이름, 엄격한 파일 key, `${env:}`/`${file:}`/`$$` 참조(env/flag 값은 그대로), `cfg.Secret`(파일 회전 재확인), `cfg.Bind`, 출처 기록, 모아서 보고하는 에러 + `Validate`, `Reload`/`Watch`, `cfg.File`, 비밀을 가리는 `config`. 결정과 근거는 [cfg/DESIGN.md](cfg/DESIGN.md).
   - [ ] 머지 후: `cfg/go.mod` 의 `replace ../` 를 제거하고 머지된 xli 버전을 require → `cfg/v0.1.0` 태그.
-  - [ ] payday 이전(한 번에), 이어서 roster/shale/cr 이전. cr 은 `auth.password`/`auth.token` 을 `cfg.Secret` 으로 (차등 비교에서 확인된 유일한 차이).
+  - [ ] payday 이전(한 번에), 이어서 roster/shale/cr 이전. 이전 시 바뀌는 동작:
+    - cr 은 `auth.password`/`auth.token` 을 `cfg.Secret` 으로 (차등 비교에서 확인된 유일한 차이). cr 비밀값의 앞뒤 공백 제거는 커스텀 `Decoder` 로 유지.
+    - 빈 플래그 값(`--x=`)이 값을 지움(지금은 무시): shale `--addr=`, roster `--base=`. Switch 로 파일의 true 를 끌 수 있음.
+    - roster `--key`/`--base` 는 지금 파일 맵에 병합 → `BindFunc` 는 교체. `--HAL`(`yaml:"-"`), 조건부 기본값(`:389`), shale `--dev` 는 수동 유지.
+    - roster/shale 의 bare `file:`/`env:` 는 `${file:}`/`${env:}` 로 (Secret 에 bare 접두는 에러).
+    - 태그 없는 필드는 snake_case(payday 는 소문자), env 의 `010` 은 10(payday 는 8), `config env` 는 필드 순서(payday 는 정렬).
+    - `Validate` 에는 모든 명령에 공통인 검사만; serve 전용 필수값은 지금처럼 사용 시점에. `completion` 은 `cfg.Load(l, comp)` 로 예외.
 - [ ] (nice-to-have, post-1.0) repeatable 다른 원소 타입(`Multi[int,...]` 등)은 `flg.Multi` 로 사소하게 추가 가능.
 
 ### Phase 4 — API 동결 & 폴리시 → `v1.0` (진행 중)

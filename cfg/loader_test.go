@@ -146,6 +146,20 @@ name: *name
 		x.Equal("yml", c.Name)
 		x.Equal(yml, s.Path)
 	}))
+	t.Run("WithPaths() tries none", x.F(func(x x.X) {
+		x.T.Chdir(x.T.TempDir())
+		x.NoError(os.WriteFile("app.yaml", []byte("name: here\n"), 0o600))
+
+		c := Config{}
+		_, err := cfg.New("app", &c).Load("", nil)
+		x.NoError(err)
+		x.Equal("here", c.Name, "app.yaml by default")
+
+		c = Config{}
+		_, err = cfg.New("app", &c, cfg.WithPaths()).Load("", nil)
+		x.NoError(err)
+		x.Equal("", c.Name)
+	}))
 	t.Run("no file at all", x.F(func(x x.X) {
 		c := Config{}
 		s, err := cfg.New("app", &c, cfg.WithPaths(filepath.Join(x.T.TempDir(), "app.yaml"))).Load("", env("APP_NAME=env"))

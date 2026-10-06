@@ -6,7 +6,8 @@ records where every value came from, and keeps file-backed values current while
 the process runs.
 
 It is a separate module (`github.com/lesomnus/xli/cfg`) so that xli itself stays
-free of a YAML dependency.
+free of a YAML dependency. It depends on xli's public API only, not on its
+internal packages, so that it builds against any later xli.
 
 This document records the decisions and the reasons for them. The decisions were
 made by surveying viper, koanf, kong, urfave/cli v3, ff v4, kelseyhightower
@@ -31,11 +32,27 @@ fill defaults in a separate pass either overwrite values that came from a file
 (envconfig, caarlos0/env), or confuse an explicit zero with "unset" (cleanenv,
 go-envconfig).
 
-- **default**: `WithDefaults(func(*T))` and the `Default` of a bound flag.
+- **default**: what the root holds when the loader is made, and the `Default`
+  of a bound flag on the command path being run.
+
+      c := Config{Db: DbConfig{MaxConn: 10}}
+      l := cfg.New("roster", &c)
+
+  Defaults compose as struct literals do: a shared block brings its defaults
+  as a value (`Db: payday.DefaultDb()`), the application sets its own around
+  it, and a test fills in what it needs before making the loader. Every load
+  starts from a deep copy of them, and a value that decodes itself is decoded
+  into a new one, so nothing a load does writes into the defaults, nor into
+  what they share with a package variable.
 - **file**: the file named by `--config`, otherwise the first of
-  `<name>.yaml`, `<name>.yml` that exists. A file that was named must exist.
+  `<name>.yaml`, `<name>.yml` that exists. A file that was named must exist;
+  `--config=` reads none.
 - **environment**: `<PREFIX>_<PATH>` for every field (see Names).
 - **flag**: flags bound with `Bind` that the user actually gave.
+
+The first load is read into the root, and the root is its snapshot's Config:
+`config` prints what the application changed after loading, and `Origin` takes
+pointers into it.
 
 ## Absent, present, empty
 
@@ -47,7 +64,9 @@ go-envconfig).
 
 The unset/empty distinction uses `os.LookupEnv`. An accidental empty variable
 (e.g. a compose template with nothing to substitute) clears a value; the origin
-record shows `cleared`, so `config` makes it visible.
+record shows `cleared`, so `config` makes it visible. A flag can be empty if its
+value is text: a string, or a list, which `--x=` clears rather than making
+`[""]`. Clearing a field does not make the nil block it is in.
 
 ## Names
 
@@ -58,15 +77,21 @@ Anonymous struct fields without a name, and fields tagged `,inline`, are inlined
 The environment variable is the prefix (the application name upper-cased, with
 anything other than a letter or digit turned into `_`) plus the path joined with
 `_`, upper-cased: `db.dsn` of `roster` is `ROSTER_DB_DSN`. An `env:"NAME"` tag
-replaces the whole name; `env:"-"` takes the field out of the environment. Two
-fields that end up with the same variable name are an error when the loader is
-created, rather than one silently winning (ff does the same).
+replaces the whole name; `env:"-"` takes the field out of the environment.
+
+What a file or the environment could not read is refused when the loader is
+made, rather than ignored: two fields, or two blocks of inlined structs, with
+one name; two fields with one variable (ff does the same); a name starting with
+`x-`, which the file ignores; an `env` tag that is not a variable name (such as
+another library's `env:"DB_DSN,required"`); a pointer to a pointer.
 
 ## Environment values
 
-A string field takes the value as it is. Other scalars are parsed with
-`strconv` (`time.Duration` with `time.ParseDuration`), or by
-`encoding.TextUnmarshaler` when the type implements it.
+A value from the environment, or from a flag, is taken as it is given: it is
+not expanded, in flow syntax neither. A string field takes the value as it is.
+Other scalars are parsed with `strconv` (`time.Duration` with
+`time.ParseDuration`), or by `encoding.TextUnmarshaler` when the type
+implements it.
 
 Lists and maps have two forms, chosen by the first character:
 
@@ -86,25 +111,41 @@ it to a YAML decoder. This is what gives it:
 - the same names for the file and the environment;
 - strict keys: a key no field answers to is an error with its position, and a suggestion
   when one is close (`db.dns: nothing reads this key (did you mean "dsn"?)`). Keys
-  starting with `x-` are ignored at every level, as in compose, so anchors have
-  a place to live;
+  starting with `x-` are ignored in every block, as in compose, so anchors have
+  a place to live; in a map they are data like any other key;
 - raw scalars: `version: 1.10` into a string field is `"1.10"`, not `"1.1"`;
 - positions for the origin record;
 - references resolved per value (below).
 
-Anchors, aliases and merge keys (`<<`) are supported; an alias names the
-nearest anchor of that name before it. `any` fields get plain Go values with
-references resolved. Types implementing goccy/go-yaml's unmarshaler interfaces
-are handed their node as written, without references resolved.
+A file is one document; a `%YAML` directive and a byte order mark are allowed.
 
-Integers are read as YAML 1.2 reads them: decimal, or `0x`/`0o`/`0b` prefixed
-(`010` is ten), and floats accept `.inf` and `.nan`.
+Anchors, aliases and merge keys (`<<`) are supported. An alias names the
+nearest anchor of that name before it; an alias to a value it is in is an
+error, as are aliases that expand to more than a million values. Merge keys
+are read as specified: a key of the mapping replaces a merged one whole (blocks
+are not merged deeply), and an earlier mapping in a list of them overrides a
+later one. The origin of a value given by an alias is where the value is
+written, at its anchor.
+
+Integers are read as YAML 1.2 reads them, in `any` fields too: decimal, or
+`0x`/`0o`/`0b` prefixed (`010` is ten), no underscores; floats accept `.inf`
+and `.nan`. `!!str` makes any scalar a string (`!!str ~` is `"~"`), and
+`!!binary` is read into a `[]byte`. Map keys written differently that read the
+same, such as `1` and `01`, are an error.
+
+`any` fields get plain Go values with references resolved. A type that
+implements goccy/go-yaml's unmarshaler interfaces (payday's `OtelConfig`,
+through `mkot.Config`) is given its block as plain values, with references
+resolved and aliases and merges expanded, mappings in order and keys of their
+own types: handed the block as written, it would see neither.
 
 Unknown environment variables under the prefix are only warnings: the
-environment is shared with the orchestrator (Kubernetes service links put
-dozens of `<SERVICE>_PORT_*` variables under a prefix that matches a service
-name). Those are filtered out; `Claims(prefixes...)` declares names the
-application reads itself.
+environment is shared with the orchestrator. Kubernetes gives every service in
+a namespace `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and the like, under a
+prefix that matches the application's when a service is named after it; the
+variables of the services that are there are left out, and a variable of that
+shape for no such service is a typo like any other. `Reads(prefixes...)`
+declares names the application reads itself.
 
 ## References
 
@@ -116,18 +157,19 @@ This replaces the three spellings the downstream applications used
 
 - `${env:}` is resolved once, inside any string value of the file, also in the
   middle of a string (`postgres://u:${env:PW}@h`). Unset without a default is
-  an error. Inside YAML flow syntax (`[...]`, `{...}`) a reference must be
-  quoted (`["${env:A}"]`), because `{` and `}` delimit a flow mapping there;
-  payday substituted the text before parsing and did not need that. The
-  parse error says so.
+  an error, and so is a reference in a reference. Inside YAML flow syntax
+  (`[...]`, `{...}`) a reference must be quoted (`["${env:A}"]`), because `{`
+  and `}` delimit a flow mapping there; payday substituted the text before
+  parsing and did not need that. The parse error says so.
 - `${file:}` is only allowed in secret fields (below), because a file is how a
   credential gets rotated and only a secret field re-reads it.
 - References are resolved per value after parsing, not by substituting text
   before parsing. That makes `$$` work everywhere (cr could not escape
   `${file:` because the text pass had already turned `$$` into `$`), and lets
   the origin record name the variable a value came through.
-- Values from the environment and flags are not expanded, except in secret
-  fields, which always read references.
+- Values from the environment and flags are taken as they are given. A secret
+  field reads a reference from them only as the whole value: a password such as
+  `Pa$$w0rd`, handed over by a Kubernetes Secret, must not lose a `$`.
 
 ## Secrets
 
@@ -136,9 +178,15 @@ This replaces the three spellings the downstream applications used
     type SecretBytes = SecretOf[[]byte, BytesDecoder]  // as read
 
 A secret field holds a literal, `${env:NAME}`, `${file:/path}` or a reference
-with a scheme registered with `WithScheme`. `Value()` returns the current value:
-for `${file:}` it checks the file on each call and re-reads it when it changed.
-The rules come from cr's `blob.SecretFile`, which gantry and bosun copy:
+with a scheme registered with `WithScheme`. In the file, a literal may hold `$`
+as `$$`; from the environment or a flag, anything but exactly one reference is
+a literal as it is. A literal written as roster and shale wrote references,
+`file:/path` or `env:NAME`, is an error that says how to write one, rather than
+a credential.
+
+`Value()` returns the current value: for `${file:}` it checks the file on each
+call and re-reads it when it changed. The rules come from cr's
+`blob.SecretFile`, which gantry and bosun copy:
 
 - changed means a different file at the path (`os.SameFile`, which catches the
   rename a rotation does) or a different size or modification time;
@@ -148,14 +196,14 @@ The rules come from cr's `blob.SecretFile`, which gantry and bosun copy:
   warning, not a failure: a credential may be minted after the process starts
   (cr's provisioning case). `Value` fails until the file has been read once,
   so a wrong path still shows on first use;
-- an empty file is a failed read, and the file is capped at 64 KiB.
+- an empty file is a failed read; only a regular file is read (a FIFO would
+  block), and no more than 64 KiB of it.
 
 Only the trailing newline is removed from a string secret: whitespace inside or
 before a credential is the credential's. Custom types implement `Decoder[T]`,
-e.g. a 32-byte key or a set of S3 credentials that must be read together.
-
-Secrets are redacted wherever `cfg` prints a configuration; a reference is
-printed as written, since it says where the secret is, not what it is.
+e.g. a 32-byte key, a set of S3 credentials that must be read together, or cr's
+secrets, which trim all the space around them. A `[]byte` from `Value` is a copy
+the caller may clear.
 
 ## Flags
 
@@ -175,26 +223,31 @@ from different commands under different flags.
   whole, e.g. `--tls cert.pem,key.pem` into a `TlsConfig` with `BindFunc`. The
   origin of every field in the block is the flag. A block has no single
   environment variable, so help shows none for it.
+- A field in a block behind a pointer has an address only once the block is
+  made: make it after `New`, so that the default stays nil.
 - The flag is applied only if the user gave it (`Count() > 0`). Its `Default`
-  is the default layer for the field.
+  is the default layer for the field, on the command path the flag is on:
+  `serve --listen` with a default of `:389` makes `ldap.addr` `:389` for
+  `serve`, not for `config`, which is another path. A default every command
+  should see belongs in the root's value.
 - The returned flag reports the field's environment variable in `Info().Env`,
   so help and generated documentation show `[$ROSTER_LDAP_ADDR]`.
 - Two flags on the executed command path bound to the same field, or to a block
   and a field in it, is an error.
-- Flags are parsed before any handler runs, so the loader, mounted on the root
-  command, sees the flags of every command on the path, including the
-  subcommand's. This removes the "parse flags, load the file, copy the flags
-  over by hand" step the downstream applications repeat.
+- Flags are parsed before any handler runs, so the loader sees the flags of
+  every command on the path, above and below the command it is mounted on.
+  This removes the "parse flags, load the file, copy the flags over by hand"
+  step the downstream applications repeat.
 
 ## Origins
 
     o, ok := l.Origin(&c.Ldap.Addr)
-    o.Source  // Unset, Default, File, Env, Flag
+    o.Source  // SourceUnset, SourceDefault, SourceFile, SourceEnv, SourceFlag
     o.Name    // "--listen", "ROSTER_LDAP_ADDR", "/etc/roster.yaml"
     o.Line, o.Column
     o.Refs    // references the value went through: ["${env:DB_PW}"]
     o.Cleared // set to empty
-    o.IsSet() // File, Env or Flag
+    o.IsSet() // file, environment or flag
 
 `ok` is false for a pointer that is not a leaf field of the loaded struct (for
 example a field of a copy), instead of a guess. Lists and maps are one field.
@@ -206,8 +259,13 @@ file, unknown keys, bad environment values, failed flag conversions, unreadable
 secrets. Afterwards `Validate() error` is called on every value in the tree that
 implements it (structs, slice elements, map values), so each block checks only
 itself. Every error is a `*FieldError` naming the field and its origin
-(`--bind: ...`, `/etc/roster.yaml:12: ldap.bind: ...`), joined with
-`errors.Join`.
+(`--bind: ...`, `/etc/roster.yaml:12:3: ldap.bind: ...`), gathered in a
+`*LoadError`.
+
+A load runs for every command that needs the configuration, so `Validate`
+checks what holds for all of them: that a value is well formed, that two
+values agree. That `serve` needs a database while `version` does not is
+checked where `serve` builds what it serves, as payday does.
 
 ## Reload
 
@@ -215,31 +273,56 @@ Environment variables cannot change under a running process; files can (a
 Kubernetes ConfigMap update, a rotated Secret). So reload covers files only:
 
 - secrets re-read their file on use (above);
-- `Watch` re-reads the configuration file every interval (5 s by default), and
-  when its content hash changed builds a new snapshot with the same
-  environment and flags. A snapshot that fails to load or validate is reported
-  once per content, and the previous one stays in force.
-- Watch keeps to the file the first load found. If it disappears, that is
-  reported and the snapshot in force stays; it does not fall back to the
-  defaults or switch to another default path (`.yml` for `.yaml`).
-- A file written in place can be read half-written. New content is therefore
-  applied only once it read the same on two checks in a row, and an empty file
-  is skipped during reload (an empty file is valid at the first load). Neither
-  matters to a file replaced by rename, which is what Kubernetes does.
+- `Reload` checks the configuration file once, and `Watch` does every interval
+  (5 s by default). When the content changed, a new snapshot is built with the
+  same environment and flags.
+- New content is loaded once it read the same at two checks in a row: a file
+  written in place can be read half-written. A file replaced by a rename, as
+  Kubernetes does, waits the one check as well. An empty file is content like
+  any other: emptying a policy file is how all of it is revoked.
+- Content that fails to load or validate leaves the snapshot in force, and is
+  tried again at every check: what failed may be a scheme's server, or a file a
+  `Validate` looks at. `Watch` reports each failure once, and reports the
+  snapshot in force when the file reads as it again, so that what reported the
+  failure can tell it is over. An application that keeps its own schedule, or
+  counts every check (cr's policy store does), calls `Reload` itself.
+- Reload keeps to the file a load found, or the first one it found itself. If
+  it disappears, that is reported and the snapshot in force stays; it does not
+  fall back to the defaults or switch to another default path (`.yml` for
+  `.yaml`).
 
 A reload never writes into the struct the application holds: it produces a new
-`*Snapshot[T]` (as cr's policy store swaps an `atomic.Pointer`). The struct
-passed to `New` holds the first load.
+`*Snapshot[T]` (as cr's policy store swaps an `atomic.Pointer`). The root holds
+the first load.
 
-`NewFile[T](path)` is the same machinery for a file of its own, without
-environment or flags, such as cr's `cr.auth.yaml`.
+`NewFile[T](path)` is a `File[T]`: the same loading and reloading for a file of
+its own, such as cr's `cr.auth.yaml`, with no environment variables or flags
+over it (`${env:}` references in it are resolved).
 
 ## Commands
 
-`NewCmdConfig(l)` is `config` (the loaded configuration as YAML, secrets
-redacted, each value commented with its origin) and `config env` (every
-environment variable the struct reads; `--set` says which are set, never to
-what).
+`Load(l, except...)` is the handler that loads the configuration, on the root
+command or on each command that needs it, once per run. A configuration that
+fails to load fails the command, so the commands that need none are given as
+`except`, with the commands under them: `xli.NewCmdCompletion()` must work
+before there is a configuration.
+
+`NewCmdConfig(l)` is `config` and `config env`:
+
+- `config` prints the configuration as YAML that reads back as the same
+  configuration, each value commented with its origin. A configuration that
+  fails to load is printed as far as it was read, followed by what is wrong.
+- `config env` lists every environment variable the struct reads; `--set` says
+  which are set, never to what. It does not load the configuration.
+
+What `config` prints is meant to be pasted into a ticket, so it redacts:
+`Secret`s and fields tagged `cfg:",secret"` (a tag on a block covers it), at
+any depth; and, as payday's `config` did, every value under a name that says it
+is secret (`token`, `password`, `secret(s)`, `seal`, `key(s)`,
+`credential(s)`, and names ending in `_token`, `_password`, `_secret`, `_key`,
+`_keys`), because a tag is what somebody forgets on the one field that matters;
+and the password in a value named `dsn`. A value read through references prints
+as written, which says where a secret is rather than what it is.
 
 ## Not in scope
 
