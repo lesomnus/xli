@@ -73,6 +73,25 @@ func TestCompletionRun(t *testing.T) {
 		out := complete(t, newCompletionTestCmd(), "", "", "echo")
 		x.Contains(out, "AVAL")
 	}))
+	t.Run("subcommands after a complete flag", x.F(func(x x.X) {
+		for _, args := range [][]string{{"--bar=x"}, {"-b=x"}, {"--bar", "x"}} {
+			out := complete(t, newCompletionTestCmd(), "", "", args...)
+			x.Contains(out, "echo", args)
+			x.NotContains(out, "--bar", args)
+		}
+	}))
+	t.Run("optional argument after a complete flag", x.F(func(x x.X) {
+		c := &xli.Command{
+			Name:  "app",
+			Flags: flg.Flags{&flg.Switch{Name: "verbose"}},
+			Args: arg.Args{&arg.String{Name: "X", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+				t.Value("XVAL")
+			})}},
+		}
+		out := complete(t, c, "", "", "--verbose")
+		x.Contains(out, "XVAL")
+		x.NotContains(out, "--verbose")
+	}))
 	t.Run("subcommands are grouped by category", x.F(func(x x.X) {
 		c := &xli.Command{
 			Name: "app",
