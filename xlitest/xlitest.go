@@ -230,11 +230,14 @@ func decodeZsh(raw string) Completions {
 			if !ok || entry == "" {
 				continue
 			}
+			// A ":" in the value is escaped as "\:"; the first bare ":"
+			// separates the description.
+			entry = strings.ReplaceAll(entry, `\:`, "\x00")
 			value, desc, _ := strings.Cut(entry, ":")
 			c.Candidates = append(c.Candidates, Candidate{
 				Group: group,
-				Value: value,
-				Desc:  desc,
+				Value: strings.ReplaceAll(value, "\x00", ":"),
+				Desc:  strings.ReplaceAll(desc, "\x00", `\:`),
 			})
 		case "f":
 			c.WantFiles = true

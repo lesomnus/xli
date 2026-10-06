@@ -25,7 +25,8 @@ function ___XLI_PROG___fish
     set -l globs
 
     # Each line is one of:
-    #   v<sep><group><sep><entry>   a candidate ("value" or "value:desc")
+    #   v<sep><group><sep><entry>   a candidate ("value" or "value:desc";
+    #                               ":" in the value is escaped as "\:")
     #   f<sep><pattern>             request file completion
     #   d<sep>                      request directory completion
     # fish cannot show groups, so only values and descriptions are used.
@@ -34,7 +35,9 @@ function ___XLI_PROG___fish
         switch $parts[1]
             case v
                 test -n "$parts[3]"; or continue
-                set -l kv (string split -m 1 -- : $parts[3])
+                set -l entry (string replace -a -- '\:' \x1e $parts[3])
+                set -l kv (string split -m 1 -- : $entry)
+                set kv (string replace -a -- \x1e : $kv)
                 if test (count $kv) -gt 1
                     printf '%s%s\t%s\n' $prefix $kv[1] $kv[2]
                 else

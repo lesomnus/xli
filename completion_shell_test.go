@@ -58,6 +58,15 @@ func newShellTestCmd() *xli.Command {
 					t.Value("with")
 				})}},
 			},
+			&xli.Command{
+				Name: "say",
+				Args: arg.Args{&arg.String{Name: "WORD", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+					t.Value("hello world")
+					t.Value("it's")
+					t.ValueD("linux:amd64", "a platform")
+					t.Value("plain?")
+				})}},
+			},
 			xli.NewCmdCompletion(),
 		},
 	}
@@ -155,6 +164,7 @@ func TestCompletionBash(t *testing.T) {
 	const code = `
 source "$SCRIPT"
 [[ -v WORDBREAKS ]] && COMP_WORDBREAKS=$WORDBREAKS
+[[ -v SHOPT ]] && shopt -s "$SHOPT"
 COMP_LINE=$LINE
 COMP_POINT=${#LINE}
 _app_bash
@@ -167,7 +177,7 @@ printf '%s\n' "${COMPREPLY[@]}"
 	}
 
 	t.Run("subcommands", x.F(func(x x.X) {
-		x.Equal([]string{"cd", "completion", "deploy", "echo"}, complete("app ", wordbreaks))
+		x.Equal([]string{"cd", "completion", "deploy", "echo", "say"}, complete("app ", wordbreaks))
 	}))
 	t.Run("subcommand prefix", x.F(func(x x.X) {
 		x.Equal([]string{"deploy"}, complete("app dep", wordbreaks))
@@ -193,6 +203,17 @@ printf '%s\n' "${COMPREPLY[@]}"
 	t.Run("directories", x.F(func(x x.X) {
 		x.Equal([]string{"sub"}, complete("app cd ", wordbreaks))
 	}))
+	t.Run("values are quoted and colons kept", x.F(func(x x.X) {
+		want := []string{`hello\ world`, `it\'s`, "linux:amd64", `plain\?`}
+		x.Equal(want, complete("app say ", wordbreaks))
+		x.Equal([]string{"linux:amd64"}, complete("app say li", wordbreaks))
+	}))
+	t.Run("glob options do not affect candidates", x.F(func(x x.X) {
+		want := []string{`hello\ world`, `it\'s`, "linux:amd64", `plain\?`}
+		x.Equal(want, complete("app say ", wordbreaks, "SHOPT=nullglob"))
+		x.Equal(want, complete("app say ", wordbreaks, "SHOPT=failglob"))
+		x.Equal([]string{"a.go", "sub"}, complete("app deploy ", wordbreaks, "SHOPT=failglob"))
+	}))
 }
 
 func TestCompletionFish(t *testing.T) {
@@ -206,7 +227,7 @@ complete -C"$LINE"
 	}
 
 	t.Run("subcommands", x.F(func(x x.X) {
-		x.Equal([]string{"cd", "completion\tprint a shell completion script", "deploy", "echo"}, complete("app "))
+		x.Equal([]string{"cd", "completion\tprint a shell completion script", "deploy", "echo", "say"}, complete("app "))
 	}))
 	t.Run("subcommand prefix", x.F(func(x x.X) {
 		x.Equal([]string{"deploy"}, complete("app dep"))
@@ -228,5 +249,8 @@ complete -C"$LINE"
 	}))
 	t.Run("directories", x.F(func(x x.X) {
 		x.Equal([]string{"sub/"}, complete("app cd "))
+	}))
+	t.Run("values with spaces, quotes, and colons", x.F(func(x x.X) {
+		x.Equal([]string{"hello world", "it's", "linux:amd64\ta platform", "plain?"}, complete("app say "))
 	}))
 }

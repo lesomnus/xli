@@ -22,6 +22,13 @@ func TestZshTab(t *testing.T) {
 		z.ValueD("foo", "the foo")
 		x.Equal("v\x1f\x1ffoo:the foo\n", b.String())
 	}))
+	t.Run("colons in values are escaped", x.F(func(x x.X) {
+		b := &strings.Builder{}
+		z := tab.NewZshTab(b)
+		z.Value("linux:amd64")
+		z.ValueD("a:b", "c:d")
+		x.Equal("v\x1f\x1flinux\\:amd64\nv\x1f\x1fa\\:b:c:d\n", b.String())
+	}))
 	t.Run("Group prefixes candidates with the group name", x.F(func(x x.X) {
 		b := &strings.Builder{}
 		z := tab.NewZshTab(b)
