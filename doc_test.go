@@ -83,18 +83,27 @@ func TestWriteMan(t *testing.T) {
 		x.Contains(out, ".SH NAME\napp \\- manage things\n")
 		x.Contains(out, ".SH SYNOPSIS\napp [options] [command]\n")
 		x.Contains(out, ".SH DESCRIPTION\nApp does many things.\n")
-		x.Contains(out, ".SH OPTIONS\n.TP\n.B \\-v, \\-\\-verbose\nchatty output\n")
+		x.Contains(out, ".SH OPTIONS\n.TP\n\\fB\\-v, \\-\\-verbose\\fR\nchatty output\n")
 	}))
 	t.Run("subcommands", x.F(func(x x.X) {
 		x.Equal(1, strings.Count(out, ".SH COMMANDS\n"))
 		x.Contains(out, ".SS app deploy\ndeploy things\n")
 		x.Contains(out, ".B app deploy [options] <TARGET>\n")
-		x.Contains(out, ".B \\-\\-format \" json|yaml\"\n(required)\n")
+		x.Contains(out, "\\fB\\-\\-format\\fR \\fIjson|yaml\\fR\n(required)\n")
 		x.Contains(out, ".SS app remote add\n")
 	}))
 	t.Run("hidden commands and flags are left out", x.F(func(x x.X) {
 		x.NotContains(out, "debug")
 		x.NotContains(out, "secret")
+	}))
+	t.Run("quotes in a flag type do not break the line", x.F(func(x x.X) {
+		c := &xli.Command{
+			Name:  "app",
+			Flags: flg.Flags{&flg.Choice{Name: "q", Parser: flg.ChoiceParser{`a"b`, "c"}}},
+		}
+		b := &strings.Builder{}
+		x.NoError(xli.WriteMan(b, c, 1))
+		x.Contains(b.String(), "\\fB\\-\\-q\\fR \\fIa\"b|c\\fR\n")
 	}))
 	t.Run("roff control characters are escaped", x.F(func(x x.X) {
 		c := &xli.Command{Name: "app", Synop: ".dangerous\n'also\nback\\slash"}
