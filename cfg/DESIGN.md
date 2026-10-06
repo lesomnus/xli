@@ -321,8 +321,9 @@ any depth; and, as payday's `config` did, every value under a name that says it
 is secret (`token`, `password`, `secret(s)`, `seal`, `key(s)`,
 `credential(s)`, and names ending in `_token`, `_password`, `_secret`, `_key`,
 `_keys`), because a tag is what somebody forgets on the one field that matters;
-and the password in a value named `dsn`. A value read through references prints
-as written, which says where a secret is rather than what it is.
+and the password in a value named `dsn` or ending in `_dsn`. A value read
+through references prints as written, which says where a secret is rather than
+what it is.
 
 ## Not in scope
 
