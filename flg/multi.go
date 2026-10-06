@@ -91,8 +91,9 @@ func (f *Multi[T, P]) Get() ([]T, bool) {
 	return f.Value, len(f.Value) > 0
 }
 
-// lookupDefault returns the configured default values, if any.
-func (f *Multi[T, P]) lookupDefault() ([]T, bool) {
+// GetDefault returns the configured default values and whether there are any.
+// Unlike Get it does not consider what the user provided.
+func (f *Multi[T, P]) GetDefault() ([]T, bool) {
 	if f.Default == nil {
 		return nil, false
 	}

@@ -79,8 +79,9 @@ func (f *Base[T, P]) Get() (T, bool) {
 	return *f.Value, true
 }
 
-// lookupDefault returns the configured default value, if any.
-func (f *Base[T, P]) lookupDefault() (T, bool) {
+// GetDefault returns the configured default value and whether there is one.
+// Unlike Get it does not consider what the user provided.
+func (f *Base[T, P]) GetDefault() (T, bool) {
 	if f.Default == nil {
 		var z T
 		return z, false

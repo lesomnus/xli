@@ -120,6 +120,22 @@ func TestPrintHelp(t *testing.T) {
 		x.Contains(b.String(), "-h,--help")
 		x.NotContains(b.String(), "[options]")
 	}))
+	t.Run("flag environment variable is shown", x.F(func(x x.X) {
+		c := &xli.Command{
+			Name:  "srv",
+			Flags: flg.Flags{&flg.String{Name: "port", Brief: "listen port"}},
+		}
+		f := c.Flags[0].(*flg.String)
+
+		b := &strings.Builder{}
+		x.NoError(c.PrintHelp(b))
+		x.NotContains(b.String(), "[$")
+
+		c.Flags[0] = envFlag{f, "SRV_PORT"}
+		b.Reset()
+		x.NoError(c.PrintHelp(b))
+		x.Contains(b.String(), "listen port [$SRV_PORT]")
+	}))
 	t.Run("variadic argument is rendered with ellipsis", x.F(func(x x.X) {
 		c := &xli.Command{
 			Name: "echo",
@@ -133,4 +149,16 @@ func TestPrintHelp(t *testing.T) {
 		x.NoError(err)
 		x.Contains(b.String(), "echo [STRING...]")
 	}))
+}
+
+// envFlag reports an environment variable for a flag, as cfg.Bind does.
+type envFlag struct {
+	flg.Flag
+	env string
+}
+
+func (f envFlag) Info() *flg.Info {
+	info := f.Flag.Info()
+	info.Env = f.env
+	return info
 }

@@ -75,8 +75,8 @@ func MustGet[T any](h Holder, name string) T {
 		return v
 	}
 	if f := h.GetFlags().Get(name); f != nil {
-		if d, ok := f.(interface{ lookupDefault() (T, bool) }); ok {
-			if v, ok := d.lookupDefault(); ok {
+		if d, ok := f.(interface{ GetDefault() (T, bool) }); ok {
+			if v, ok := d.GetDefault(); ok {
 				return v
 			}
 		}
@@ -96,8 +96,8 @@ func MustFind[T any, U NestedHolder[U]](h NestedHolder[U], name string) T {
 	}
 	for {
 		if f := h.GetFlags().Get(name); f != nil {
-			if d, ok := f.(interface{ lookupDefault() (T, bool) }); ok {
-				if v, ok := d.lookupDefault(); ok {
+			if d, ok := f.(interface{ GetDefault() (T, bool) }); ok {
+				if v, ok := d.GetDefault(); ok {
 					return v
 				}
 			}

@@ -20,6 +20,11 @@ type Info struct {
 	// still accepted on the command line.
 	Hidden bool
 
+	// Env names an environment variable the flag's value can also be given
+	// by, for help and generated documentation. The flag machinery does not
+	// read it; it is set by whatever does (e.g. the cfg package).
+	Env string
+
 	// Default is the string form of the flag's default value, for help
 	// rendering. HasDefault is false when the flag has no default.
 	Default    string
@@ -97,9 +102,22 @@ func (fs Flags) ByCategory() []Flags {
 
 func (fs Flags) WithCategory(name string, vs ...Flag) Flags {
 	for _, v := range vs {
-		if s, ok := v.(interface{ setCategory(string) }); ok {
-			s.setCategory(name)
+		for f := v; f != nil; f = Unwrap(f) {
+			if s, ok := f.(interface{ setCategory(string) }); ok {
+				s.setCategory(name)
+				break
+			}
 		}
 	}
 	return append(fs, vs...)
+}
+
+// Unwrap returns the flag f wraps, or nil if f does not wrap one. A flag that
+// decorates another (e.g. to bind it to a configuration field) implements
+// `Unwrap() Flag`, which lets the flg package reach the flag underneath.
+func Unwrap(f Flag) Flag {
+	if u, ok := f.(interface{ Unwrap() Flag }); ok {
+		return u.Unwrap()
+	}
+	return nil
 }

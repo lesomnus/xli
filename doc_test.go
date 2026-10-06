@@ -68,6 +68,12 @@ func TestWriteMarkdown(t *testing.T) {
 		x.NotContains(out, "debug")
 		x.NotContains(out, "secret")
 	}))
+	t.Run("flag environment variable is shown", x.F(func(x x.X) {
+		c := &xli.Command{Name: "app", Flags: flg.Flags{envFlag{&flg.String{Name: "port", Brief: "listen port"}, "APP_PORT"}}}
+		b := &strings.Builder{}
+		x.NoError(xli.WriteMarkdown(b, c))
+		x.Contains(b.String(), "| `--port` | `string` | listen port [$APP_PORT] |")
+	}))
 }
 
 func TestWriteMan(t *testing.T) {
