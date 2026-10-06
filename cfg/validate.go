@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/lesomnus/xli/internal/suggest"
+	"github.com/lesomnus/xli/cfg/internal/suggest"
 )
 
 // Validator is implemented by a block of the configuration that checks itself.
