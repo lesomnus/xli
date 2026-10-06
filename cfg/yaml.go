@@ -220,20 +220,27 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 		v.SetBytes(b)
 		return es
 	}
+	// A value that reads itself is read whole, into a new one: the default it
+	// replaces may share what it holds with the defaults.
+	fresh := reflect.New(v.Type())
 	switch ptr.(type) {
 	case yaml.BytesUnmarshaler, yaml.InterfaceUnmarshaler, yaml.NodeUnmarshaler:
-		if err := yaml.NodeToValue(n, ptr); err != nil {
+		if err := yaml.NodeToValue(n, fresh.Interface()); err != nil {
 			es.add(d.at(n, key), err)
+			return es
 		}
+		v.Set(fresh.Elem())
 		return es
 	case encoding.TextUnmarshaler:
 		text, err := d.text(n, str)
 		if err == nil {
-			err = ptr.(encoding.TextUnmarshaler).UnmarshalText([]byte(text))
+			err = fresh.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(text))
 		}
 		if err != nil {
 			es.add(d.at(n, key), err)
+			return es
 		}
+		v.Set(fresh.Elem())
 		refs = d.r.refs
 		return es
 	}
