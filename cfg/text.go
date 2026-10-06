@@ -77,6 +77,10 @@ func parseRef(ref string) (scheme string, rest string, err error) {
 	if !ok || scheme == "" {
 		return "", "", fmt.Errorf("%q: want ${scheme:...}", ref)
 	}
+	if strings.Contains(rest, "${") {
+		// `${env:A:-${env:B}}`: the first "}" would end the outer one.
+		return "", "", fmt.Errorf("%q: a reference cannot hold another", ref)
+	}
 	return scheme, rest, nil
 }
 
@@ -201,13 +205,13 @@ func setScalar(v reflect.Value, s string) error {
 			return nil
 		}
 		n, err := strconv.ParseInt(s, intBase(s), v.Type().Bits())
-		if err != nil {
+		if err != nil || strings.Contains(s, "_") {
 			return fmt.Errorf("%q is not an integer of %d bits", s, v.Type().Bits())
 		}
 		v.SetInt(n)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		n, err := strconv.ParseUint(s, intBase(s), v.Type().Bits())
-		if err != nil {
+		if err != nil || strings.Contains(s, "_") {
 			return fmt.Errorf("%q is not an unsigned integer of %d bits", s, v.Type().Bits())
 		}
 		v.SetUint(n)

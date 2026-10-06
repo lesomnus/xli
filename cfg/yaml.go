@@ -2,10 +2,12 @@ package cfg
 
 import (
 	"encoding"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -20,6 +22,12 @@ type decoder struct {
 	file    string
 	anchors map[string][]anchor
 
+	// active are the nodes being read: an alias to one of them is an alias to
+	// a value it is in, which has no end.
+	active map[ast.Node]bool
+	// nodes counts the nodes read, which aliases can multiply.
+	nodes int
+
 	// leaf, when set, is called for every field of the root struct that is a
 	// leaf of the schema, with the node its value was read from.
 	leaf func(key string, n ast.Node, refs []string, cleared bool)
@@ -30,6 +38,10 @@ func (d *decoder) body(f *ast.File) (ast.Node, error) {
 	var body ast.Node
 	for _, doc := range f.Docs {
 		if doc.Body == nil {
+			continue
+		}
+		if _, ok := doc.Body.(*ast.DirectiveNode); ok {
+			// `%YAML 1.2` before the document.
 			continue
 		}
 		if body != nil {
@@ -75,8 +87,8 @@ func (d *decoder) anchored(name string, at int) (ast.Node, bool) {
 }
 
 // resolve follows anchors, aliases and tags to the node that holds the value.
-// str reports a `!!str` tag.
-func (d *decoder) resolve(n ast.Node) (_ ast.Node, str bool, err error) {
+// tag is the tag it was given, such as "!!str", or "".
+func (d *decoder) resolve(n ast.Node) (_ ast.Node, tag string, err error) {
 	for range 64 {
 		switch v := n.(type) {
 		case *ast.AnchorNode:
@@ -85,19 +97,48 @@ func (d *decoder) resolve(n ast.Node) (_ ast.Node, str bool, err error) {
 			name := v.Value.GetToken().Value
 			a, ok := d.anchored(name, offset(v))
 			if !ok {
-				return nil, false, fmt.Errorf("alias *%s names no anchor", name)
+				return nil, "", fmt.Errorf("alias *%s names no anchor", name)
 			}
 			n = a
 		case *ast.TagNode:
-			if v.Start.Value == "!!str" {
-				str = true
+			if tag == "" {
+				tag = v.Start.Value
 			}
 			n = v.Value
 		default:
-			return n, str, nil
+			return n, tag, nil
 		}
 	}
-	return nil, false, errors.New("aliases nest too deeply")
+	return nil, "", errors.New("aliases nest too deeply")
+}
+
+// maxNodes is the most nodes a document is read as. A configuration has a few
+// hundred; aliases of aliases can make billions of a few lines.
+const maxNodes = 1 << 20
+
+// enter marks n as being read, until leave. It fails for a node that is being
+// read already, which only an alias to a value it is in can make happen.
+func (d *decoder) enter(n ast.Node) error {
+	if d.active == nil {
+		d.active = map[ast.Node]bool{}
+	}
+	if d.active[n] {
+		return errors.New("an alias refers to a value it is in")
+	}
+	if d.nodes++; d.nodes > maxNodes {
+		return errors.New("aliases expand to too many values")
+	}
+	d.active[n] = true
+	return nil
+}
+
+func (d *decoder) leave(n ast.Node) {
+	delete(d.active, n)
+}
+
+func isNull(n ast.Node) bool {
+	_, ok := n.(*ast.NullNode)
+	return ok || n == nil
 }
 
 // at is the origin of a node in the file, for an error about it.
@@ -115,14 +156,16 @@ func (d *decoder) at(n ast.Node, key string) Origin {
 // root reports that v is still on the root struct's own fields (not inside a
 // list or a map), where leaves are reported to d.leaf.
 func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es errs) {
-	n, str, err := d.resolve(n)
+	written := n
+	n, tag, err := d.resolve(n)
 	if err != nil {
-		es.add(d.at(n, key), err)
+		es.add(d.at(written, key), err)
 		return es
 	}
+	str := tag == "!!str"
 
 	leaf := root && isLeaf(v.Type())
-	if _, ok := n.(*ast.NullNode); ok || n == nil {
+	if isNull(n) && !str {
 		v.SetZero()
 		if root && d.leaf != nil {
 			// A leaf, or a block whose leaves are all cleared.
@@ -135,8 +178,14 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 		if v.IsNil() {
 			v.Set(reflect.New(v.Type().Elem()))
 		}
-		return d.decode(n, v.Elem(), key, root)
+		return d.decode(written, v.Elem(), key, root)
 	}
+
+	if err := d.enter(n); err != nil {
+		es.add(d.at(written, key), err)
+		return es
+	}
+	defer d.leave(n)
 
 	var refs []string
 	if leaf && d.leaf != nil {
@@ -159,6 +208,18 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 			es.add(d.at(n, key), err)
 		}
 		refs = sf.refs()
+		// A secret in a list or a map: the references of the field it is in.
+		d.r.refs = append(d.r.refs, refs...)
+		return es
+	}
+	if tag == "!!binary" && v.Type() == bytesType {
+		text, _, ok := scalarText(n)
+		b, err := base64.StdEncoding.DecodeString(strings.Join(strings.Fields(text), ""))
+		if !ok || err != nil {
+			es.addf(d.at(n, key), "want base64 for !!binary")
+			return es
+		}
+		v.SetBytes(b)
 		return es
 	}
 	switch ptr.(type) {
@@ -193,7 +254,7 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 			}
 			break
 		}
-		a, err := d.anyOf(n, str, 0)
+		a, err := d.anyValue(n, str, 0)
 		if err != nil {
 			es.add(d.at(n, key), err)
 			break
@@ -238,9 +299,17 @@ func scalarText(n ast.Node) (text string, isString bool, ok bool) {
 		return v.Value.Value, true, true
 	case *ast.IntegerNode, *ast.FloatNode, *ast.BoolNode, *ast.InfinityNode, *ast.NanNode:
 		return n.GetToken().Value, false, true
+	case *ast.NullNode:
+		// Only asked for under `!!str`, which makes `~` the string "~".
+		if t := n.GetToken(); t != nil {
+			return t.Value, false, true
+		}
+		return "", false, true
 	}
 	return "", false, false
 }
+
+var bytesType = reflect.TypeFor[[]byte]()
 
 func nodeKind(n ast.Node) string {
 	switch n.(type) {
@@ -259,8 +328,10 @@ type entry struct {
 	value ast.Node
 }
 
-// entries are the keys and values of a mapping, those of merge keys (`<<`)
-// first so the mapping's own override them.
+// entries are the keys and values of a mapping, with those of its merge keys
+// (`<<`) as the merge key is specified: a key of the mapping's own overrides a
+// merged one, and a mapping earlier in a list of merged ones overrides a later
+// one. A value overridden is replaced whole; blocks are not merged deeply.
 func (d *decoder) entries(n ast.Node) ([]entry, error) {
 	return d.entriesAt(n, 0)
 }
@@ -278,8 +349,11 @@ func (d *decoder) entriesAt(n ast.Node, depth int) ([]entry, error) {
 	default:
 		return nil, fmt.Errorf("want a mapping, not %s", nodeKind(n))
 	}
+	if d.nodes += len(mvs); d.nodes > maxNodes {
+		return nil, errors.New("aliases expand to too many values")
+	}
 
-	merged := []entry{}
+	merged := [][]entry{}
 	own := []entry{}
 	for _, mv := range mvs {
 		if _, ok := mv.Key.(*ast.MergeKeyNode); !ok {
@@ -304,10 +378,43 @@ func (d *decoder) entriesAt(n ast.Node, depth int) ([]entry, error) {
 			if err != nil {
 				return nil, fmt.Errorf("<<: %w", err)
 			}
-			merged = append(merged, es...)
+			merged = append(merged, es)
 		}
 	}
-	return append(merged, own...), nil
+	if len(merged) == 0 {
+		return own, nil
+	}
+
+	seen := map[string]bool{}
+	for _, e := range own {
+		if k, ok := d.keyOf(e.key); ok {
+			seen[k] = true
+		}
+	}
+	es := []entry{}
+	for _, src := range merged {
+		for _, e := range src {
+			if k, ok := d.keyOf(e.key); ok {
+				if seen[k] {
+					continue
+				}
+				seen[k] = true
+			}
+			es = append(es, e)
+		}
+	}
+	return append(es, own...), nil
+}
+
+// keyOf is the text of a mapping key; ok is false for a key that is not a
+// single value.
+func (d *decoder) keyOf(n ast.Node) (string, bool) {
+	k, _, err := d.resolve(n)
+	if err != nil {
+		return "", false
+	}
+	text, _, ok := scalarText(k)
+	return text, ok
 }
 
 // fieldOf is a struct field by the name it has in the configuration, through
@@ -442,12 +549,12 @@ func (d *decoder) decodeMap(n ast.Node, v reflect.Value, key string) (es errs) {
 
 	m := reflect.MakeMapWithSize(v.Type(), len(entries))
 	for _, e := range entries {
-		kn, str, err := d.resolve(e.key)
+		kn, tag, err := d.resolve(e.key)
 		if err != nil {
 			es.add(d.at(e.key, key), err)
 			continue
 		}
-		name, err := d.text(kn, str)
+		name, err := d.text(kn, tag == "!!str")
 		if err != nil {
 			es.add(d.at(e.key, key), err)
 			continue
@@ -459,10 +566,17 @@ func (d *decoder) decodeMap(n ast.Node, v reflect.Value, key string) (es errs) {
 			es.add(d.at(e.key, sub), err)
 			continue
 		}
+		if m.MapIndex(k).IsValid() {
+			// Keys written differently that read the same, e.g. 1 and 01.
+			es.addf(d.at(e.key, sub), "given twice")
+			continue
+		}
 		val := reflect.New(v.Type().Elem()).Elem()
 		if sub := d.decode(e.value, val, sub, false); len(sub) > 0 {
 			es = append(es, sub...)
-			continue
+			if !onlyPending(sub) {
+				continue
+			}
 		}
 		m.SetMapIndex(k, val)
 	}
@@ -476,15 +590,24 @@ func (d *decoder) anyOf(n ast.Node, str bool, depth int) (any, error) {
 	if depth > 64 {
 		return nil, errors.New("nests too deeply")
 	}
-	n, s, err := d.resolve(n)
+	n, tag, err := d.resolve(n)
 	if err != nil {
 		return nil, err
 	}
-	str = str || s
-
-	switch v := n.(type) {
-	case nil, *ast.NullNode:
+	str = str || tag == "!!str"
+	if isNull(n) && !str {
 		return nil, nil
+	}
+	if err := d.enter(n); err != nil {
+		return nil, err
+	}
+	defer d.leave(n)
+	return d.anyValue(n, str, depth)
+}
+
+// anyValue is anyOf for a node resolved and entered.
+func (d *decoder) anyValue(n ast.Node, str bool, depth int) (any, error) {
+	switch v := n.(type) {
 	case *ast.MappingNode, *ast.MappingValueNode:
 		es, err := d.entries(v)
 		if err != nil {
@@ -492,11 +615,11 @@ func (d *decoder) anyOf(n ast.Node, str bool, depth int) (any, error) {
 		}
 		m := map[string]any{}
 		for _, e := range es {
-			k, str, err := d.resolve(e.key)
+			k, tag, err := d.resolve(e.key)
 			if err != nil {
 				return nil, err
 			}
-			name, err := d.text(k, str)
+			name, err := d.text(k, tag == "!!str")
 			if err != nil {
 				return nil, err
 			}
@@ -523,11 +646,43 @@ func (d *decoder) anyOf(n ast.Node, str bool, depth int) (any, error) {
 	if str {
 		return d.text(n, true)
 	}
+	if text, _, ok := scalarText(n); ok {
+		return scalarOf(n, text), nil
+	}
 	var a any
 	if err := yaml.NodeToValue(n, &a); err != nil {
 		return nil, err
 	}
 	return a, nil
+}
+
+// scalarOf is a number or a boolean as YAML 1.2 reads it, as the fields of
+// other types do (`010` is ten), in the types goccy/go-yaml gives: uint64 for an
+// integer that is not negative, int64 for one that is, float64 and bool. What
+// YAML 1.2 does not read as one, such as `1_000`, is the string written.
+func scalarOf(n ast.Node, text string) any {
+	switch n.(type) {
+	case *ast.IntegerNode:
+		if strings.Contains(text, "_") {
+			break
+		}
+		if !strings.HasPrefix(text, "-") {
+			if u, err := strconv.ParseUint(strings.TrimPrefix(text, "+"), intBase(text), 64); err == nil {
+				return u
+			}
+		} else if i, err := strconv.ParseInt(text, intBase(text), 64); err == nil {
+			return i
+		}
+	case *ast.FloatNode, *ast.InfinityNode, *ast.NanNode:
+		if f, err := parseFloat(text, 64); err == nil {
+			return f
+		}
+	case *ast.BoolNode:
+		if b, err := strconv.ParseBool(text); err == nil {
+			return b
+		}
+	}
+	return text
 }
 
 // onlyPending reports whether es holds nothing but warnings about secret files
