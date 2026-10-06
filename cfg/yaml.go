@@ -22,6 +22,10 @@ type decoder struct {
 	file    string
 	anchors map[string][]anchor
 
+	// ordered makes anyOf give a mapping as a yaml.MapSlice, its keys in order
+	// and of their own types, for a type that decodes itself.
+	ordered bool
+
 	// active are the nodes being read: an alias to one of them is an alias to
 	// a value it is in, which has no end.
 	active map[ast.Node]bool
@@ -225,11 +229,15 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 	fresh := reflect.New(v.Type())
 	switch ptr.(type) {
 	case yaml.BytesUnmarshaler, yaml.InterfaceUnmarshaler, yaml.NodeUnmarshaler:
-		if err := yaml.NodeToValue(n, fresh.Interface()); err != nil {
+		// The type decodes itself, and would see neither the references nor
+		// the anchors outside its block: it is given the block as plain values,
+		// with references resolved and aliases and merges expanded.
+		if err := d.unmarshal(n, str, fresh.Interface()); err != nil {
 			es.add(d.at(n, key), err)
 			return es
 		}
 		v.Set(fresh.Elem())
+		refs = d.r.refs
 		return es
 	case encoding.TextUnmarshaler:
 		text, err := d.text(n, str)
@@ -280,6 +288,20 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 	}
 	refs = d.r.refs
 	return es
+}
+
+// unmarshal decodes n into ptr, a type that decodes itself, by handing it n as
+// plain values: with the references in its strings resolved, and its aliases
+// and merges expanded.
+func (d *decoder) unmarshal(n ast.Node, str bool, ptr any) error {
+	prev := d.ordered
+	d.ordered = true
+	a, err := d.anyValue(n, str, 0)
+	d.ordered = prev
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal([]byte(flowOf(a)), ptr)
 }
 
 // text is the text of a scalar node with its references resolved.
@@ -619,6 +641,7 @@ func (d *decoder) anyValue(n ast.Node, str bool, depth int) (any, error) {
 			return nil, err
 		}
 		m := map[string]any{}
+		ms := yaml.MapSlice{}
 		for _, e := range es {
 			k, tag, err := d.resolve(e.key)
 			if err != nil {
@@ -632,7 +655,18 @@ func (d *decoder) anyValue(n ast.Node, str bool, depth int) (any, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", name, err)
 			}
-			m[name] = val
+			if !d.ordered {
+				m[name] = val
+				continue
+			}
+			var kv any = name
+			if _, isString, _ := scalarText(k); !isString && tag != "!!str" {
+				kv = scalarOf(k, name)
+			}
+			ms = append(ms, yaml.MapItem{Key: kv, Value: val})
+		}
+		if d.ordered {
+			return ms, nil
 		}
 		return m, nil
 	case *ast.SequenceNode:

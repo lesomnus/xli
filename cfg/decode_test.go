@@ -1,10 +1,12 @@
 package cfg_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/lesomnus/xli/cfg"
 	"github.com/lesomnus/xli/internal/x"
 )
@@ -158,6 +160,62 @@ func TestDecodeErrors(t *testing.T) {
 		_, err := cfg.New("app", &Config{}).Load(p, nil)
 		x.NotContains(err.Error(), "must be quoted")
 	}))
+}
+
+// Otel decodes itself, as payday's OtelConfig does through mkot.Config.
+type Otel struct {
+	Exporters map[string]Exporter `yaml:"exporters"`
+}
+
+type Exporter struct {
+	Endpoint string            `yaml:"endpoint"`
+	Headers  map[string]string `yaml:"headers"`
+}
+
+func (o *Otel) UnmarshalYAML(unmarshal func(any) error) error {
+	type plain Otel
+	return unmarshal((*plain)(o))
+}
+
+// Keys decodes itself from bytes, keeping the order of the keys.
+type Keys []string
+
+func (k *Keys) UnmarshalYAML(b []byte) error {
+	var ms yaml.MapSlice
+	if err := yaml.Unmarshal(b, &ms); err != nil {
+		return err
+	}
+	for _, it := range ms {
+		*k = append(*k, fmt.Sprintf("%v:%T", it.Key, it.Key))
+	}
+	return nil
+}
+
+func TestDecodeTypesThatDecodeThemselves(t *testing.T) {
+	type C struct {
+		Otel Otel `yaml:"otel"`
+		Keys Keys `yaml:"keys"`
+	}
+	p := write(t, `
+x-headers: &h {authorization: "Bearer ${env:TOKEN}"}
+otel:
+  exporters:
+    otlp:
+      endpoint: ${env:ENDPOINT}
+      headers: *h
+keys: {z: 1, a: 2, 10: 3}
+`)
+	c := C{}
+	l := cfg.New("app", &c)
+	_, err := l.Load(p, env("TOKEN=t", "ENDPOINT=https://otel"))
+	x := x.New(t)
+	x.NoError(err)
+	x.Equal(Exporter{Endpoint: "https://otel", Headers: map[string]string{"authorization": "Bearer t"}}, c.Otel.Exporters["otlp"],
+		"references are resolved and aliases expanded in what a type decodes itself")
+	x.Equal(Keys{"z:string", "a:string", "10:uint64"}, c.Keys, "in order, and of their own types")
+
+	o, _ := l.Origin(&c.Otel)
+	x.Equal([]string{"${env:ENDPOINT}", "${env:TOKEN}"}, o.Refs)
 }
 
 func TestDecodePendingSecretInMap(t *testing.T) {
