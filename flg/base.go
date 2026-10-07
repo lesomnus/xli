@@ -7,12 +7,19 @@ import (
 	"github.com/lesomnus/xli/tab"
 )
 
+// Parser reads the value of a flag of type T from the text it was given as.
+// ToString is a value written back, for a Default in help, and String names
+// the type, for help; empty for a switch. A parser with a NoValue() bool
+// method that reports true takes no value: a switch.
 type Parser[T any] interface {
 	Parse(s string) (T, error)
 	ToString(v T) string
 	String() string
 }
 
+// Base is a flag that takes one value of type T, read by P; the last time it
+// is given wins. The types of this package are Bases with their parsers:
+// [String], [Int], [Switch] and the rest.
 type Base[T any, P Parser[T]] struct {
 	Name     string
 	Alias    rune
@@ -46,6 +53,7 @@ type Base[T any, P Parser[T]] struct {
 	count int
 }
 
+// Info is what the flag says of itself.
 func (f *Base[T, P]) Info() *Info {
 	info := &Info{
 		Category: f.Category,
@@ -86,6 +94,8 @@ func (f *Base[T, P]) GetDefault() (T, bool) {
 	return *f.Default, true
 }
 
+// Handle parses u into Value and calls the Handler with it. In completion it
+// offers the parser's candidates, if it has any, instead.
 func (f *Base[T, P]) Handle(ctx context.Context, u string) error {
 	if m := mode.From(ctx); m == mode.Tab {
 		complete(tab.From(ctx), f.Parser)
@@ -104,6 +114,7 @@ func (f *Base[T, P]) Handle(ctx context.Context, u string) error {
 	return f.handle(ctx, v)
 }
 
+// Count is how many times the flag was given.
 func (f *Base[T, P]) Count() int {
 	return f.count
 }

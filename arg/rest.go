@@ -8,6 +8,8 @@ import (
 	"github.com/lesomnus/xli/tab"
 )
 
+// RestStrings is a variadic argument of strings; RestInts and the others are
+// the same for their types.
 type RestStrings = Rest[string, StringParser]
 
 type RestInts = Rest[int, IntParser]
@@ -18,6 +20,8 @@ type RestUints = Rest[uint, UintParser]
 type RestUint32s = Rest[uint32, Uint32Parser]
 type RestUint64s = Rest[uint64, Uint64Parser]
 
+// RestParser reads the arguments that are left with P, as many times as it
+// takes to read them all.
 type RestParser[T any, P Parser[T]] struct {
 	Base P
 }
@@ -41,6 +45,8 @@ func (p *RestParser[T, P]) String() string {
 	return fmt.Sprintf("%s...", p.Base.String())
 }
 
+// Rest is a variadic argument: every word that is left, each read by P. It is
+// optional, and it is the last argument of its command.
 type Rest[T any, P Parser[T]] struct {
 	Name string
 
@@ -59,10 +65,12 @@ type Rest[T any, P Parser[T]] struct {
 	Parser RestParser[T, P]
 }
 
+// String is the argument as the usage line writes it: [NAME...].
 func (a *Rest[T, P]) String() string {
 	return fmt.Sprintf("[%s...]", a.Name)
 }
 
+// Info is what the argument says of itself.
 func (a *Rest[T, P]) Info() *Info {
 	usage := a.Usage
 	if usage == nil {
@@ -102,6 +110,7 @@ func (a *Rest[T, P]) Info() *Info {
 	return info
 }
 
+// Get is the values the user gave, and whether there was at least one.
 func (a *Rest[T, P]) Get() ([]T, bool) {
 	return a.Value, len(a.Value) > 0
 }
@@ -114,15 +123,18 @@ func (a *Rest[T, P]) lookupDefault() ([]T, bool) {
 	return a.Default, true
 }
 
+// IsOptional is true: a variadic argument may be given no values.
 func (a *Rest[T, P]) IsOptional() bool {
 	// Rest implies optional.
 	return true
 }
 
+// IsMany is true.
 func (a *Rest[T, P]) IsMany() bool {
 	return true
 }
 
+// Parse reads the values into Value with the Parser.
 func (a *Rest[T, P]) Parse(rest []string) (int, error) {
 	vs, n, err := a.Parser.Parse(rest)
 	if n == 0 || err != nil {

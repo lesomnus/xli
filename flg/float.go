@@ -4,9 +4,11 @@ import (
 	"strconv"
 )
 
+// Float32 is a flag that takes a float32, and Float64 a float64.
 type Float32 = Base[float32, Float32Parser]
 type Float64 = Base[float64, Float64Parser]
 
+// Float32Parser reads a float32 as strconv.ParseFloat does.
 type Float32Parser struct{}
 
 func (Float32Parser) Parse(s string) (float32, error) {
@@ -22,6 +24,7 @@ func (Float32Parser) String() string {
 	return "float32"
 }
 
+// Float64Parser reads a float64 as strconv.ParseFloat does.
 type Float64Parser struct{}
 
 func (Float64Parser) Parse(s string) (float64, error) {

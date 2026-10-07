@@ -20,27 +20,43 @@ import (
 	"github.com/lesomnus/xli/tab"
 )
 
+// Command is a node of the command tree: what it is called, what it takes, the
+// commands below it, and the handler that runs on the way through it. A tree
+// is built once and run once; see the package documentation.
 type Command struct {
+	// Category groups the command under a heading in its parent's help and
+	// completion.
 	Category string
-	Name     string
-	Aliases  []string
-	Brief    string
-	Synop    string
+	// Name is the word that selects the command on the command line, and
+	// Aliases are other words that do.
+	Name    string
+	Aliases []string
+	// Brief is a line saying what the command does, shown beside its name;
+	// Synop is the longer description its own help shows.
+	Brief string
+	Synop string
 
-	Flags    flg.Flags
-	Args     arg.Args
+	// Flags are the command's own flags, and Args its arguments, in order.
+	// Neither is given to its parent or its subcommands.
+	Flags flg.Flags
+	Args  arg.Args
+	// Commands are the commands below this one.
 	Commands Commands
 
 	// Exclusive lists groups of flag names of which at most one may be given,
 	// e.g. {{"json", "yaml"}}. Run returns ErrFlagConflict otherwise.
 	Exclusive [][]string
 
+	// Handler is the command's middleware; nil is one that calls next.
 	Handler Handler
 
 	// Hidden omits the command from its parent's help and completion; it can
 	// still be run by name.
 	Hidden bool
 
+	// The command's input and outputs. Run sets the root's to os.Stdin,
+	// os.Stdout and os.Stderr where they are nil, and a subcommand's to its
+	// parent's where they are nil.
 	io.ReadCloser
 	io.Writer
 	ErrWriter io.Writer
@@ -48,18 +64,23 @@ type Command struct {
 	parent *Command
 }
 
+// GetName is Name. GetName, GetFlags and GetArgs are what the frm package
+// knows of a command; see [xmd.Command].
 func (c *Command) GetName() string {
 	return c.Name
 }
 
+// GetFlags is Flags.
 func (c *Command) GetFlags() flg.Flags {
 	return c.Flags
 }
 
+// GetArgs is Args.
 func (c *Command) GetArgs() arg.Args {
 	return c.Args
 }
 
+// String is the command's name and aliases, separated by commas.
 func (c *Command) String() string {
 	vs := make([]string, 1, len(c.Aliases)+1)
 	vs[0] = c.Name
@@ -67,14 +88,19 @@ func (c *Command) String() string {
 	return strings.Join(vs, ",")
 }
 
+// HasParent reports whether the command is below another in the run: Run sets
+// the parent of each command on the path it takes.
 func (c *Command) HasParent() bool {
 	return c.parent != nil
 }
 
+// Parent is the command above this one in the run, or nil for the root or a
+// command not on the path of a run.
 func (c *Command) Parent() *Command {
 	return c.parent
 }
 
+// Tree is the path of the run from the root to this command, the root first.
 func (c *Command) Tree() []*Command {
 	vs := []*Command{}
 	p := c
@@ -86,6 +112,7 @@ func (c *Command) Tree() []*Command {
 	return vs
 }
 
+// Root is the command at the top of the run.
 func (c *Command) Root() *Command {
 	p := c
 	for p.parent != nil {
@@ -94,36 +121,50 @@ func (c *Command) Root() *Command {
 	return p
 }
 
+// Print writes to the command's Writer as fmt.Fprint does.
 func (c *Command) Print(vs ...any) (int, error) {
 	return fmt.Fprint(c.Writer, vs...)
 }
 
+// Printf writes to the command's Writer as fmt.Fprintf does.
 func (c *Command) Printf(format string, vs ...any) (int, error) {
 	return fmt.Fprintf(c.Writer, format, vs...)
 }
 
+// Println writes to the command's Writer as fmt.Fprintln does.
 func (c *Command) Println(vs ...any) (int, error) {
 	return fmt.Fprintln(c.Writer, vs...)
 }
 
+// Scan reads from the command's ReadCloser as fmt.Fscan does.
 func (c *Command) Scan(vs ...any) (int, error) {
 	return fmt.Fscan(c.ReadCloser, vs...)
 }
 
+// Scanf reads from the command's ReadCloser as fmt.Fscanf does.
 func (c *Command) Scanf(format string, vs ...any) (int, error) {
 	return fmt.Fscanf(c.ReadCloser, format, vs...)
 }
 
+// Scanln reads from the command's ReadCloser as fmt.Fscanln does.
 func (c *Command) Scanln(vs ...any) (int, error) {
 	return fmt.Fscanln(c.ReadCloser, vs...)
 }
 
-// Run parses the `args` and executes the `c.Handler`.
-// It runs subcommand after all arguments are parsed if found one.
-// Any `Flag`s or `Arg`s including the one in the subcommands returns error, it stops running and returns the error.
-// It will not executes the subcommand if "--help" or "-h" is found in the execution command.
-// Handler has responsible to execute subcommand's handler.
-// This function does not guarantees execution of subcommand's handler.
+// Run runs the command line args -- usually os.Args[1:] -- against the tree
+// below c.
+//
+// It parses the whole line first, into the flags and arguments of every
+// command on the path -- calling their handlers -- and returns a [UsageError]
+// for what does not fit before any command's handler runs. Then it calls c's
+// handler, and a subcommand's handler runs only when its parent's calls next:
+// Run does not call it on the handler's behalf. With --help or -h on the line
+// it runs in help mode, and the help of the command it was given to is printed
+// when that command's handler calls next. A line from a generated completion
+// script runs in completion mode.
+//
+// Run writes into the tree: the values it parses, each command's parent, and
+// the IO a subcommand inherits. A tree is run once.
 func (c *Command) Run(ctx context.Context, args []string) error {
 	if l := len(args); l > 2 {
 		tag := args[l-3]
@@ -433,12 +474,14 @@ func usageLine(c *Command) string {
 	return strings.Join(parts, " ")
 }
 
+// PrintHelp writes the command's help to w: its usage line, its description,
+// its arguments and flags, and the commands below it by category. The help is
+// xli's; there is no template to replace it with (ROADMAP, Phase 3).
 func (c *Command) PrintHelp(w io.Writer) error {
-	// TODO(Phase 4): allow a user-supplied template once the injection
-	// surface (Command field vs context) is decided.
 	return defaultHelpTemplate.Execute(w, c)
 }
 
+// Commands are the commands below one command.
 type Commands []*Command
 
 // Visible returns the commands that are not hidden.
@@ -452,6 +495,8 @@ func (cs Commands) Visible() Commands {
 	return vs
 }
 
+// Get is the command called name, by its name or an alias; nil if there is
+// none.
 func (cs Commands) Get(name string) *Command {
 	for _, c := range cs {
 		if c.Name == name {
@@ -465,6 +510,8 @@ func (cs Commands) Get(name string) *Command {
 	return nil
 }
 
+// ByCategory is cs grouped by Category, each group in the order its first
+// command appears.
 func (cs Commands) ByCategory() []Commands {
 	i := map[string]int{}
 	vs := []Commands{}
@@ -481,6 +528,7 @@ func (cs Commands) ByCategory() []Commands {
 	return vs
 }
 
+// WithCategory is cs with vs appended, each put in the category name.
 func (cs Commands) WithCategory(name string, vs ...*Command) Commands {
 	for _, v := range vs {
 		v.Category = name

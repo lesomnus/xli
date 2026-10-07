@@ -207,9 +207,13 @@ Flags: flg.Flags{
 
 ## Handlers
 
-Attach a handler to react when a flag is parsed. Handlers are mode-aware, mirroring
-command handlers (`flg.OnRun`, `flg.OnHelp`, `flg.OnTab`, …) and compose with
-`flg.Wrap`:
+Attach a handler to react when a flag is parsed. It is called as the command
+line is parsed, before any command's handler runs, and it is mode-aware like
+command handlers (`flg.OnRun`, `flg.OnHelp`, `flg.OnTab`, …): it sees the mode
+its command's handler will. `flg.OnRun` is called when the flag's command is
+the one being run, `flg.OnRunPass` when it is on the way to a subcommand -- a
+flag of the root, given before a subcommand -- and `flg.On(mode.Run, …)` in
+either. Handlers compose with `flg.Wrap`:
 
 ```go
 &flg.String{

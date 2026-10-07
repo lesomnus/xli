@@ -1,235 +1,68 @@
+// Package xli builds command-line interfaces as a tree of commands whose
+// handlers are middleware.
+//
+// A [Command] declares its name, its [flg.Flags], its [arg.Args] and its
+// subcommands. [Command.Run] parses a command line against the tree, stores
+// what it parsed in the flags and arguments, and calls the handlers of the
+// commands on the path, from the root down:
+//
+//	root := &xli.Command{
+//		Name:  "app",
+//		Flags: flg.Flags{&flg.Switch{Name: "verbose", Alias: 'v'}},
+//		Commands: xli.Commands{
+//			{
+//				Name: "greet",
+//				Args: arg.Args{&arg.String{Name: "NAME"}},
+//				Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+//					cmd.Printf("hello, %s\n", arg.MustGet[string](cmd, "NAME"))
+//					return next(ctx)
+//				}),
+//			},
+//		},
+//		Handler: xli.RequireSubcommand(),
+//	}
+//	err := root.Run(ctx, os.Args[1:])
+//
+// # What is intended, and easy to trip on
+//
+// The following are by design, and each is a surprise if it is not known.
+//
+// A handler is middleware. It is given next, and the subcommand runs only if
+// the handler calls next(ctx): Run does not call it on the handler's behalf.
+// A parent sets up what its subcommands share -- a configuration, a client, a
+// span -- before next, and acts on the result after it; one that returns
+// without calling next ends the run there. A command with no handler calls
+// next, and [Chain] puts several handlers on one command, each of which calls
+// the next in turn.
+//
+// The handler of every command on the path runs, in a mode that says why:
+// [mode.Run] for the command named last, [mode.Run] with [mode.Pass] for the
+// commands on the way to it, and [mode.Help] and [mode.Tab] for --help and
+// shell completion, which walk the same tree. [OnRun], [OnRunPass], [OnHelp]
+// and [OnTab] call a function in their mode and next in any other.
+//
+// Positions are strict. A command's flags and arguments are its own: they are
+// not given to its parent or to its subcommand, and its flags come before its
+// arguments. In `app --verbose deploy --force web`, --verbose is app's and
+// --force and web are deploy's; `app deploy web --force` is [ErrFlagAfterArg].
+// It is what keeps a deep tree unambiguous.
+//
+// A tree is run once. Run writes into the tree it is given: the values it
+// parses into the flags and arguments, each command's parent, and the IO a
+// subcommand inherits. Build the tree once per process, as a command line is
+// run once per process; a test that runs two command lines builds two trees.
+//
+// A flag's Default and Value are not the same thing. Default is the value you
+// configured, and the framework never writes it; Value is what the user gave,
+// and only the framework writes it. [flg.Get] and [arg.Get] report whether the
+// user gave a value; [flg.MustGet] and [arg.MustGet] return it, or else the
+// Default, and panic if there is neither.
+//
+// # More
+//
+// The guides under docs/ in the repository cover commands, flags, arguments,
+// completion and testing. Package [github.com/lesomnus/xli/xlitest] runs a
+// command line in a test, and the optional module
+// [github.com/lesomnus/xli/cfg] reads a configuration struct from a file, the
+// environment and these flags.
 package xli
-
-import (
-	"fmt"
-	"io"
-	"strings"
-
-	"github.com/lesomnus/xli/arg"
-	"github.com/lesomnus/xli/flg"
-)
-
-// WriteMarkdown writes a Markdown reference for c and all of its visible
-// subcommands: one section per command with its usage, description,
-// arguments, options, and subcommands. Hidden commands and flags are left out.
-func WriteMarkdown(w io.Writer, c *Command) error {
-	p := &docPrinter{w: w}
-	walkDoc(c, func(c *Command, depth int) {
-		path := commandPath(c)
-		if depth == 0 {
-			p.printf("# %s\n\n", path)
-		} else {
-			p.printf("## %s\n\n", path)
-		}
-		if c.Brief != "" {
-			p.printf("%s\n\n", c.Brief)
-		}
-		p.printf("```\n%s\n```\n\n", usageLine(c))
-		if c.Synop != "" {
-			p.printf("%s\n\n", c.Synop)
-		}
-
-		if len(c.Args) > 0 {
-			p.printf("**Arguments**\n\n| Argument | Description |\n| --- | --- |\n")
-			for _, a := range c.Args {
-				info := a.Info()
-				p.printf("| `%s` | %s |\n", mdCell(info.Usage.String()), mdCell(argDesc(info)))
-			}
-			p.printf("\n")
-		}
-
-		if fs := c.Flags.Visible(); len(fs) > 0 {
-			p.printf("**Options**\n\n| Option | Type | Description |\n| --- | --- | --- |\n")
-			for _, f := range fs {
-				info := f.Info()
-				typ := ""
-				if info.Type != "" {
-					typ = fmt.Sprintf("`%s`", mdCell(info.Type))
-				}
-				p.printf("| `%s` | %s | %s |\n", flagLabel(info), typ, mdCell(flagDesc(info)))
-			}
-			p.printf("\n")
-		}
-
-		if cs := c.Commands.Visible(); len(cs) > 0 {
-			p.printf("**Commands**\n\n| Command | Description |\n| --- | --- |\n")
-			for _, sub := range cs {
-				p.printf("| [`%s`](#%s) | %s |\n", sub.Name, mdAnchor(commandPath(sub)), mdCell(sub.Brief))
-			}
-			p.printf("\n")
-		}
-	})
-	return p.err
-}
-
-// WriteMan writes a man page in roff format for c, documenting c and all of
-// its visible subcommands. section is the manual section, usually 1.
-// Hidden commands and flags are left out.
-func WriteMan(w io.Writer, c *Command, section int) error {
-	p := &docPrinter{w: w}
-	has_commands := false
-	walkDoc(c, func(c *Command, depth int) {
-		if depth == 0 {
-			p.printf(".TH %s %d\n", roff(strings.ToUpper(c.Name)), section)
-			p.printf(".SH NAME\n%s", roff(c.Name))
-			if c.Brief != "" {
-				p.printf(" \\- %s", roff(c.Brief))
-			}
-			p.printf("\n.SH SYNOPSIS\n%s\n", roff(usageLine(c)))
-			if c.Synop != "" {
-				p.printf(".SH DESCRIPTION\n%s\n", roff(c.Synop))
-			}
-		} else {
-			if !has_commands {
-				p.printf(".SH COMMANDS\n")
-				has_commands = true
-			}
-			p.printf(".SS %s\n", roff(commandPath(c)))
-			if c.Brief != "" {
-				p.printf("%s\n.PP\n", roff(c.Brief))
-			}
-			p.printf(".B %s\n", roff(usageLine(c)))
-			if c.Synop != "" {
-				p.printf(".PP\n%s\n", roff(c.Synop))
-			}
-		}
-
-		if len(c.Args) > 0 {
-			if depth == 0 {
-				p.printf(".SH ARGUMENTS\n")
-			} else {
-				p.printf(".PP\nArguments:\n")
-			}
-			for _, a := range c.Args {
-				info := a.Info()
-				p.printf(".TP\n.B %s\n%s\n", roff(info.Usage.String()), roff(argDesc(info)))
-			}
-		}
-
-		if fs := c.Flags.Visible(); len(fs) > 0 {
-			if depth == 0 {
-				p.printf(".SH OPTIONS\n")
-			} else {
-				p.printf(".PP\nOptions:\n")
-			}
-			for _, f := range fs {
-				info := f.Info()
-				// Inline font escapes rather than .B/.BI, whose quoted
-				// arguments would break on a '"' in the type.
-				p.printf(".TP\n\\fB%s\\fR", roff(flagLabel(info)))
-				if info.Type != "" {
-					p.printf(" \\fI%s\\fR", roff(info.Type))
-				}
-				p.printf("\n%s\n", roff(flagDesc(info)))
-			}
-		}
-	})
-	return p.err
-}
-
-// walkDoc visits c and its visible descendants depth-first (c has depth 0),
-// linking parents on the way so usage lines and command paths are complete.
-func walkDoc(c *Command, f func(c *Command, depth int)) {
-	var walk func(c *Command, depth int)
-	walk = func(c *Command, depth int) {
-		subs := c.Commands.Visible()
-		for _, sub := range subs {
-			sub.parent = c
-		}
-		f(c, depth)
-		for _, sub := range subs {
-			walk(sub, depth+1)
-		}
-	}
-	walk(c, 0)
-}
-
-type docPrinter struct {
-	w   io.Writer
-	err error
-}
-
-func (p *docPrinter) printf(format string, vs ...any) {
-	if p.err != nil {
-		return
-	}
-	_, p.err = fmt.Fprintf(p.w, format, vs...)
-}
-
-func commandPath(c *Command) string {
-	tree := c.Tree()
-	names := make([]string, len(tree))
-	for i, v := range tree {
-		names[i] = v.Name
-	}
-	return strings.Join(names, " ")
-}
-
-// flagLabel renders "-v, --verbose" or "--verbose".
-func flagLabel(info *flg.Info) string {
-	if info.Alias == 0 {
-		return "--" + info.Name
-	}
-	return fmt.Sprintf("-%c, --%s", info.Alias, info.Name)
-}
-
-func flagDesc(info *flg.Info) string {
-	vs := []string{}
-	if info.Brief != "" {
-		vs = append(vs, info.Brief)
-	}
-	if info.Required {
-		vs = append(vs, "(required)")
-	}
-	if info.HasDefault {
-		vs = append(vs, fmt.Sprintf("(default: %s)", info.Default))
-	}
-	if info.Env != "" {
-		vs = append(vs, fmt.Sprintf("[$%s]", info.Env))
-	}
-	return strings.Join(vs, " ")
-}
-
-func argDesc(info *arg.Info) string {
-	vs := []string{}
-	if info.Brief != "" {
-		vs = append(vs, info.Brief)
-	}
-	if info.HasDefault {
-		vs = append(vs, fmt.Sprintf("(default: %s)", info.Default))
-	}
-	return strings.Join(vs, " ")
-}
-
-// mdCell escapes text for a Markdown table cell.
-func mdCell(s string) string {
-	s = strings.ReplaceAll(s, "|", `\|`)
-	return strings.ReplaceAll(s, "\n", " ")
-}
-
-// mdAnchor returns the GitHub-style heading anchor for a command path.
-func mdAnchor(path string) string {
-	b := strings.Builder{}
-	for _, r := range strings.ToLower(path) {
-		switch {
-		case r == ' ':
-			b.WriteRune('-')
-		case r == '-' || r == '_' || ('a' <= r && r <= 'z') || ('0' <= r && r <= '9'):
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-// roff escapes text for a roff (man) document.
-func roff(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\e`)
-	s = strings.ReplaceAll(s, "-", `\-`)
-	lines := strings.Split(s, "\n")
-	for i, l := range lines {
-		if strings.HasPrefix(l, ".") || strings.HasPrefix(l, "'") {
-			lines[i] = `\&` + l
-		}
-	}
-	return strings.Join(lines, "\n")
-}

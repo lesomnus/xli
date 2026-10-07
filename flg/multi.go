@@ -53,6 +53,7 @@ type Multi[T any, P Parser[T]] struct {
 	Hidden bool
 }
 
+// Info is what the flag says of itself.
 func (f *Multi[T, P]) Info() *Info {
 	info := &Info{
 		Category: f.Category,
@@ -98,6 +99,8 @@ func (f *Multi[T, P]) GetDefault() ([]T, bool) {
 	return f.Default, true
 }
 
+// Handle parses u and appends it to Value, and calls the Handler with all of
+// Value. In completion it offers the parser's candidates, if it has any.
 func (f *Multi[T, P]) Handle(ctx context.Context, u string) error {
 	if m := mode.From(ctx); m == mode.Tab {
 		complete(tab.From(ctx), f.Parser)
