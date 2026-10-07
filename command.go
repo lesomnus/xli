@@ -157,18 +157,8 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	// Parses flags and args according to the collected information.
-	// Parsed flags and args should be stored in each Arg and Flag.
-	for f := range f_root.Iter() {
-		if f.is_help {
-			break
-		}
-		if err := f.prepare(ctx); err != nil {
-			return &UsageError{Cmd: f.c_curr, Err: err}
-		}
-	}
-
-	// Set a mode if not set.
+	// Set a mode if not set. It is decided before the flags and arguments are
+	// parsed: their handlers are called as they are, and see it.
 	if m := mode.From(ctx); m == mode.Unspecified {
 		m = mode.Run
 		for f := f_root; f != nil; f = f.next {
@@ -179,6 +169,23 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 		}
 
 		ctx = mode.Into(ctx, m|mode.Pass)
+	}
+
+	// Parses flags and args according to the collected information.
+	// Parsed flags and args should be stored in each Arg and Flag. A
+	// command's own see the mode its handler will: with Pass on the way to a
+	// subcommand, and without it on the last command.
+	for f := range f_root.Iter() {
+		if f.is_help {
+			break
+		}
+		fctx := ctx
+		if f.next == nil {
+			fctx = mode.Into(ctx, mode.From(ctx).NoPass())
+		}
+		if err := f.prepare(fctx); err != nil {
+			return &UsageError{Cmd: f.c_curr, Err: err}
+		}
 	}
 
 	// Enforce required and exclusive flags, but only when actually running
