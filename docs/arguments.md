@@ -111,7 +111,9 @@ shown in `--help`.
 
 ## Handlers
 
-Attach a handler that runs when the argument is parsed (mode-aware, like flags):
+Attach a handler that runs when the argument is parsed. It sees the mode its
+command's handler will, as a flag's handler does (see
+[flags.md](flags.md#handlers)):
 
 ```go
 &arg.String{

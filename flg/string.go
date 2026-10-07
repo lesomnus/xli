@@ -4,8 +4,10 @@ import (
 	"fmt"
 )
 
+// String is a flag that takes a string.
 type String = Base[string, StringParser]
 
+// StringParser takes the text as it is.
 type StringParser struct{}
 
 func (StringParser) Parse(s string) (string, error) {

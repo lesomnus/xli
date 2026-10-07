@@ -7,6 +7,8 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
+// Int is a argument that takes an int; Int32, Int64, Uint, Uint32 and Uint64
+// are the others of the family.
 type Int = Base[int, IntParser]
 type Int32 = Base[int32, Int32Parser]
 type Int64 = Base[int64, Int64Parser]
@@ -21,6 +23,8 @@ func (intParserBase[T]) String() string {
 	return fmt.Sprintf("%T", *new(T))
 }
 
+// IntParser reads a decimal int; the other integer parsers read their
+// types the same way, refusing a value out of their range.
 type IntParser struct{ intParserBase[int] }
 
 func (IntParser) Parse(rest []string) (int, int, error) {

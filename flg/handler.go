@@ -7,12 +7,17 @@ import (
 	"github.com/lesomnus/xli/tab"
 )
 
+// HandlerFunc is a handler as a function, called with the value of the flag.
 type HandlerFunc[T any] func(ctx context.Context, v T) error
 
+// Handler is called with the value of the flag each time it is given, as the line is parsed. It is not
+// middleware: there is no next, and an error is the flag's value being
+// refused, reported as a usage error.
 type Handler[T any] interface {
 	Handle(ctx context.Context, v T) error
 }
 
+// Handle is f as a Handler, in every mode.
 func Handle[T any](f HandlerFunc[T]) Handler[T] {
 	return handler[T](f)
 }
@@ -23,6 +28,7 @@ func (h handler[T]) Handle(ctx context.Context, v T) error {
 	return h(ctx, v)
 }
 
+// Wrap is hs as one handler, called in order until one returns an error.
 func Wrap[T any](hs ...Handler[T]) Handler[T] {
 	return handler[T](func(ctx context.Context, v T) error {
 		for _, h := range hs {
@@ -34,6 +40,7 @@ func Wrap[T any](hs ...Handler[T]) Handler[T] {
 	})
 }
 
+// OnF calls a when f reports true for the mode, and does nothing otherwise.
 func OnF[T any](f func(m mode.Mode) bool, a HandlerFunc[T]) Handler[T] {
 	return handler[T](func(ctx context.Context, v T) error {
 		m := mode.From(ctx)
@@ -44,22 +51,37 @@ func OnF[T any](f func(m mode.Mode) bool, a HandlerFunc[T]) Handler[T] {
 	})
 }
 
+// On calls f when the mode has every bit of m set.
 func On[T any](m mode.Mode, f HandlerFunc[T]) Handler[T] {
 	return OnF(func(m_ mode.Mode) bool { return m_&m == m }, f)
 }
 
+// OnExact calls f when the mode is m.
 func OnExact[T any](m mode.Mode, f HandlerFunc[T]) Handler[T] {
 	return OnF(func(m_ mode.Mode) bool { return m_ == m }, f)
 }
 
-func OnHelp[T any](f HandlerFunc[T]) Handler[T]     { return OnExact(mode.Help, f) }
-func OnRun[T any](f HandlerFunc[T]) Handler[T]      { return OnExact(mode.Run, f) }
-func OnHelpPass[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Help|mode.Pass, f) }
-func OnTabPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Tab|mode.Pass, f) }
-func OnRunPass[T any](f HandlerFunc[T]) Handler[T]  { return OnExact(mode.Run|mode.Pass, f) }
+// OnRun calls f when the flag's command is the one run.
+func OnRun[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Run, f) }
 
+// OnRunPass calls f when the flag's command is on the way to the one run.
+func OnRunPass[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Run|mode.Pass, f) }
+
+// OnHelp calls f when --help is given to the flag's command.
+func OnHelp[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Help, f) }
+
+// OnHelpPass calls f when --help is given to a command below the flag's.
+func OnHelpPass[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Help|mode.Pass, f) }
+
+// OnTabPass calls f when the shell asks a command below the flag's for
+// completions.
+func OnTabPass[T any](f HandlerFunc[T]) Handler[T] { return OnExact(mode.Tab|mode.Pass, f) }
+
+// TabHandlerFunc offers completion candidates for the flag's value to tab.
 type TabHandlerFunc[T any] func(ctx context.Context, tab tab.Tab) error
 
+// OnTab calls f with the context's [tab.Tab] when the shell asks for a value
+// of the flag.
 func OnTab[T any](f TabHandlerFunc[T]) Handler[T] {
 	return OnExact(mode.Tab, func(ctx context.Context, v T) error {
 		t := tab.From(ctx)

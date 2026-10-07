@@ -32,17 +32,18 @@
 
 ## 3. 다운스트림 호환성 매트릭스 (깨면 안 되는 API)
 
-`lesomnus/{arrakis, flob, clade, tegra-exporter}` 에서 실제로 사용 중인 심볼. 변경 시 이 목록을 기준으로 breaking 여부를 판정한다.
+xli 를 import 하는 12개 모듈에서 실제로 사용 중인 심볼 (2026-10-07, import 별칭까지 따라가며 집계): `lesomnus/{arrakis, flob, clade, tegra-exporter, payday, roster, shale, cr, gantry}`, `Holiday-Robot/{khala, kamino, bosun}`. 변경 시 이 목록을 기준으로 breaking 여부를 판정한다.
 
 | 패키지 | 사용 중인 심볼 |
 |---|---|
-| `xli` | `Command`, `Next`, `OnRun`, `Chain`, `RequireSubcommand`, `OnRunPass`, `HandlerFunc`, `Handler`, `Commands`, `OnF` |
-| `arg` | `MustGet`, `Args`, `String`, `Get`, `RestStrings`, `Mono` |
-| `flg` | `String`, `VisitP`, `Flags`, `Switch`, `MustGet`, `Find`, `Base`, `Get` |
-| `mode` | `Run`, `Pass`, `Mode` |
-| `frm` | `HasSeq`, `From` |
+| `xli` | `Command`, `Commands`, `Next`, `Handler`, `HandlerFunc`, `Chain`, `On`, `OnF`, `OnRun`, `OnRunPass`, `RequireSubcommand` |
+| `arg` | `Args`, `String`, `Get`, `MustGet`, `RestStrings`, `Rest`, `Mono`, `MonoParser`, `Handle`, `Handler` |
+| `flg` | `Flags`, `Flag`, `String`, `Switch`, `Int`, `Duration`, `Strings`, `Base`, `Get`, `MustGet`, `Visit`, `VisitP`, `Find`, `Handle`, `Handler` |
+| `mode` | `Mode`, `Run`, `Pass` |
+| `frm` | `From`, `HasSeq` |
+| `xlitest` | `Harness`, `Result` |
 
-**전혀 안 쓰는 것 → 자유롭게 수정/이름변경 가능**: `OnTap`/`OnTapPass`, tab/completion API 전체, `xli.S`/`xli.D`/`xli.Stringer`, `lex.*` 직접 사용, `Command.Root()`.
+**전혀 안 쓰던 것 → Phase 4 에서 정리함**: `OnTap`/`OnTapPass`(삭제), `Countdown`(삭제), `Command.Usage`·플래그의 `Usage`·`xli.S`/`xli.D`/`xli.Stringer`(아무도 읽지 않아 삭제), `NormalizeCompletionArgs`·`DefaultHelpTemplate`(비공개), `lex`(→ `internal/lex`), `tab.ZshTab`(→ `internal/comp.Writer`). tab/completion API 의 나머지와 `Command.Root()` 는 그대로다.
 
 ### 기본값(default) 의미론 — ✅ 구현됨 (breaking)
 > 아래는 확정 계약이며 Phase 3 에서 구현 완료됨. (요약: `Default`=기본값/read-only, `Value`=파싱값/framework-write, `Get`=명시여부, `MustGet`=Value→Default→panic)
@@ -164,7 +165,12 @@ tab completion 엔진을 실제로 동작하게 고침.
 ### Phase 4 — API 동결 & 폴리시 → `v1.0` (진행 중)
 - [x] (선행) `flg.Flags.WithCategory` 버그 픽스 — `Base.Category` 필드 + setter (이전엔 no-op)
 - [x] README 작성 (검증된 quick-start 예제 포함; 현재 2줄 → 본문)
-- [ ] 공개 API 최종 점검 (mode 상수 타입 통일 ✅, 죽은 export 제거 — `mode.Resolve`✅ / `arg.IsMany` 검토, 네이밍 일관성). `xmd` 패키지는 **public 유지 결정** (xli↔frm import cycle 차단용 최소 인터페이스 `Command{GetName/GetFlags/GetArgs}`, 유지 비용 낮음).
+- [x] 공개 API 최종 점검 (mode 상수 타입 통일 ✅, 죽은 export 제거 — `mode.Resolve`✅, 네이밍 일관성). `xmd` 패키지는 **public 유지 결정** (xli↔frm import cycle 차단용 최소 인터페이스 `Command{GetName/GetFlags/GetArgs}`, 유지 비용 낮음). 12개 모듈의 사용처를 집계해 아무도 안 쓰는 것을 정리:
+  - 삭제: deprecated `OnTap`/`OnTapPass`(xli·arg·flg), `Countdown`, 아무도 읽지 않던 `Command.Usage`·플래그의 `Usage`와 그것만을 위한 `Stringer`/`S`/`D`.
+  - 비공개·internal 로: `NormalizeCompletionArgs`, `DefaultHelpTemplate`(대입해도 효과 없었음), `lex` → `internal/lex`, `tab.ZshTab` → `internal/comp.Writer`(모든 셸 공통 출력이라 이름이 틀렸음).
+  - 일관성: `arg.TabHandlerFunc` 도 `flg` 처럼 `error` 를 반환.
+  - `arg.IsMany` 는 **유지** — usage 줄이 가변 인자 판정에 쓰고, 사용자 정의 Arg 가 말할 수 있어야 한다.
+  - 점검 중 발견한 버그 수정: 플래그·인자 핸들러가 파싱 중(모드 결정 전)에 불려 `flg.OnRun` 등 모드 조건 핸들러가 `Run` 에서 **한 번도 불리지 않았다** → 모드를 파싱 전에 정하고, 경유 명령의 것은 `Run|Pass`, 마지막 명령의 것은 `Run` 을 보게 함.
 - [x] **freeze 결정 완료**: `tab.Tab` 확장(`Group`) 적용, custom help template 미제공 결정, `arg` 패키지 기본값 계약 적용 (커밋 `b0796fa`/`5705f9b`)
 - [x] help/에러 UX 폴리시 (`feat/cli-ux`):
   - Usage 줄을 strict positioning 과 일치시킴 (`app deploy [options] <TARGET>`, 이전엔 `<TARGET> [options]` 로 잘못 안내), Options 에 `-h,--help` 표시
@@ -174,7 +180,7 @@ tab completion 엔진을 실제로 동작하게 고침.
   - `WriteMarkdown` / `WriteMan` 문서 생성
   - completion 버그 픽스: 완성된 flag 뒤 공백(`app --bar=x `)에서 flag 이름을 다시 제안하던 문제
 - [x] CI (`.github/workflows/ci.yaml`): 두 모듈 각각 `gofmt`/`vet`/`test -race`, go.mod 가 말하는 Go(1.24.1) 로. fish 를 설치해 셸 completion 테스트가 skip 으로 통과하지 않게 하고, cfg 는 require 한 xli 와 옆의 xli(`go work`) 양쪽에 대고 돌린다.
-- [ ] 의도된 날카로운 모서리 문서화 (단일 실행 트리, 핸들러의 `next()` 호출 책임, strict positioning) — godoc/README 보강
+- [x] 의도된 날카로운 모서리 문서화 (단일 실행 트리, 핸들러의 `next()` 호출 책임, strict positioning) — 패키지 godoc(`doc.go`, 마크다운/man 생성기는 `docgen.go` 로), README 의 "By design" 절, 모든 공개 패키지의 패키지 문서와 핵심 API(`Command`·`Run`·핸들러·에러·`Get`/`MustGet`/`Find` 계약) 주석. 파서의 Parse/String 같은 인터페이스 구현 메서드는 인터페이스 문서로 갈음.
   - [x] "생성자는 가볍게, 무거운 작업은 Handler 에서" 가이드 (`docs/commands.md`) — 이슈 #2(lazy command init) 를 not planned 로 닫으며 대체
 - [ ] **arrakis 마이그레이션 적용** (`Value:`→`Default:`, diff.go 주입 패턴 변경)
 - [ ] 다운스트림 4개 레포 최종 회귀 통과

@@ -8,11 +8,16 @@ import (
 	"github.com/lesomnus/xli/tab"
 )
 
+// Parser reads an argument's value of type T from rest, the words of the
+// command line from its position on, and reports how many it took. String
+// names the type, for help.
 type Parser[T any] interface {
 	Parse(rest []string) (T, int, error)
 	String() string
 }
 
+// Base is an argument that takes one value of type T, read by P. The types of
+// this package are Bases with their parsers: [String], [Int] and the rest.
 type Base[T any, P Parser[T]] struct {
 	Name string
 
@@ -35,6 +40,8 @@ type Base[T any, P Parser[T]] struct {
 	Parser P
 }
 
+// String is the argument as the usage line writes it: <NAME>, or [NAME] if it
+// is optional.
 func (a *Base[T, P]) String() string {
 	if a.Optional {
 		return fmt.Sprintf("[%s]", a.Name)
@@ -43,6 +50,7 @@ func (a *Base[T, P]) String() string {
 	}
 }
 
+// Info is what the argument says of itself.
 func (a *Base[T, P]) Info() *Info {
 	usage := a.Usage
 	if usage == nil {
@@ -102,14 +110,17 @@ func (a *Base[T, P]) lookupDefault() (T, bool) {
 	return *a.Default, true
 }
 
+// IsOptional is Optional.
 func (a *Base[T, P]) IsOptional() bool {
 	return a.Optional
 }
 
+// IsMany is false: a Base takes one value.
 func (a *Base[T, P]) IsMany() bool {
 	return false
 }
 
+// Parse reads the value into Value with the Parser.
 func (a *Base[T, P]) Parse(rest []string) (int, error) {
 	v, n, err := a.Parser.Parse(rest)
 	if n == 0 || err != nil {

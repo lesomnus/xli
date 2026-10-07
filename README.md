@@ -200,6 +200,24 @@ source <(app completion bash)   # bash (~/.bashrc)
 app completion fish | source    # fish (~/.config/fish/config.fish)
 ```
 
+### By design
+
+Four things are deliberate, and each is a surprise if it is not known:
+
+- **`next` is yours to call.** `Run` does not run a subcommand on a handler's
+  behalf: a handler that returns without calling `next(ctx)` ends the run there.
+  A command with no handler calls `next`.
+- **Positions are strict.** A command's flags and arguments are its own, and its
+  flags come before its arguments. In `app --verbose deploy --force web`,
+  `--verbose` is `app`'s and `--force` and `web` are `deploy`'s;
+  `app deploy web --force` is `ErrFlagAfterArg`.
+- **A tree is run once.** `Run` writes into the tree: the values it parses, each
+  command's parent, and the IO a subcommand inherits. Build the tree once per
+  process; a test that runs two command lines builds two trees.
+- **A flag's handler runs while the line is parsed**, before any command's
+  handler, in the mode its command's handler will see: `flg.OnRun` for a flag of
+  the command being run, `flg.OnRunPass` for one of a command on the way to it.
+
 ## License
 
 See the repository for license details.

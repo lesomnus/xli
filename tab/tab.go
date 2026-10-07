@@ -1,7 +1,17 @@
+// Package tab is where completion candidates go: a handler running for shell
+// completion finds a Tab in its context and offers values to it.
+//
+//	Handler: flg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
+//		t.ValueD("json", "JSON output")
+//		t.ValueD("yaml", "YAML output")
+//		return nil
+//	}),
 package tab
 
 import "context"
 
+// Tab is the sink of completion candidates. The one a run puts in the context
+// writes them for the shell's completion script.
 type Tab interface {
 	// Value adds a completion candidate.
 	Value(v string)
@@ -19,6 +29,7 @@ type Tab interface {
 
 type ctxKey struct{}
 
+// From is the Tab ctx carries, or nil when it is not a completion run.
 func From(ctx context.Context) Tab {
 	v, ok := ctx.Value(ctxKey{}).(Tab)
 	if !ok {
@@ -28,6 +39,7 @@ func From(ctx context.Context) Tab {
 	return v
 }
 
+// Into is ctx carrying v, for [From].
 func Into(ctx context.Context, v Tab) context.Context {
 	return context.WithValue(ctx, ctxKey{}, v)
 }
