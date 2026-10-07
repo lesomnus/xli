@@ -182,7 +182,7 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] CI (`.github/workflows/ci.yaml`): 두 모듈 각각 `gofmt`/`vet`/`test -race`, go.mod 가 말하는 Go(1.24.1) 로. fish 를 설치해 셸 completion 테스트가 skip 으로 통과하지 않게 하고, cfg 는 require 한 xli 와 옆의 xli(`go work`) 양쪽에 대고 돌린다.
 - [x] 의도된 날카로운 모서리 문서화 (단일 실행 트리, 핸들러의 `next()` 호출 책임, strict positioning) — 패키지 godoc(`doc.go`, 마크다운/man 생성기는 `docgen.go` 로), README 의 "By design" 절, 모든 공개 패키지의 패키지 문서와 핵심 API(`Command`·`Run`·핸들러·에러·`Get`/`MustGet`/`Find` 계약) 주석. 파서의 Parse/String 같은 인터페이스 구현 메서드는 인터페이스 문서로 갈음.
   - [x] "생성자는 가볍게, 무거운 작업은 Handler 에서" 가이드 (`docs/commands.md`) — 이슈 #2(lazy command init) 를 not planned 로 닫으며 대체
-- [ ] **arrakis 마이그레이션 적용** (`Value:`→`Default:`, diff.go 주입 패턴 변경)
+- [x] **arrakis 마이그레이션 적용** (lesomnus/arrakis#6, 2026-10-07): render·diff·bump·commit·test 의 `Value:`→`Default:`, 그리고 `diff` 는 `--diff` 스위치에 값을 주입하는 대신 뽑아낸 `render()` 를 `with_diff=true` 로 직접 부른다. 7가지 실행에서 출력이 이전과 같고, 옮기기 전의 arrakis 는 새 xli 에서 `"port": flg not set` 으로 panic 하고 `diff` 는 주입한 스위치를 조용히 무시했다.
 - [x] 다운스트림 최종 회귀 통과 — 4개가 아니라 xli 를 쓰는 12개 저장소(13개 모듈)를 이 브랜치에 `replace` 로 대고 빌드·vet·테스트 (2026-10-07): arrakis, flob, clade, tegra-exporter(자기 Go 1.26 으로), payday(+apptest, 자기 go.work 로), roster, shale, cr, khala, kamino, gantry, bosun 모두 통과. 예외는 shale `TestDemoProducer` 하나로, 이 환경에 ffmpeg 가 없어 xli 를 바꾸기 전에도 같은 이유로 실패한다(나머지 e2e 는 CI 와 같은 `-timeout 20m` 으로 통과).
 - [ ] **`v1.0.0` 태그** (릴리즈 시점은 사용자 결정)
 
