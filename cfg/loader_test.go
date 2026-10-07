@@ -399,6 +399,25 @@ func TestValidate(t *testing.T) {
 	x.ErrorContains(err, "port is required")
 }
 
+// TestFileValidateNamesTheFile is a file of its own whose Validate finds
+// something wrong with the whole of it, or with a part it did not set. Nothing
+// else is over a File, so the error is about that file and says which, as an
+// error about a value it wrote says where.
+func TestFileValidateNamesTheFile(t *testing.T) {
+	x := x.New(t)
+
+	p := write(t, "peers: [{}]\n")
+	_, err := cfg.NewFile[Validated](p).Load()
+	x.ErrorContains(err, p+": port is required")
+	x.ErrorContains(err, p+": peers[0]: addr is required")
+
+	// A configuration with an environment over it is not one file, and its
+	// Validate is not said to be about one.
+	_, err = cfg.New("app", &Validated{}).Load(p, nil)
+	x.ErrorContains(err, "port is required")
+	x.NotContains(err.Error(), p+": port is required")
+}
+
 func TestOrigin(t *testing.T) {
 	c := Config{}
 	l := cfg.New("app", &c, cfg.WithPaths())

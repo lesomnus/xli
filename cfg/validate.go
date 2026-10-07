@@ -27,10 +27,17 @@ func validate[T any](v reflect.Value, s *Snapshot[T]) errs {
 }
 
 func (s *Snapshot[T]) originFor(key string) Origin {
+	o := Origin{Key: key}
 	if f, ok := s.schema.byKey[key]; ok {
-		return s.originOf(f)
+		o = s.originOf(f)
 	}
-	return Origin{Key: key}
+	if s.whole && s.Path != "" && o.Source != SourceFile {
+		// A file of its own is all there is: what Validate finds wrong with
+		// the whole of it, or with a part it did not set, is about that file,
+		// and the file is where it is put right.
+		o.Source, o.Name = SourceFile, s.Path
+	}
+	return o
 }
 
 // walkValidate validates v and what it holds. promoted reports that v is an
