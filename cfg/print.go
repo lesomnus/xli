@@ -34,6 +34,11 @@ import (
 //
 // A value read through references, such as `postgres://u:${env:PW}@h`, prints
 // as it was written: it says where the secret is, not what it is.
+//
+// A block that decodes itself prints as it marshals, but for the embedded
+// structs that hold nothing, such as an "Unimplemented..." type embedded for
+// its methods: goccy/go-yaml writes one as a key of its own, which says
+// nothing.
 func (s *Snapshot[T]) Print(w io.Writer) error {
 	p := &printer{
 		schema:  s.schema,
@@ -321,6 +326,11 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 		if err := yaml.UnmarshalWithOptions(out, &a, yaml.UseOrderedMap()); err != nil {
 			return err
 		}
+		names := map[string]bool{}
+		markers(addressable(v), names, map[uintptr]bool{})
+		if len(names) > 0 {
+			a = dropMarkers(a, names)
+		}
 		writePlain(b, a, secret, name, flow)
 		return nil
 	}
@@ -435,6 +445,117 @@ func writePlain(b *strings.Builder, v any, secret bool, name string, flow bool) 
 		}
 		writeFlow(b, v)
 	}
+}
+
+// markers adds to out the keys goccy/go-yaml writes, anywhere in v, for an
+// embedded struct that holds nothing: a type embedded for its methods, as an
+// "Unimplemented..." type is, which goccy writes as a key of its own --
+// `unimplementedexporterconfig: {}` -- since it inlines only what is tagged
+// `,inline`. Such a key reads back as it was, and says nothing.
+func markers(v reflect.Value, out map[string]bool, seen map[uintptr]bool) {
+	switch v.Kind() {
+	case reflect.Pointer:
+		if v.IsNil() || seen[v.Pointer()] {
+			return
+		}
+		seen[v.Pointer()] = true
+		markers(v.Elem(), out, seen)
+	case reflect.Interface:
+		if !v.IsNil() {
+			markers(v.Elem(), out, seen)
+		}
+	case reflect.Struct:
+		t := v.Type()
+		for i := range t.NumField() {
+			sf := t.Field(i)
+			if !sf.IsExported() {
+				continue
+			}
+			if et := sf.Type; sf.Anonymous {
+				if et.Kind() == reflect.Pointer {
+					et = et.Elem()
+				}
+				if et.Kind() == reflect.Struct && !holdsExported(et) {
+					if name, ok := goccyKey(sf); ok {
+						out[name] = true
+					}
+					continue
+				}
+			}
+			markers(v.Field(i), out, seen)
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			markers(v.Index(i), out, seen)
+		}
+	case reflect.Map:
+		for it := v.MapRange(); it.Next(); {
+			markers(it.Value(), out, seen)
+		}
+	}
+}
+
+// holdsExported reports whether the struct type t has a field goccy writes.
+func holdsExported(t reflect.Type) bool {
+	for i := range t.NumField() {
+		if t.Field(i).IsExported() {
+			return true
+		}
+	}
+	return false
+}
+
+// goccyKey is the key goccy/go-yaml writes the embedded field sf under; ok is
+// false for one it does not write as a key of its own.
+func goccyKey(sf reflect.StructField) (key string, ok bool) {
+	tag := sf.Tag.Get("yaml")
+	if tag == "" {
+		tag = sf.Tag.Get("json")
+	}
+	name, opts, _ := strings.Cut(tag, ",")
+	if name == "-" || slices.Contains(strings.Split(opts, ","), "inline") {
+		return "", false
+	}
+	if name == "" {
+		name = strings.ToLower(sf.Name)
+	}
+	return name, true
+}
+
+// dropMarkers is a without the entries named in names whose value is empty.
+func dropMarkers(a any, names map[string]bool) any {
+	switch a := a.(type) {
+	case yaml.MapSlice:
+		out := make(yaml.MapSlice, 0, len(a))
+		for _, it := range a {
+			if names[fmt.Sprint(it.Key)] && emptyPlain(it.Value) {
+				continue
+			}
+			out = append(out, yaml.MapItem{Key: it.Key, Value: dropMarkers(it.Value, names)})
+		}
+		return out
+	case []any:
+		out := make([]any, len(a))
+		for i, e := range a {
+			out[i] = dropMarkers(e, names)
+		}
+		return out
+	}
+	return a
+}
+
+// emptyPlain reports whether a, as goccy/go-yaml decodes into any, is null or
+// an empty mapping.
+func emptyPlain(a any) bool {
+	switch a := a.(type) {
+	case nil:
+		return true
+	case yaml.MapSlice:
+		return len(a) == 0
+	case map[string]any:
+		return len(a) == 0
+	}
+	return false
 }
 
 // fieldAt is the field at index of the struct v, through inlined pointers;

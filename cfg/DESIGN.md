@@ -339,6 +339,12 @@ and the password in a value named `dsn` or ending in `_dsn`. A value read
 through references prints as written, which says where a secret is rather than
 what it is.
 
+A block that decodes itself prints as it marshals, with those names redacted,
+and without the embedded structs that hold nothing: a type embedded for its
+methods, as mkot's `UnimplementedExporterConfig` is, which goccy/go-yaml writes
+as a key of its own (`unimplementedexporterconfig: {}`) since it inlines only
+what is tagged `,inline`. That key reads back as it was, and says nothing.
+
 ## Not in scope
 
 Remote sources (vault, consul; possible through `WithScheme`), formats other
