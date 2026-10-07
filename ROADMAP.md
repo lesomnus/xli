@@ -151,7 +151,7 @@ tab completion 엔진을 실제로 동작하게 고침.
 - [x] 상호배타 그룹: `Command.Exclusive [][]string` → `ErrFlagConflict` (Run 모드에서만 검사).
 - [x] env-var 바인딩 → flag 단위가 아니라 **선택적 설정 계층 `cfg` 모듈**로 해결 (`github.com/lesomnus/xli/cfg`, 별도 모듈). payday 의 범용 로더를 옮겨와 확장: 기본값(`New` 시점 root 의 값) < 파일 < env < flag, struct 경로 기반 이름, 엄격한 파일 key, `${env:}`/`${file:}`/`$$` 참조(env/flag 값은 그대로), `cfg.Secret`(파일 회전 재확인), `cfg.Bind`, 출처 기록, 모아서 보고하는 에러 + `Validate`, `Reload`/`Watch`, `cfg.File`, 비밀을 가리는 `config`. 결정과 근거는 [cfg/DESIGN.md](cfg/DESIGN.md).
   - [x] 머지 후: `cfg/go.mod` 의 `replace ../` 를 제거하고 머지된 xli 버전(`v0.0.0-20261006051808-dadaa2417a76`)을 require → `cfg/v0.1.0` 태그. xli 와 cfg 를 함께 고칠 때는 `go work` 로 묶는다.
-  - [x] cfg 후속 릴리스: `v0.1.1` (이름이 `_dsn` 으로 끝나는 값의 비밀번호도 가림), `v0.1.2` (값이 하나도 없는 블록을 `config` 출력에서 뺌 — 헤더만 찍히면 다시 읽을 때 null 로 지워짐).
+  - [x] cfg 후속 릴리스: `v0.1.1` (이름이 `_dsn` 으로 끝나는 값의 비밀번호도 가림), `v0.1.2` (값이 하나도 없는 블록을 `config` 출력에서 뺌 — 헤더만 찍히면 다시 읽을 때 null 로 지워짐), `v0.1.3` (앞뒤 공백을 지우는 `TrimSpaceDecoder` — cr·gantry·bosun 의 복사본을 대신함, 경로로 비밀을 만드는 `SetFile` — `token_file` 같은 설정용, `File` 의 Validate 에러에 파일 경로, 스스로 디코드하는 블록의 출력에서 메서드용 내장 구조체(`unimplementedexporterconfig: {}`)를 뺌).
   - [x] payday 이전(한 번에): payday#28 (`6bb6d9c`) — `config.For`/`pdcmd.Load` 등을 지우고 `pd new` 템플릿·`internal/apptest` 를 cfg 로. `docs/migrating.md` 에 대응표.
   - [x] 앱 이전: roster#90, shale#121, cr#71, Holiday-Robot/khala#36, Holiday-Robot/kamino#25. 공통으로 `cli.Cmd` 에서 `cfg.New`/`cfg.Load(l, version, …)`/`cfg.NewCmdConfig`, `cmd.Loader` 제거, `version` 은 설정을 읽지 않음. 저장소의 설정 파일과 운영 설정(khala.deploy, kamino.deploy)을 미리 cfg 로 읽어 확인. 그때 바뀐 동작:
     - cr 은 `auth.password`/`auth.token` 을 `cmd.Secret` (`cfg.SecretOf` + 앞뒤 공백 제거 `Decoder`) 으로, `strictAuth` 제거(파일 전체가 엄격).
