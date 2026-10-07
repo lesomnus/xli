@@ -1,0 +1,61 @@
+# Two modules, so two runs: `cfg` has a go.mod of its own, and `go test ./...`
+# at the root does not enter it.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [., cfg]
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+    steps:
+      - uses: actions/checkout@v6
+
+      # The version go.mod names rather than the newest: it is the oldest Go
+      # this library says it builds with, and a newer one would not notice a
+      # function it does not have.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ matrix.module }}/go.mod
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+
+      # The completion tests run the script they generate in the shell it is
+      # for, and skip a shell that is not there. The runner has bash and not
+      # fish, and a test that skips is a test that is green.
+      - if: matrix.module == '.'
+        run: sudo apt-get update && sudo apt-get install -y fish
+
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  # cfg requires a released xli, so the run above tests it against what the
+  # apps that use it are built with. This one tests it against the xli beside
+  # it, so that a change to xli that breaks cfg fails in the pull request that
+  # makes it rather than in the one that next moves cfg's requirement.
+  cfg-on-head:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: cfg/go.mod
+          cache-dependency-path: cfg/go.sum
+      - run: go work init . ./cfg
+      - run: go vet ./...
+        working-directory: cfg
+      - run: go test -race ./...
+        working-directory: cfg

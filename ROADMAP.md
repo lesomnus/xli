@@ -173,6 +173,7 @@ tab completion 엔진을 실제로 동작하게 고침.
   - `Command.Hidden` / `flg.*.Hidden` (+ `Commands.Visible()`/`Flags.Visible()`)
   - `WriteMarkdown` / `WriteMan` 문서 생성
   - completion 버그 픽스: 완성된 flag 뒤 공백(`app --bar=x `)에서 flag 이름을 다시 제안하던 문제
+- [x] CI (`.github/workflows/ci.yaml`): 두 모듈 각각 `gofmt`/`vet`/`test -race`, go.mod 가 말하는 Go(1.24.1) 로. fish 를 설치해 셸 completion 테스트가 skip 으로 통과하지 않게 하고, cfg 는 require 한 xli 와 옆의 xli(`go work`) 양쪽에 대고 돌린다.
 - [ ] 의도된 날카로운 모서리 문서화 (단일 실행 트리, 핸들러의 `next()` 호출 책임, strict positioning) — godoc/README 보강
   - [x] "생성자는 가볍게, 무거운 작업은 Handler 에서" 가이드 (`docs/commands.md`) — 이슈 #2(lazy command init) 를 not planned 로 닫으며 대체
 - [ ] **arrakis 마이그레이션 적용** (`Value:`→`Default:`, diff.go 주입 패턴 변경)
