@@ -33,6 +33,20 @@ func (StringDecoder) Decode(raw []byte) (string, error) {
 	return s, nil
 }
 
+// TrimSpaceDecoder reads a secret as a string without the whitespace around
+// it: the rule for a credential a tool writes with a newline, or a person
+// pastes with a space either side, where nothing at its edges can be part of
+// it, as with a token. A secret that is nothing but whitespace is empty.
+type TrimSpaceDecoder struct{}
+
+func (TrimSpaceDecoder) Decode(raw []byte) (string, error) {
+	s := strings.TrimSpace(string(raw))
+	if s == "" {
+		return "", errEmpty
+	}
+	return s, nil
+}
+
 // BytesDecoder reads a secret as it is.
 type BytesDecoder struct{}
 
@@ -152,6 +166,22 @@ func (s *SecretOf[T, D]) UnmarshalText(b []byte) error {
 		return nil
 	}
 	return err
+}
+
+// SetFile makes s the secret in the file at path, read as `${file:path}` is:
+// now, and again by Value whenever the file changed. It is for an application
+// whose configuration names the file rather than holding a reference to it,
+// such as a `token_file`. A file that cannot be read yet is not an error;
+// Value reports it until it can be read.
+func (s *SecretOf[T, D]) SetFile(path string) error {
+	if path == "" {
+		return errors.New("secret file: no path")
+	}
+	st := &secretState[T, D]{ref: "${file:" + path + "}", path: path}
+	s.s = st
+	// Read now, as a load would; until it can be, Value says why.
+	st.get()
+	return nil
 }
 
 // pendingError is a secret file that could not be read at load. It is a

@@ -367,3 +367,91 @@ func TestSecretOrigin(t *testing.T) {
 	x.True(ok)
 	x.Equal([]string{"${file:" + path + "}"}, o.Refs)
 }
+
+// TestSecretTrimSpace is the rule for a credential nothing at the edges of
+// can be part of, as a token: the whitespace around it goes, from a file or as
+// it is written, and nothing but whitespace is no credential.
+func TestSecretTrimSpace(t *testing.T) {
+	type C struct {
+		Token cfg.SecretOf[string, cfg.TrimSpaceDecoder] `yaml:"token"`
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "token")
+
+	t.Run("from a file and as written", x.F(func(x x.X) {
+		writeAt(x.T, path, " \tdckr_pat_x \r\n")
+		for given, want := range map[string]string{
+			"token: ${file:" + path + "}\n": "dckr_pat_x",
+			"token: '  hunter2  '\n":        "hunter2",
+		} {
+			c := &C{}
+			_, err := cfg.New("app", c).Load(write(x.T, given), nil)
+			x.NoError(err)
+			v, err := c.Token.Value()
+			x.NoError(err)
+			x.Equal(want, v, given)
+		}
+	}))
+	t.Run("whitespace alone is empty", x.F(func(x x.X) {
+		_, err := cfg.New("app", &C{}).Load(write(x.T, "token: '  '\n"), nil)
+		x.ErrorContains(err, "token: empty")
+
+		// From a file it is a failed read, which keeps what was read before.
+		writeAt(x.T, path, "first\n")
+		c := &C{}
+		_, err = cfg.New("app", c).Load(write(x.T, "token: ${file:"+path+"}\n"), nil)
+		x.NoError(err)
+		rotate(x.T, path, " \n")
+		v, err := c.Token.Value()
+		x.NoError(err)
+		x.Equal("first", v)
+	}))
+}
+
+// TestSecretSetFile is a secret made from a path rather than read from a
+// configuration: the same file rules as `${file:}`, for an application whose
+// configuration names the file.
+func TestSecretSetFile(t *testing.T) {
+	dir := t.TempDir()
+
+	t.Run("read now and when rotated", x.F(func(x x.X) {
+		path := filepath.Join(dir, "token")
+		writeAt(x.T, path, "one\n")
+		var s cfg.Secret
+		x.NoError(s.SetFile(path))
+		v, err := s.Value()
+		x.NoError(err)
+		x.Equal("one", v)
+		x.Equal("${file:"+path+"}", s.Ref())
+
+		rotate(x.T, path, "two\n")
+		v, err = s.Value()
+		x.NoError(err)
+		x.Equal("two", v)
+	}))
+	t.Run("a file not there yet fails until it is", x.F(func(x x.X) {
+		path := filepath.Join(dir, "late")
+		var s cfg.Secret
+		x.NoError(s.SetFile(path))
+		_, err := s.Value()
+		x.ErrorContains(err, "secret file "+path)
+
+		writeAt(x.T, path, "here\n")
+		v, err := s.Value()
+		x.NoError(err)
+		x.Equal("here", v)
+	}))
+	t.Run("a path is anything, braces too", x.F(func(x x.X) {
+		path := filepath.Join(dir, "a}b")
+		writeAt(x.T, path, "braced\n")
+		var s cfg.Secret
+		x.NoError(s.SetFile(path))
+		v, err := s.Value()
+		x.NoError(err)
+		x.Equal("braced", v)
+	}))
+	t.Run("no path is an error", x.F(func(x x.X) {
+		var s cfg.Secret
+		x.ErrorContains(s.SetFile(""), "no path")
+	}))
+}
