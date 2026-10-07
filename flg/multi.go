@@ -29,7 +29,6 @@ type Multi[T any, P Parser[T]] struct {
 
 	Brief string
 	Synop string
-	Usage fmt.Stringer
 
 	// Default is the value used when the user does not provide the flag. It is
 	// set by the framework user and never modified by the framework. A nil
@@ -63,7 +62,6 @@ func (f *Multi[T, P]) Info() *Info {
 		Type:     fmt.Sprintf("%s...", f.Parser.String()),
 		Brief:    f.Brief,
 		Synop:    f.Synop,
-		Usage:    f.Usage,
 		Required: f.Required,
 		Hidden:   f.Hidden,
 	}
