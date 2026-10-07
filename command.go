@@ -15,7 +15,7 @@ import (
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/internal/comp"
-	"github.com/lesomnus/xli/lex"
+	"github.com/lesomnus/xli/internal/lex"
 	"github.com/lesomnus/xli/mode"
 	"github.com/lesomnus/xli/tab"
 )
@@ -140,15 +140,15 @@ func (c *Command) Run(ctx context.Context, args []string) error {
 			var t tab.Tab
 			switch sh {
 			case "zsh", "bash", "fish":
-				// The line format written by ZshTab is shell-agnostic; each
+				// The line format comp.Writer writes is shell-agnostic; each
 				// generated script decodes it with what its shell supports.
-				t = tab.NewZshTab(w)
+				t = comp.NewWriter(w)
 			default:
 				return errors.New("unknown shell of completion")
 			}
 
 			ctx = tab.Into(ctx, t)
-			args = NormalizeCompletionArgs(args[:l-3], curr, buff)
+			args = normalizeCompletionArgs(args[:l-3], curr, buff)
 			return c.runCompletion(ctx, args)
 		}
 	}
@@ -266,7 +266,7 @@ func completeFlagNames(t tab.Tab, c *Command) {
 	}
 }
 
-// args must be a normalized one by `NormalizeCompletionArgs`.
+// args must be a normalized one by `normalizeCompletionArgs`.
 func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	tab := tab.From(ctx)
 	if tab == nil {
@@ -302,7 +302,7 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 		need_val = true
 		need_arg = false
 	}
-	// NormalizeCompletionArgs turns a flag name being typed into "--", so any
+	// normalizeCompletionArgs turns a flag name being typed into "--", so any
 	// other token starting with "-" is a flag that is already complete and the
 	// cursor is on the next word.
 	typing_flag := last == "--"
@@ -387,12 +387,15 @@ func (c *Command) runCompletion(ctx context.Context, args []string) error {
 	return nil
 }
 
+// helpText is the help template. It is not exported: the help is xli's, and
+// there is no hook to replace it (ROADMAP, Phase 3).
+//
 //go:embed help.go.tpl
-var DefaultHelpTemplate string
+var helpText string
 
 // defaultHelpTemplate is parsed once at startup; the embedded template is a
 // compile-time constant, so a parse failure is a programmer error.
-var defaultHelpTemplate = template.Must(template.New("help").Funcs(helpFuncs).Parse(DefaultHelpTemplate))
+var defaultHelpTemplate = template.Must(template.New("help").Funcs(helpFuncs).Parse(helpText))
 
 var helpFuncs = template.FuncMap{
 	"usage": usageLine,

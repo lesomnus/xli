@@ -1,9 +1,8 @@
-package xli_test
+package xli
 
 import (
 	"testing"
 
-	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/internal/x"
 )
 
@@ -102,7 +101,7 @@ func TestNormalizeCompletionArgs(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.desc, x.F(func(x x.X) {
-			args := xli.NormalizeCompletionArgs(tc.args, tc.curr, tc.buff)
+			args := normalizeCompletionArgs(tc.args, tc.curr, tc.buff)
 			x.Equal(tc.expected, args)
 		}))
 	}

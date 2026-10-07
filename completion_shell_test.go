@@ -41,30 +41,34 @@ func newShellTestCmd() *xli.Command {
 		Commands: xli.Commands{
 			&xli.Command{
 				Name: "deploy",
-				Args: arg.Args{&arg.String{Name: "FILE", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+				Args: arg.Args{&arg.String{Name: "FILE", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 					t.Files("*.go")
+					return nil
 				})}},
 			},
 			&xli.Command{
 				Name: "cd",
-				Args: arg.Args{&arg.String{Name: "DIR", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+				Args: arg.Args{&arg.String{Name: "DIR", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 					t.Dirs()
+					return nil
 				})}},
 			},
 			&xli.Command{
 				Name: "echo",
-				Args: arg.Args{&arg.RestStrings{Name: "WORD", Handler: arg.OnTab[[]string](func(ctx context.Context, t tab.Tab) {
+				Args: arg.Args{&arg.RestStrings{Name: "WORD", Handler: arg.OnTab[[]string](func(ctx context.Context, t tab.Tab) error {
 					t.ValueD("royale", "a burger")
 					t.Value("with")
+					return nil
 				})}},
 			},
 			&xli.Command{
 				Name: "say",
-				Args: arg.Args{&arg.String{Name: "WORD", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+				Args: arg.Args{&arg.String{Name: "WORD", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 					t.Value("hello world")
 					t.Value("it's")
 					t.ValueD("linux:amd64", "a platform")
 					t.Value("plain?")
+					return nil
 				})}},
 			},
 			xli.NewCmdCompletion(),

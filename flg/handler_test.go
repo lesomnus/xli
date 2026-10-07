@@ -223,25 +223,6 @@ func TestOnTab(t *testing.T) {
 		x.NoError(err)
 		x.False(ran)
 	}))
-
-	t.Run("OnTap is an alias of OnTab", x.F(func(x x.X) {
-		ft := &handlerTestFakeTab{}
-		ran := false
-		h := flg.OnTap[string](func(ctx context.Context, tb tab.Tab) error {
-			ran = true
-			return nil
-		})
-
-		ctx := tab.Into(mode.Into(context.Background(), mode.Tab), ft)
-		err := h.Handle(ctx, "")
-		x.NoError(err)
-		x.True(ran)
-
-		ran = false
-		err = h.Handle(mode.Into(context.Background(), mode.Tab), "")
-		x.NoError(err)
-		x.False(ran)
-	}))
 }
 
 func TestOnTabPass(t *testing.T) {
@@ -268,24 +249,6 @@ func TestOnTabPass(t *testing.T) {
 
 		ctx := mode.Into(context.Background(), mode.Tab)
 		err := h.Handle(ctx, "v")
-		x.NoError(err)
-		x.False(ran)
-	}))
-
-	t.Run("OnTapPass is an alias of OnTabPass", x.F(func(x x.X) {
-		ran := false
-		h := flg.OnTapPass[string](func(ctx context.Context, v string) error {
-			ran = true
-			return nil
-		})
-
-		ctx := mode.Into(context.Background(), mode.Tab|mode.Pass)
-		err := h.Handle(ctx, "v")
-		x.NoError(err)
-		x.True(ran)
-
-		ran = false
-		err = h.Handle(mode.Into(context.Background(), mode.Tab), "v")
 		x.NoError(err)
 		x.False(ran)
 	}))

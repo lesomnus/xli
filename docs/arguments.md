@@ -129,9 +129,10 @@ Provide candidates with `arg.OnTab`:
 ```go
 &arg.RestStrings{
 	Name: "FILE",
-	Handler: arg.OnTab[[]string](func(ctx context.Context, t tab.Tab) {
+	Handler: arg.OnTab[[]string](func(ctx context.Context, t tab.Tab) error {
 		t.Value("a.txt")
 		t.Value("b.txt")
+		return nil
 	}),
 }
 ```

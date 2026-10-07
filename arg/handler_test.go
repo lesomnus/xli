@@ -150,9 +150,10 @@ func TestOnTab(t *testing.T) {
 	t.Run("runs tab func when tab present", x.F(func(x x.X) {
 		ft := &handlerTestTab{}
 		called := false
-		h := arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+		h := arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 			called = true
 			t.Value("suggest")
+			return nil
 		})
 		ctx := tab.Into(mode.Into(context.Background(), mode.Tab), ft)
 		err := h.Handle(ctx, "")
@@ -163,8 +164,9 @@ func TestOnTab(t *testing.T) {
 
 	t.Run("no-op when tab absent", x.F(func(x x.X) {
 		called := false
-		h := arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+		h := arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 			called = true
+			return nil
 		})
 		ctx := mode.Into(context.Background(), mode.Tab)
 		err := h.Handle(ctx, "")
@@ -175,8 +177,9 @@ func TestOnTab(t *testing.T) {
 	t.Run("no-op when not tab mode", x.F(func(x x.X) {
 		ft := &handlerTestTab{}
 		called := false
-		h := arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+		h := arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 			called = true
+			return nil
 		})
 		ctx := tab.Into(mode.Into(context.Background(), mode.Run), ft)
 		err := h.Handle(ctx, "")

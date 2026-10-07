@@ -41,8 +41,9 @@ func newCompletionTestCmd() *xli.Command {
 				Name:  "echo",
 				Brief: "echo-brief",
 				Args: arg.Args{
-					&arg.RestStrings{Name: "STRING", Handler: arg.OnTab[[]string](func(ctx context.Context, t tab.Tab) {
+					&arg.RestStrings{Name: "STRING", Handler: arg.OnTab[[]string](func(ctx context.Context, t tab.Tab) error {
 						t.Value("AVAL")
+						return nil
 					})},
 				},
 			},
@@ -84,8 +85,9 @@ func TestCompletionRun(t *testing.T) {
 		c := &xli.Command{
 			Name:  "app",
 			Flags: flg.Flags{&flg.Switch{Name: "verbose"}},
-			Args: arg.Args{&arg.String{Name: "X", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+			Args: arg.Args{&arg.String{Name: "X", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 				t.Value("XVAL")
+				return nil
 			})}},
 		}
 		out := complete(t, c, "", "", "--verbose")
@@ -133,8 +135,9 @@ func TestCompletionRun(t *testing.T) {
 				})},
 			},
 			Args: arg.Args{
-				&arg.String{Name: "OPT", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+				&arg.String{Name: "OPT", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 					t.Value("AVAL")
+					return nil
 				})},
 			},
 		}
@@ -149,8 +152,9 @@ func TestCompletionRun(t *testing.T) {
 			return &xli.Command{
 				Name: "app",
 				Args: arg.Args{
-					&arg.String{Name: "OPT", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+					&arg.String{Name: "OPT", Optional: true, Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 						t.Value("AVAL")
+						return nil
 					})},
 				},
 			}
@@ -170,8 +174,9 @@ func TestCompletionRun(t *testing.T) {
 			return &xli.Command{
 				Name: "app",
 				Args: arg.Args{
-					&arg.String{Name: "REQ", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+					&arg.String{Name: "REQ", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 						t.Value("AVAL")
+						return nil
 					})},
 				},
 			}
@@ -194,11 +199,13 @@ func TestCompletionRun(t *testing.T) {
 			return &xli.Command{
 				Name: "app",
 				Args: arg.Args{
-					&arg.String{Name: "FIRST", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+					&arg.String{Name: "FIRST", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 						t.Value("FIRST_VAL")
+						return nil
 					})},
-					&arg.String{Name: "SECOND", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+					&arg.String{Name: "SECOND", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 						t.Value("SECOND_VAL")
+						return nil
 					})},
 				},
 			}

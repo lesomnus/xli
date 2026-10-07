@@ -83,17 +83,4 @@ func TestOnTab(t *testing.T) {
 		x.NoError(err)
 		x.False(fired)
 	}))
-	t.Run("deprecated OnTap aliases OnTab", x.F(func(x x.X) {
-		fired := false
-		c := &xli.Command{
-			Handler: xli.OnTap(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
-				fired = true
-				return next(ctx)
-			}),
-		}
-
-		err := c.Run(t.Context(), nil)
-		x.NoError(err)
-		x.False(fired)
-	}))
 }

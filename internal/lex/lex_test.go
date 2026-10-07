@@ -3,8 +3,8 @@ package lex_test
 import (
 	"testing"
 
+	"github.com/lesomnus/xli/internal/lex"
 	"github.com/lesomnus/xli/internal/x"
-	"github.com/lesomnus/xli/lex"
 )
 
 func TestLex(t *testing.T) {

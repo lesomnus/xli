@@ -138,8 +138,9 @@ func newCompletionCmd() *xli.Command {
 				Name:  "echo",
 				Brief: "echo-brief",
 				Args: arg.Args{
-					&arg.RestStrings{Name: "STRING", Handler: arg.OnTab[[]string](func(ctx context.Context, t tab.Tab) {
+					&arg.RestStrings{Name: "STRING", Handler: arg.OnTab[[]string](func(ctx context.Context, t tab.Tab) error {
 						t.Value("AVAL")
+						return nil
 					})},
 				},
 			},
@@ -240,8 +241,9 @@ func TestComplete(t *testing.T) {
 		c := &xli.Command{
 			Name: "app",
 			Args: arg.Args{
-				&arg.String{Name: "PATH", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+				&arg.String{Name: "PATH", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 					t.Files("*.go")
+					return nil
 				})},
 			},
 		}
@@ -255,8 +257,9 @@ func TestComplete(t *testing.T) {
 		c := &xli.Command{
 			Name: "app",
 			Args: arg.Args{
-				&arg.String{Name: "DIR", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+				&arg.String{Name: "DIR", Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 					t.Dirs()
+					return nil
 				})},
 			},
 		}
