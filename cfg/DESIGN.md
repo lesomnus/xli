@@ -177,6 +177,8 @@ This replaces the three spellings the downstream applications used
     type Secret      = SecretOf[string, StringDecoder] // drops one trailing "\n" or "\r\n"
     type SecretBytes = SecretOf[[]byte, BytesDecoder]  // as read
 
+    SecretOf[string, TrimSpaceDecoder]                 // drops the whitespace around it
+
 A secret field holds a literal, `${env:NAME}`, `${file:/path}` or a reference
 with a scheme registered with `WithScheme`. In the file, a literal may hold `$`
 as `$$`; from the environment or a flag, anything but exactly one reference is
@@ -199,11 +201,18 @@ call and re-reads it when it changed. The rules come from cr's
 - an empty file is a failed read; only a regular file is read (a FIFO would
   block), and no more than 64 KiB of it.
 
-Only the trailing newline is removed from a string secret: whitespace inside or
-before a credential is the credential's. Custom types implement `Decoder[T]`,
-e.g. a 32-byte key, a set of S3 credentials that must be read together, or cr's
-secrets, which trim all the space around them. A `[]byte` from `Value` is a copy
-the caller may clear.
+Only the trailing newline is removed from a `Secret`: whitespace inside or
+before a credential is the credential's. `TrimSpaceDecoder` is the other rule,
+for a credential nothing at the edges of can be part of, as a token: the
+whitespace around it goes, and nothing but whitespace is empty. cr, gantry and
+bosun each kept that decoder before cfg did. Custom types implement
+`Decoder[T]`, e.g. a 32-byte key, or a set of S3 credentials that must be read
+together. A `[]byte` from `Value` is a copy the caller may clear.
+
+`(*SecretOf).SetFile(path)` makes a secret from a path rather than from a
+configuration value, by the same rules as `${file:path}`: for an application
+whose configuration names the file, such as a `token_file`, rather than holding
+a reference to it.
 
 ## Flags
 
