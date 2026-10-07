@@ -76,7 +76,7 @@ func newCmdShellCompletion(shell string) *Command {
 //
 //	$ foo bar
 //	          ^
-func NormalizeCompletionArgs(args []string, curr string, buff string) []string {
+func normalizeCompletionArgs(args []string, curr string, buff string) []string {
 	if len(args) == 0 {
 		return args
 	}

@@ -10,8 +10,8 @@ import (
 	"github.com/lesomnus/xli/arg"
 	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/xli/frm"
+	"github.com/lesomnus/xli/internal/lex"
 	"github.com/lesomnus/xli/internal/suggest"
-	"github.com/lesomnus/xli/lex"
 	"github.com/lesomnus/xli/mode"
 	"github.com/lesomnus/xli/xmd"
 )

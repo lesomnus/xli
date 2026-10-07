@@ -28,10 +28,11 @@ func NewExampleCompletionCmd() *xli.Command {
 					&arg.RestStrings{
 						Name:  "STRING",
 						Brief: "String to display",
-						Handler: arg.OnTab[[]string](func(ctx context.Context, tab tab.Tab) {
+						Handler: arg.OnTab[[]string](func(ctx context.Context, tab tab.Tab) error {
 							tab.Value("royale")
 							tab.Value("with")
 							tab.Value("cheese")
+							return nil
 						}),
 					},
 				},
@@ -48,10 +49,11 @@ func NewExampleCompletionCmd() *xli.Command {
 				Flags: flg.Flags{
 					&flg.String{
 						Name: "baz",
-						Handler: arg.OnTab[string](func(ctx context.Context, tab tab.Tab) {
+						Handler: flg.OnTab[string](func(ctx context.Context, tab tab.Tab) error {
 							tab.Value("royale")
 							tab.Value("with")
 							tab.Value("cheese")
+							return nil
 						}),
 					},
 				},

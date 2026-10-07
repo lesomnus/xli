@@ -1,9 +1,10 @@
 // Package comp holds the wire protocol shared between xli's completion
 // machinery and its shell integration: the argv tag that switches a normal run
-// into the completion path, and the field separator used on each emitted line.
+// into the completion path, the field separator used on each emitted line, and
+// the Writer that emits them.
 //
 // These values are the single source of truth for the Go side (the root xli
-// package, tab, and xlitest). The generated shell scripts under completions/
+// package and xlitest). The generated shell scripts under completions/
 // hardcode the same values and must be kept in sync by hand.
 package comp
 

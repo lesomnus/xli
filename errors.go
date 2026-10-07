@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/lesomnus/xli/internal/lex"
 	"github.com/lesomnus/xli/internal/suggest"
-	"github.com/lesomnus/xli/lex"
 )
 
 var (

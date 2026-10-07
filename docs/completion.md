@@ -59,14 +59,14 @@ Use the mode-aware `OnTab` handler on a flag or argument. It receives a
 
 &arg.String{
 	Name: "PATH",
-	Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) {
+	Handler: arg.OnTab[string](func(ctx context.Context, t tab.Tab) error {
 		t.Files("") // complete any file
+		return nil
 	}),
 }
 ```
 
-> `flg.OnTab` handlers return `error`; `arg.OnTab` handlers do not. Both run only
-> in `Tab` mode.
+> Both run only in `Tab` mode, and both return `error`.
 
 ## The `tab.Tab` sink
 
@@ -99,8 +99,8 @@ type Tab interface {
   ```
 
 Candidate emission does not return errors (a broken completion pipe should not
-fail your command); `flg.OnTab` returns `error` only so it can surface failures
-from work it does to compute candidates.
+fail your command); an `OnTab` handler returns `error` only so it can surface
+failures from work it does to compute candidates.
 
 ## Shell differences
 
