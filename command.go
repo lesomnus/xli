@@ -26,7 +26,6 @@ type Command struct {
 	Aliases  []string
 	Brief    string
 	Synop    string
-	Usage    Stringer
 
 	Flags    flg.Flags
 	Args     arg.Args

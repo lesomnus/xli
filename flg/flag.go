@@ -13,7 +13,6 @@ type Info struct {
 	Type     string
 	Brief    string
 	Synop    string
-	Usage    fmt.Stringer
 	Required bool
 
 	// Hidden reports that the flag is omitted from help and completion; it is
