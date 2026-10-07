@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/goccy/go-yaml"
 	"github.com/lesomnus/xli/cfg"
 	"github.com/lesomnus/xli/internal/x"
 )
@@ -173,4 +174,59 @@ func TestPrintLeavesOutBlocksWithNothingInThem(t *testing.T) {
 	s, err = cfg.New("app", &c, cfg.WithPaths()).Load("", env("APP_NAME=n"))
 	x.NoError(err)
 	x.Equal("name: n  # APP_NAME\n", printed(t, s), "not client: alone, which reads back as null")
+}
+
+// UnimplementedExporter is a type embedded for its methods, as mkot's
+// UnimplementedExporterConfig is: it holds nothing.
+type UnimplementedExporter struct{}
+
+func (UnimplementedExporter) Export() error { return nil }
+
+type OtlpExporter struct {
+	UnimplementedExporter
+	Endpoint string `yaml:"endpoint"`
+}
+
+// Telemetry decodes itself, as mkot's Config does.
+type Telemetry struct {
+	UnimplementedExporter
+	Exporters map[string]*OtlpExporter `yaml:"exporters"`
+}
+
+func (t *Telemetry) UnmarshalYAML(b []byte) error {
+	type plain Telemetry
+	return yaml.UnmarshalWithOptions(b, (*plain)(t), yaml.Strict())
+}
+
+// TestPrintLeavesOutWhatIsEmbeddedForItsMethods is a type that decodes itself,
+// printed as it marshals -- but for the embedded structs that hold nothing,
+// which goccy writes as keys of their own (`unimplementedexporter: {}`). They
+// say nothing, and an exporter with nothing set is kept under its name: it says
+// the exporter is there.
+func TestPrintLeavesOutWhatIsEmbeddedForItsMethods(t *testing.T) {
+	type C struct {
+		Otel Telemetry `yaml:"otel"`
+	}
+	x := x.New(t)
+	p := write(t, `
+otel:
+  exporters:
+    otlp: {endpoint: "collector:4317"}
+    pretty: {}
+`)
+	c := &C{}
+	s, err := cfg.New("app", c).Load(p, nil)
+	x.NoError(err)
+
+	out := printed(t, s)
+	x.NotContains(out, "unimplementedexporter")
+	x.Contains(out, "otlp: {endpoint: ")
+	x.Contains(out, "pretty: {endpoint: \"\"}")
+
+	// And it reads back to the same configuration.
+	back := &C{}
+	_, err = cfg.New("app", back).Load(write(t, out), nil)
+	x.NoError(err)
+	x.Equal("collector:4317", back.Otel.Exporters["otlp"].Endpoint)
+	x.NotNil(back.Otel.Exporters["pretty"])
 }
