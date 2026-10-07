@@ -88,6 +88,9 @@ type Snapshot[T any] struct {
 	// written are the values of the file read through references, as
 	// written, for Print.
 	written map[string]any
+	// whole reports that the file is all there is to the configuration, as
+	// for a File: nothing is over it, so what is wrong with it is in it.
+	whole bool
 }
 
 type options struct {
@@ -393,6 +396,7 @@ func (l *Loader[T]) build(in *inputs, path string, content []byte) (*Snapshot[T]
 		schema:  l.schema,
 		origins: map[string]Origin{},
 		written: map[string]any{},
+		whole:   l.file != "",
 	}
 
 	var es errs

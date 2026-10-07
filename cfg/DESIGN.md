@@ -271,6 +271,11 @@ itself. Every error is a `*FieldError` naming the field and its origin
 (`--bind: ...`, `/etc/roster.yaml:12:3: ldap.bind: ...`), gathered in a
 `*LoadError`.
 
+The file of a `File` is all there is to it, with nothing over it, so what its
+`Validate` finds wrong with the whole of it, or with a part it did not set, is
+said to be about that file (`/etc/cr/cr.auth.yaml: match "x": ...`). Of a
+configuration with an environment and flags over the file, it is not.
+
 A load runs for every command that needs the configuration, so `Validate`
 checks what holds for all of them: that a value is well formed, that two
 values agree. That `serve` needs a database while `version` does not is
