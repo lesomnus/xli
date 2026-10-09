@@ -35,6 +35,12 @@ type Command struct {
 	// Synop is the longer description its own help shows.
 	Brief string
 	Synop string
+	// Examples are command lines that use the command, each with a comment
+	// above it if it needs one. They end its help and are in the generated
+	// documentation. The blank lines around them and the indentation they all
+	// share are not part of them, so a raw string can be indented with the
+	// code around it.
+	Examples string
 
 	// Flags are the command's own flags, and Args its arguments, in order.
 	// Neither is given to its parent or its subcommands.
@@ -448,7 +454,8 @@ var helpText string
 var defaultHelpTemplate = template.Must(template.New("help").Funcs(helpFuncs).Parse(helpText))
 
 var helpFuncs = template.FuncMap{
-	"usage": usageLine,
+	"usage":    usageLine,
+	"examples": helpExamples,
 }
 
 // usageLine renders the synopsis line of c, e.g. "app deploy [options] <TARGET>".
@@ -477,9 +484,53 @@ func usageLine(c *Command) string {
 	return strings.Join(parts, " ")
 }
 
+// helpExamples is Examples as the help prints them, indented as its other
+// sections are; empty if there are none.
+func helpExamples(s string) string {
+	lines := exampleLines(s)
+	for i, l := range lines {
+		if l != "" {
+			lines[i] = "    " + l
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// exampleLines is Examples line by line, without the blank lines at either end,
+// the indentation the lines share, or the spaces they end with.
+func exampleLines(s string) []string {
+	lines := strings.Split(s, "\n")
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+
+	indent := lines[0][:len(lines[0])-len(strings.TrimLeft(lines[0], " \t"))]
+	for _, l := range lines[1:] {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		n := 0
+		for n < len(indent) && n < len(l) && indent[n] == l[n] {
+			n++
+		}
+		indent = indent[:n]
+	}
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(strings.TrimPrefix(l, indent), " \t")
+	}
+	return lines
+}
+
 // PrintHelp writes the command's help to w: its usage line, its description,
-// its arguments and flags, and the commands below it by category. The help is
-// xli's; there is no template to replace it with (ROADMAP, Phase 3).
+// its arguments and flags, the commands below it by category, and its
+// examples. The help is xli's; there is no template to replace it with
+// (ROADMAP, Phase 3).
 func (c *Command) PrintHelp(w io.Writer) error {
 	return defaultHelpTemplate.Execute(w, c)
 }

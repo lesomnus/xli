@@ -64,4 +64,7 @@ Options:
 		{{ end -}}{{ end -}}
 	{{ end -}}
 
+{{ with examples $.Examples -}}
+	{{ printf "\n\nExamples:\n%s" . -}}
+{{ end -}}
 {{ print "\n" -}}

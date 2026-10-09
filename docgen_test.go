@@ -17,6 +17,9 @@ func newDocTestCmd() *xli.Command {
 		Brief: "manage things",
 		Synop: "App does many things.",
 		Flags: flg.Flags{&flg.Switch{Name: "verbose", Alias: 'v', Brief: "chatty output"}},
+		Examples: `
+			app -v deploy --format json web
+		`,
 		Commands: xli.Commands{
 			&xli.Command{
 				Name:  "deploy",
@@ -27,6 +30,10 @@ func newDocTestCmd() *xli.Command {
 					&flg.Switch{Name: "secret", Hidden: true},
 				},
 				Args: arg.Args{&arg.String{Name: "TARGET", Brief: "where to deploy"}},
+				Examples: `
+					# On another port.
+					app deploy --port 9090 --format yaml web
+				`,
 			},
 			&xli.Command{
 				Name:     "remote",
@@ -64,6 +71,10 @@ func TestWriteMarkdown(t *testing.T) {
 		x.Contains(out, "| [`deploy`](#app-deploy) | deploy things |")
 		x.Contains(out, "| [`add`](#app-remote-add) | add one |")
 	}))
+	t.Run("examples, before the subcommands", x.F(func(x x.X) {
+		x.Contains(out, "| chatty output |\n\n**Examples**\n\n```\napp -v deploy --format json web\n```\n\n**Commands**\n")
+		x.Contains(out, "**Examples**\n\n```\n# On another port.\napp deploy --port 9090 --format yaml web\n```\n\n")
+	}))
 	t.Run("hidden commands and flags are left out", x.F(func(x x.X) {
 		x.NotContains(out, "debug")
 		x.NotContains(out, "secret")
@@ -97,6 +108,10 @@ func TestWriteMan(t *testing.T) {
 		x.Contains(out, ".B app deploy [options] <TARGET>\n")
 		x.Contains(out, "\\fB\\-\\-format\\fR \\fIjson|yaml\\fR\n(required)\n")
 		x.Contains(out, ".SS app remote add\n")
+	}))
+	t.Run("examples", x.F(func(x x.X) {
+		x.Contains(out, "\nchatty output\n.SH EXAMPLES\n.RS 4\n.nf\napp \\-v deploy \\-\\-format json web\n.fi\n.RE\n.SH COMMANDS\n")
+		x.Contains(out, ".PP\nExamples:\n.RS 4\n.nf\n# On another port.\napp deploy \\-\\-port 9090 \\-\\-format yaml web\n.fi\n.RE\n")
 	}))
 	t.Run("hidden commands and flags are left out", x.F(func(x x.X) {
 		x.NotContains(out, "debug")

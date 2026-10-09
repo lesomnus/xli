@@ -11,7 +11,8 @@ import (
 
 // WriteMarkdown writes a Markdown reference for c and all of its visible
 // subcommands: one section per command with its usage, description,
-// arguments, options, and subcommands. Hidden commands and flags are left out.
+// arguments, options, examples, and subcommands. Hidden commands and flags are
+// left out.
 func WriteMarkdown(w io.Writer, c *Command) error {
 	p := &docPrinter{w: w}
 	walkDoc(c, func(c *Command, depth int) {
@@ -49,6 +50,10 @@ func WriteMarkdown(w io.Writer, c *Command) error {
 				p.printf("| `%s` | %s | %s |\n", flagLabel(info), typ, mdCell(flagDesc(info)))
 			}
 			p.printf("\n")
+		}
+
+		if lines := exampleLines(c.Examples); len(lines) > 0 {
+			p.printf("**Examples**\n\n```\n%s\n```\n\n", strings.Join(lines, "\n"))
 		}
 
 		if cs := c.Commands.Visible(); len(cs) > 0 {
@@ -122,6 +127,15 @@ func WriteMan(w io.Writer, c *Command, section int) error {
 				}
 				p.printf("\n%s\n", roff(flagDesc(info)))
 			}
+		}
+
+		if lines := exampleLines(c.Examples); len(lines) > 0 {
+			if depth == 0 {
+				p.printf(".SH EXAMPLES\n")
+			} else {
+				p.printf(".PP\nExamples:\n")
+			}
+			p.printf(".RS 4\n.nf\n%s\n.fi\n.RE\n", roff(strings.Join(lines, "\n")))
 		}
 	})
 	return p.err
