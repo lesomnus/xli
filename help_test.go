@@ -437,6 +437,46 @@ func TestHelpForAnAgent(t *testing.T) {
 	}))
 }
 
+func TestExamples(t *testing.T) {
+	newCmd := func() *xli.Command {
+		return &xli.Command{
+			Name:  "deploy",
+			Flags: flg.Flags{&flg.String{Name: "port", Brief: "listen port"}},
+			Examples: `
+				# Deploy the web service on port 9090.
+				deploy --port 9090 web
+
+				# A line indented further stays so.
+				deploy \
+				    --port 9090 web
+			`,
+		}
+	}
+
+	t.Run("end the help, indented as the rest of it", x.F(func(x x.X) {
+		b := &strings.Builder{}
+		x.NoError(newCmd().PrintHelp(b))
+		x.True(strings.HasSuffix(b.String(), " listen port\n\n"+
+			"Examples:\n"+
+			"    # Deploy the web service on port 9090.\n"+
+			"    deploy --port 9090 web\n"+
+			"\n"+
+			"    # A line indented further stays so.\n"+
+			"    deploy \\\n"+
+			"        --port 9090 web\n"), b.String())
+	}))
+	t.Run("are not there when there are none", x.F(func(x x.X) {
+		for _, v := range []string{"", "\n\t\t\n\t"} {
+			c := newCmd()
+			c.Examples = v
+			b := &strings.Builder{}
+			x.NoError(c.PrintHelp(b))
+			x.NotContains(b.String(), "Examples:")
+			x.True(strings.HasSuffix(b.String(), " listen port\n"), b.String())
+		}
+	}))
+}
+
 // envFlag reports an environment variable for a flag, as cfg.Bind does.
 type envFlag struct {
 	flg.Flag
