@@ -48,6 +48,9 @@ Commands:{{ range $.Commands.Visible.ByCategory -}}
 
 Options:
 {{- printf "\n    %-20s %s" "-h,--help" "show help" -}}
+{{ if len $.Commands.Visible | ne 0 -}}
+	{{ printf "\n    %-20s %s" "--help-all" "show help of every command below too" -}}
+{{ end -}}
 {{ range $.Flags.Visible.ByCategory -}}
 		{{ $category := (index . 0).Info.Category -}}
 		{{ if len $category | ne 0 -}}
