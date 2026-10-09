@@ -29,6 +29,8 @@ type frame struct {
 	remain []string // remain args after end of command
 
 	is_help bool
+	// help_all is --help-all: the help of every command below, too.
+	help_all bool
 }
 
 func (f *frame) Cmd() xmd.Command {
@@ -135,8 +137,9 @@ func parseFrame(cmd *Command, args_rest []string) (*frame, error) {
 			if len(f.args) > 0 {
 				return f, &FlagError{flag: v, err: ErrFlagAfterArg}
 			}
-			if n := v.Name(); n == "help" || n == "h" {
+			if n := v.Name(); n == "help" || n == "h" || n == "help-all" {
 				f.is_help = true
+				f.help_all = n == "help-all"
 				return f, nil
 			}
 
@@ -330,6 +333,12 @@ func (f *frame) execute(ctx context.Context) error {
 	ctx = mode.Into(ctx, m.NoPass())
 	return c.Handler.Handle(ctx, c, func(ctx context.Context) error {
 		if f.is_help {
+			if f.help_all {
+				return c.printHelpAll(c)
+			}
+			if byAgent() {
+				return c.printAgentHelp(c)
+			}
 			return c.PrintHelp(c)
 		}
 		return nil

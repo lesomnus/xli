@@ -160,8 +160,11 @@ func (c *Command) Scanln(vs ...any) (int, error) {
 // handler, and a subcommand's handler runs only when its parent's calls next:
 // Run does not call it on the handler's behalf. With --help or -h on the line
 // it runs in help mode, and the help of the command it was given to is printed
-// when that command's handler calls next. A line from a generated completion
-// script runs in completion mode.
+// when that command's handler calls next. --help-all prints the help of every
+// command below it as well, and so do --help and -h when an AI agent runs the
+// command and that is not more than it takes in at once; see the package
+// documentation. A line from a generated completion script runs in completion
+// mode.
 //
 // Run writes into the tree: the values it parses, each command's parent, and
 // the IO a subcommand inherits. A tree is run once.
@@ -479,6 +482,28 @@ func usageLine(c *Command) string {
 // xli's; there is no template to replace it with (ROADMAP, Phase 3).
 func (c *Command) PrintHelp(w io.Writer) error {
 	return defaultHelpTemplate.Execute(w, c)
+}
+
+// printHelpAll writes the help of c and then that of every visible command
+// below it, depth first and in the order c's help lists them, each after a
+// rule. It is what --help-all prints. Each command is linked to its parent on
+// the way, as a run links the ones on its path, so its usage line is whole.
+func (c *Command) printHelpAll(w io.Writer) error {
+	if err := c.PrintHelp(w); err != nil {
+		return err
+	}
+	for _, group := range c.Commands.Visible().ByCategory() {
+		for _, sub := range group {
+			sub.parent = c
+			if _, err := io.WriteString(w, "\n---\n\n"); err != nil {
+				return err
+			}
+			if err := sub.printHelpAll(w); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Commands are the commands below one command.

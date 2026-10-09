@@ -19,7 +19,8 @@ import (
 )
 
 // When XLI_SHELL_TEST is set the test binary acts as the "app" CLI below, so
-// the generated completion scripts can drive it from a real shell.
+// the generated completion scripts can drive it from a real shell. Otherwise
+// it runs the tests, as a person would see the help.
 func TestMain(m *testing.M) {
 	if os.Getenv("XLI_SHELL_TEST") == "1" {
 		if err := newShellTestCmd().Run(context.Background(), os.Args[1:]); err != nil {
@@ -28,6 +29,11 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
+
+	// --help prints more when an AI agent runs the command, and an agent may
+	// well be what runs these tests. They are about the help a person gets;
+	// the ones about an agent's say so themselves.
+	os.Setenv("XLI_AGENT", "0")
 	os.Exit(m.Run())
 }
 
