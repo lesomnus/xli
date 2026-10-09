@@ -27,6 +27,8 @@ and context is nested as you go down the tree.
   suggest close matches ("did you mean …?").
 - **Generated help**, **shell completion** (zsh, bash, fish), and **Markdown /
   man page** generation. Commands and flags can be hidden from all three.
+- **Help an AI agent reads in one call** — `--help-all` prints the help of every
+  command below as well, and an agent gets it from `--help` when it fits.
 - **Configuration (optional)** — the `cfg` module loads your own struct from a
   YAML file, the environment and bound flags, records where every value came
   from, re-reads rotated secret files and reloads the file
@@ -184,7 +186,9 @@ completion are exempt).
 ### Help and completion
 
 `--help` / `-h` render a generated help message (usage line, arguments, flags
-with defaults, and subcommands grouped by category).
+with defaults, subcommands grouped by category, and the command's `Examples`).
+`--help-all` prints it for every command below as well, and so does `--help`
+when an AI agent runs the command and it is not too long (see below).
 
 Add shell completion by mounting the completion command and sourcing its script:
 
@@ -202,7 +206,7 @@ app completion fish | source    # fish (~/.config/fish/config.fish)
 
 ### By design
 
-Four things are deliberate, and each is a surprise if it is not known:
+Five things are deliberate, and each is a surprise if it is not known:
 
 - **`next` is yours to call.** `Run` does not run a subcommand on a handler's
   behalf: a handler that returns without calling `next(ctx)` ends the run there.
@@ -217,6 +221,15 @@ Four things are deliberate, and each is a surprise if it is not known:
 - **A flag's handler runs while the line is parsed**, before any command's
   handler, in the mode its command's handler will see: `flg.OnRun` for a flag of
   the command being run, `flg.OnRunPass` for one of a command on the way to it.
+- **An AI agent gets more from `--help`.** When the environment says an agent
+  runs the command — `AI_AGENT`, or an agent's own variable such as
+  `CLAUDECODE`, `CODEX_CI` or `GEMINI_CLI` — `--help` and `-h` print what
+  `--help-all` does, the help of every command below too, so that an agent
+  learns a tree in one call rather than one per level. When that is more than
+  16 KiB, they print the command's own help and a map of every command below
+  it, with commands whose commands below have the same names on one line
+  (`app {user,team} {get,ls}`). `XLI_AGENT=0` says no agent runs the command,
+  and `XLI_AGENT=1` says one does.
 
 ## License
 

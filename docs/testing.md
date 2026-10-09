@@ -157,6 +157,20 @@ if !strings.Contains(got.Stdout, "Usage:") {
 }
 ```
 
+What `--help` prints depends on who runs it. For an AI agent it is the help of
+every command below as well
+([commands.md](commands.md#when-an-ai-agent-runs-the-command)), and an agent may
+be what runs your tests. A test that says what the help leaves out, or compares
+all of it, sets `XLI_AGENT` so that it reads the same whoever runs it:
+
+```go
+t.Setenv("XLI_AGENT", "0") // the help a person gets
+got := xlitest.Run(t, newCmd(), "deploy", "--help")
+```
+
+`t.Setenv` cannot be used in a parallel test; for those, set it for the whole
+package in `TestMain` with `os.Setenv`.
+
 ## Testing completion
 
 Completion is the awkward part to test by hand: the shell re-invokes your

@@ -58,6 +58,19 @@
 // user gave a value; [flg.MustGet] and [arg.MustGet] return it, or else the
 // Default, and panic if there is neither.
 //
+// An AI agent gets more from --help than a person does. --help-all prints the
+// help of the command and of every command below it, and when the environment
+// says an agent runs the command -- AI_AGENT, or an agent's own variable such
+// as CLAUDECODE, CODEX_CI or GEMINI_CLI -- --help and -h print that too: a
+// person reads one command's help and asks for the next, and an agent would
+// ask one level at a time down a tree it can be given whole. A tree of
+// hundreds of commands is more than an agent takes in at once, so past 16 KiB
+// they print the command's own help and a map of every command below it, a
+// line for each shape of them -- "app {user,team} {get,ls}" -- and the agent
+// asks the one it wants. XLI_AGENT=0 says no agent runs the command and
+// XLI_AGENT=1 says one does; a test of what the help says sets it, since an
+// agent may be what runs the test.
+//
 // # More
 //
 // The guides under docs/ in the repository cover commands, flags, arguments,

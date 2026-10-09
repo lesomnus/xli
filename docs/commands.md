@@ -13,6 +13,7 @@ type Command struct {
 	Aliases  []string
 	Brief    string   // one-line summary (shown next to the name)
 	Synop    string   // longer description (shown as "Description:")
+	Examples string   // command lines that use it (shown as "Examples:")
 
 	Flags    flg.Flags
 	Args     arg.Args
@@ -206,15 +207,81 @@ cmd.Scan(...)    cmd.Scanf(...)    cmd.Scanln(...)
 ## Help
 
 `--help` / `-h` print a generated message: name, usage line, argument and flag
-details (with defaults and `(required)` markers), and subcommands grouped by
-category. `Synop` is shown as a `Description:` section. The template is built in
-and not currently overridable.
+details (with defaults and `(required)` markers), subcommands grouped by
+category, and examples. `Synop` is shown as a `Description:` section, and
+`Examples` as an `Examples:` section at the end. The template is built in and
+not currently overridable.
+
+`Examples` is written as one block. The blank lines around it and the
+indentation its lines share are dropped, so a raw string can be indented with
+the code around it:
+
+```go
+&xli.Command{
+	Name: "deploy",
+	Examples: `
+		# Deploy the web service on port 9090.
+		app deploy --port 9090 web
+	`,
+}
+```
+
+### Every command below: `--help-all`
+
+`--help-all` prints the help of the command it is given to and then that of
+every visible command below it, depth first and in the order the help lists
+them, each after a `---` line. It is listed among the options of a command that
+has commands below it, and on one that has none it is `--help`.
+
+### When an AI agent runs the command
+
+An agent learns a CLI from its help, and one `--help` per level is one call per
+level. So when the environment says an agent runs the command, `--help` and
+`-h` print what `--help-all` does, as long as that is no more than 16 KiB —
+about four thousand tokens, which is all of the help of most command lines.
+`--help-all` prints all of it whatever its length.
+
+Past that, a tree of hundreds of commands would be more than an agent takes in
+at once. Most of them are usually the same few verbs on a list of resources,
+so they print the command's own help and a map of every command below it: the
+ones with no commands below them share a line, and so do the ones whose
+commands below have the same names, a choice of names in braces.
+
+```
+The 20 commands below ({a,b} is a or b):
+    app {version,serve}
+    app {user,team} {get,ls,add,erase}
+    app role {get,ls,watch}
+    app org member {add,erase}
+
+Their help is more than an AI agent's --help prints at once. --help on one of
+them prints its help with the commands below it; --help-all prints all of it
+(22 KB).
+```
+
+The agent then asks the one it wants, and gets the commands below that one,
+which usually fit. A map that does not fit beside the command's own help
+either is left out, and the line says how many commands there are instead.
+
+These variables say an agent runs the command:
+
+| Variable | Set by |
+| --- | --- |
+| `AI_AGENT` | the one being agreed on ([agents.md#136](https://github.com/agentsmd/agents.md/issues/136)): Claude Code, GitHub Copilot, OpenCode and others |
+| `CLAUDECODE` | Claude Code |
+| `CODEX_CI`, `CODEX_SANDBOX`, `CODEX_THREAD_ID` | Codex |
+| `CURSOR_AGENT` | Cursor |
+| `GEMINI_CLI` | Gemini CLI |
+
+An empty one says nothing. `XLI_AGENT`, read as a bool, decides instead of
+them: `XLI_AGENT=0` says no agent runs the command, and `XLI_AGENT=1` says one
+does.
 
 ## Generating documentation
 
 `xli.WriteMarkdown(w, root)` writes a Markdown reference for the whole tree. Each
-command gets a section with its usage line, description, and tables of arguments,
-options, and subcommands, and subcommands link to their own sections.
+command gets a section with its usage line, description, tables of arguments and
+options, examples, and a table of subcommands that link to their own sections.
 `xli.WriteMan(w, root, 1)` writes the same content as one roff man page (section
 1), with subcommands under `COMMANDS`. Hidden commands and flags are left out of
 both.
