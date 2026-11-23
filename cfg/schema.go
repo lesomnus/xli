@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/goccy/go-yaml"
+	"github.com/lesomnus/xli/cfg/internal/reference"
 )
 
 // field is one leaf of the configuration struct: a value that is read as a
@@ -86,7 +87,7 @@ func (s *schema) walk(t reflect.Type, prefix string, path []string, index []int,
 		if strings.HasPrefix(tag.name, "x-") {
 			return fmt.Errorf("cfg: %s.%s: %q is never read from a file, where x- keys are ignored", t, sf.Name, tag.name)
 		}
-		if tag.env != "" && tag.env != "-" && !validEnvName(tag.env) {
+		if tag.env != "" && tag.env != "-" && !reference.ValidEnvName(tag.env) {
 			return fmt.Errorf("cfg: %s.%s: env:%q is not a variable name", t, sf.Name, tag.env)
 		}
 		idx := append(append([]int{}, index...), i)
@@ -343,6 +344,9 @@ func isLeaf(t reflect.Type) bool {
 // readsItself reports whether a value of type t (or a pointer to one) decodes
 // itself.
 func readsItself(t reflect.Type) bool {
+	if reference.IsTarget(t) {
+		return true
+	}
 	p := reflect.PointerTo(t)
 	for _, i := range []reflect.Type{secretType, textUnmarshaler, yamlBytes, yamlInterface, nodeUnmarshaler} {
 		if t.Implements(i) || p.Implements(i) {
@@ -357,6 +361,15 @@ func isSecret(t reflect.Type) bool {
 		t = t.Elem()
 	}
 	return reflect.PointerTo(t).Implements(secretType)
+}
+
+// isRefType reports whether a value of type t is a ref.Of or a secret: read
+// through a reference, and printed as it.
+func isRefType(t reflect.Type) bool {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	return reflect.PointerTo(t).Implements(secretType) || reference.IsTarget(t)
 }
 
 // value is the field f of root, allocating the pointers on the way when alloc is

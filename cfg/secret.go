@@ -1,61 +1,30 @@
 package cfg
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
-	"io"
 	"os"
-	"strings"
-	"sync"
+
+	"github.com/lesomnus/xli/cfg/internal/reference"
+	"github.com/lesomnus/xli/cfg/ref"
 )
 
-// Decoder turns the bytes of a secret into its value.
-type Decoder[T any] interface {
-	Decode(raw []byte) (T, error)
-}
+// Decoder turns the bytes of a secret into its value. It is ref.Decoder.
+type Decoder[T any] = ref.Decoder[T]
 
 // StringDecoder reads a secret as a string without one trailing newline ("\n"
 // or "\r\n"), which is what `echo` and editors leave at the end of a file.
-// Anything else, whitespace included, is the secret's.
-type StringDecoder struct{}
-
-func (StringDecoder) Decode(raw []byte) (string, error) {
-	s := string(raw)
-	if v, ok := strings.CutSuffix(s, "\r\n"); ok {
-		s = v
-	} else {
-		s = strings.TrimSuffix(s, "\n")
-	}
-	if s == "" {
-		return "", errEmpty
-	}
-	return s, nil
-}
+// Anything else, whitespace included, is the secret's. It is
+// ref.StringDecoder.
+type StringDecoder = ref.StringDecoder
 
 // TrimSpaceDecoder reads a secret as a string without the whitespace around
 // it: the rule for a credential a tool writes with a newline, or a person
 // pastes with a space either side, where nothing at its edges can be part of
-// it, as with a token. A secret that is nothing but whitespace is empty.
-type TrimSpaceDecoder struct{}
+// it, as with a token. A secret that is nothing but whitespace is empty. It is
+// ref.TrimSpaceDecoder.
+type TrimSpaceDecoder = ref.TrimSpaceDecoder
 
-func (TrimSpaceDecoder) Decode(raw []byte) (string, error) {
-	s := strings.TrimSpace(string(raw))
-	if s == "" {
-		return "", errEmpty
-	}
-	return s, nil
-}
-
-// BytesDecoder reads a secret as it is.
-type BytesDecoder struct{}
-
-func (BytesDecoder) Decode(raw []byte) ([]byte, error) {
-	if len(raw) == 0 {
-		return nil, errEmpty
-	}
-	return raw, nil
-}
+// BytesDecoder reads a secret as it is. It is ref.BytesDecoder.
+type BytesDecoder = ref.BytesDecoder
 
 // Secret is a string credential: a literal, `${env:NAME}`, `${file:/path}` or a
 // reference of a scheme registered with WithScheme. See SecretOf.
@@ -64,7 +33,7 @@ type Secret = SecretOf[string, StringDecoder]
 // SecretBytes is a credential read as bytes, e.g. a binary key. See SecretOf.
 type SecretBytes = SecretOf[[]byte, BytesDecoder]
 
-// SecretOf is a credential of type T, read by D.
+// SecretOf is a credential of type T, read by D: a ref.Of marked secret.
 //
 // It is given as a literal, or as exactly one reference: `${env:NAME}`,
 // `${env:NAME:-default}`, `${file:/path}`, or `${scheme:...}` for a scheme
@@ -83,68 +52,52 @@ type SecretBytes = SecretOf[[]byte, BytesDecoder]
 //   - an empty file is a failed read, and a file over 64 KiB is refused.
 //
 // A secret prints as its reference, or as "<redacted>" for a literal, so a
-// configuration can be shown without its secrets.
+// configuration can be shown without its secrets. That, and the smaller cap on
+// a file, is all that sets it apart from a ref.Of.
 //
 // Copies of a SecretOf share their state.
 type SecretOf[T any, D Decoder[T]] struct {
-	s *secretState[T, D]
-}
-
-type secretState[T any, D Decoder[T]] struct {
-	ref  string // as written; "" for a literal
-	path string // for ${file:}
-
-	mu    sync.Mutex
-	value T
-	seen  os.FileInfo
+	r ref.Of[T, D]
 }
 
 // maxSecretFile is the most read from a secret file.
 const maxSecretFile = 64 << 10
 
+// asSecret is how a SecretOf is read.
+var asSecret = reference.Reading{Name: "secret", MaxFile: maxSecretFile}
+
 const redacted = "<redacted>"
 
 // secretField is implemented by *SecretOf.
 type secretField interface {
-	setSecret(text string, r *resolver) error
-	refs() []string
+	refField
+	secret()
 }
 
 // Value is the secret as it is now. A []byte is a copy of its own, which the
 // caller may clear after use.
 func (s SecretOf[T, D]) Value() (T, error) {
-	if s.s == nil {
-		var z T
-		return z, nil
-	}
-	v, err := s.s.get()
-	if b, ok := any(v).([]byte); ok {
-		v = any(bytes.Clone(b)).(T)
-	}
-	return v, err
+	return s.r.Value()
 }
 
 // IsZero reports whether the secret was not given.
 func (s SecretOf[T, D]) IsZero() bool {
-	return s.s == nil
+	return s.r.IsZero()
 }
 
 // Ref is the reference the secret was given as, e.g. "${file:/run/key}", or ""
 // for a literal.
 func (s SecretOf[T, D]) Ref() string {
-	if s.s == nil {
-		return ""
-	}
-	return s.s.ref
+	return s.r.Ref()
 }
 
 // String is the reference, or "<redacted>" for a literal, or "" if not given.
 func (s SecretOf[T, D]) String() string {
 	switch {
-	case s.s == nil:
+	case s.r.IsZero():
 		return ""
-	case s.s.ref != "":
-		return s.s.ref
+	case s.r.Ref() != "":
+		return s.r.Ref()
 	default:
 		return redacted
 	}
@@ -161,7 +114,7 @@ func (s SecretOf[T, D]) MarshalText() ([]byte, error) {
 // a Loader. A `${file:}` that cannot be read yet is not an error; Value
 // reports it.
 func (s *SecretOf[T, D]) UnmarshalText(b []byte) error {
-	err := s.setSecret(string(b), &resolver{lookup: os.LookupEnv, verbatim: true})
+	err := s.setRef(string(b), &resolver{lookup: os.LookupEnv, verbatim: true})
 	if isPending(err) {
 		return nil
 	}
@@ -174,220 +127,69 @@ func (s *SecretOf[T, D]) UnmarshalText(b []byte) error {
 // such as a `token_file`. A file that cannot be read yet is not an error;
 // Value reports it until it can be read.
 func (s *SecretOf[T, D]) SetFile(path string) error {
-	if path == "" {
-		return errors.New("secret file: no path")
-	}
-	st := &secretState[T, D]{ref: "${file:" + path + "}", path: path}
-	s.s = st
-	// Read now, as a load would; until it can be, Value says why.
-	st.get()
-	return nil
+	return s.target().LoadFile(path, asSecret)
 }
 
-// pendingError is a secret file that could not be read at load. It is a
-// warning, not an error: Value keeps trying.
-type pendingError struct {
-	err error
+func (s *SecretOf[T, D]) secret() {}
+
+// target is the ref.Of s holds, as the loader reads into it.
+func (s *SecretOf[T, D]) target() reference.Target {
+	t, _ := reference.TargetOf(&s.r)
+	return t
 }
 
-func (e *pendingError) Error() string {
-	return e.err.Error() + "; it is read again when used"
-}
-
-func (e *pendingError) Unwrap() error {
-	return e.err
+func (s *SecretOf[T, D]) setRef(text string, r *resolver) error {
+	return loadRef(s.target(), text, r, asSecret)
 }
 
 func (s *SecretOf[T, D]) refs() []string {
-	if s.s == nil || s.s.ref == "" {
-		return nil
-	}
-	return []string{s.s.ref}
+	return refsOf1(s.r)
 }
 
-func (s *SecretOf[T, D]) setSecret(text string, r *resolver) error {
-	if text == "" {
-		s.s = nil
-		return nil
-	}
+// refField is a field the loader reads references into: a SecretOf, or a
+// ref.Of as an ofField.
+type refField interface {
+	setRef(text string, r *resolver) error
+	refs() []string
+}
 
-	var ref, lit string
-	if r.verbatim {
-		// From the environment or a flag: a reference only as the whole
-		// value, so that a password with a "$$" or a "${" in it, as a
-		// Kubernetes Secret may hand over, is taken as it is.
-		if isRef(text) {
-			ref = text
-		} else {
-			lit = text
-		}
-	} else {
-		var err error
-		if ref, lit, err = splitSecret(text); err != nil {
-			return err
-		}
-	}
+// ofField is a ref.Of as a refField.
+type ofField struct {
+	o reference.Target
+}
 
-	st := &secretState[T, D]{ref: ref}
-	if ref == "" {
-		if p, ok := bareRef(lit); ok {
-			return fmt.Errorf("%q would be taken as it is; a reference is written ${%s}", lit, p)
-		}
-		v, err := decode[T, D]([]byte(lit))
-		if err != nil {
-			return err
-		}
-		st.value = v
-		s.s = st
-		return nil
-	}
-	r.refs = append(r.refs, ref)
+func (f ofField) setRef(text string, r *resolver) error {
+	return loadRef(f.o, text, r, reference.Reading{})
+}
 
-	scheme, rest, err := parseRef(ref)
-	if err != nil {
-		return err
-	}
-	var raw []byte
-	switch scheme {
-	case "file":
-		if rest == "" {
-			return fmt.Errorf("%s: names no file", ref)
-		}
-		st.path = rest
-		s.s = st
-		if _, err := st.get(); err != nil {
-			return &pendingError{err}
-		}
-		return nil
-	case "env":
-		v, err := r.env(rest)
-		if err != nil {
-			return err
-		}
-		raw = []byte(v)
-	default:
-		raw, err = r.scheme(scheme, rest)
-		if err != nil {
-			return fmt.Errorf("%s: %w", ref, err)
-		}
-	}
+func (f ofField) refs() []string {
+	return refsOf1(f.o)
+}
 
-	v, err := decode[T, D](raw)
-	if err != nil {
-		return fmt.Errorf("%s: %w", ref, err)
+// asRefField is what ptr points to as a refField, if it is one.
+func asRefField(ptr any) (refField, bool) {
+	if p, ok := ptr.(refField); ok {
+		return p, true
 	}
-	st.value = v
-	s.s = st
+	if t, ok := reference.TargetOf(ptr); ok {
+		return ofField{t}, true
+	}
+	return nil, false
+}
+
+// loadRef reads text into o by r, and records the reference it is read
+// through.
+func loadRef(o reference.Target, text string, r *resolver, how reference.Reading) error {
+	if reference.IsRef(text) {
+		r.refs = append(r.refs, text)
+	}
+	return o.Load(text, r, how)
+}
+
+// refsOf1 is the reference o was given as, if it was given as one.
+func refsOf1(o interface{ Ref() string }) []string {
+	if s := o.Ref(); s != "" {
+		return []string{s}
+	}
 	return nil
-}
-
-func decode[T any, D Decoder[T]](raw []byte) (T, error) {
-	var d D
-	return d.Decode(raw)
-}
-
-// isRef reports whether text is exactly one reference.
-func isRef(text string) bool {
-	return strings.HasPrefix(text, "${") && strings.IndexByte(text, '}') == len(text)-1
-}
-
-// bareRef reports whether a literal looks like a reference written as roster
-// and shale used to, `file:/path` or `env:NAME`; p is it as the body of one.
-func bareRef(lit string) (p string, ok bool) {
-	if strings.HasPrefix(lit, "file:") || strings.HasPrefix(lit, "env:") {
-		return lit, true
-	}
-	return "", false
-}
-
-// splitSecret reads a secret as written in the file: exactly one reference, or
-// a literal in which `$$` is a `$`.
-func splitSecret(text string) (ref string, lit string, err error) {
-	if isRef(text) {
-		return text, "", nil
-	}
-
-	b := strings.Builder{}
-	for i := 0; i < len(text); i++ {
-		if text[i] == '$' && i+1 < len(text) {
-			switch text[i+1] {
-			case '$':
-				i++
-			case '{':
-				return "", "", errors.New("a secret is a literal or exactly one reference; write $$ for a literal $")
-			}
-		}
-		b.WriteByte(text[i])
-	}
-	return "", b.String(), nil
-}
-
-// get is the value, re-reading the file of a ${file:} secret when it changed.
-func (st *secretState[T, D]) get() (T, error) {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-
-	if st.path == "" {
-		return st.value, nil
-	}
-
-	fi, err := os.Stat(st.path)
-	switch {
-	case err != nil:
-		return st.failed(err)
-	case st.seen != nil && st.unchanged(fi):
-		return st.value, nil
-	case !fi.Mode().IsRegular():
-		// A FIFO or a device would block, or never end.
-		return st.failed(errors.New("not a regular file"))
-	}
-
-	b, fi, err := readCapped(st.path)
-	if err != nil {
-		return st.failed(err)
-	}
-	v, err := decode[T, D](b)
-	if err != nil {
-		return st.failed(err)
-	}
-	st.value, st.seen = v, fi
-	return v, nil
-}
-
-// readCapped reads the file at path, of at most maxSecretFile bytes, and
-// describes the file it read.
-func readCapped(path string) ([]byte, os.FileInfo, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer f.Close()
-
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, nil, err
-	}
-	b, err := io.ReadAll(io.LimitReader(f, maxSecretFile+1))
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(b) > maxSecretFile {
-		return nil, nil, fmt.Errorf("over the %d byte cap", maxSecretFile)
-	}
-	return b, fi, nil
-}
-
-// failed is a read that gave no value: the one in hand if there is one.
-func (st *secretState[T, D]) failed(err error) (T, error) {
-	if st.seen != nil {
-		return st.value, nil
-	}
-	var z T
-	return z, fmt.Errorf("secret file %s: %w", st.path, err)
-}
-
-func (st *secretState[T, D]) unchanged(fi os.FileInfo) bool {
-	return os.SameFile(st.seen, fi) &&
-		fi.Size() == st.seen.Size() &&
-		fi.ModTime().Equal(st.seen.ModTime())
 }

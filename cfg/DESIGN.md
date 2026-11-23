@@ -161,23 +161,68 @@ This replaces the three spellings the downstream applications used
   (`[...]`, `{...}`) a reference must be quoted (`["${env:A}"]`), because `{`
   and `}` delimit a flow mapping there; payday substituted the text before
   parsing and did not need that. The parse error says so.
-- `${file:}` is only allowed in secret fields (below), because a file is how a
-  credential gets rotated and only a secret field re-reads it.
+- `${file:}` is only allowed in a field declared with package `ref` (`ref.Of`,
+  `ref.String`, `ref.Bytes`) or a secret field (below), because only those
+  read the file again when it changes. A file is how a deployment replaces a
+  value under a running process: a credential when it is rotated, and as much
+  a certificate, a CA bundle, a public key or a policy, which are no secrets.
+  Before package `ref`, a file was read into a secret alone, so a value that
+  is no secret was named by a key of the application's own (`cert_file`), and
+  one configuration said *read this from a file* two ways.
 - References are resolved per value after parsing, not by substituting text
   before parsing. That makes `$$` work everywhere (cr could not escape
   `${file:` because the text pass had already turned `$$` into `$`), and lets
   the origin record name the variable a value came through.
-- Values from the environment and flags are taken as they are given. A secret
-  field reads a reference from them only as the whole value: a password such as
-  `Pa$$w0rd`, handed over by a Kubernetes Secret, must not lose a `$`.
+- Values from the environment and flags are taken as they are given. A `ref`
+  or secret field reads a reference from them only as the whole value: a
+  password such as `Pa$$w0rd`, handed over by a Kubernetes Secret, must not
+  lose a `$`.
+
+A value that may be written as a reference is declared with package `ref`:
+
+    package ref // github.com/lesomnus/xli/cfg/ref
+
+    type Of[T any, D Decoder[T]] struct{ ... }
+    type String = Of[string, StringDecoder] // drops one trailing "\n" or "\r\n"
+    type Bytes  = Of[[]byte, BytesDecoder]  // as read
+
+    Of[string, TrimSpaceDecoder]            // drops the whitespace around it
+
+A field declared with `ref.Of` holds a literal, `${env:NAME}`, `${file:/path}`
+or a reference with a scheme registered with `WithScheme`, as a secret does
+(below), and is read by the same rules; the name says nothing of secrecy,
+because what may be written as a reference is a question of where a value is
+kept, not of who may see it. It prints as its reference as written, and a
+literal as itself, unless the field is redacted anyway by its tag or its name
+(Commands): `tls.cert: ${file:/tls/tls.crt}` prints as written, a certificate
+pasted in prints as it is, and a private key pasted into `tls.key` is redacted.
+It reads up to 1 MiB of a file, where a secret reads 64 KiB: a CA bundle of a
+system is some 200 KiB, and is what this is for.
+
+`ref` is a package of its own, which imports neither xli nor `cfg`, because
+`cfg` imports xli and through it `text/template`: a package that only declares
+the shape of a configuration, such as payday's `config`, which is linked into
+a WebAssembly sandbox held to carry no template engine, must be able to use
+the type. A test holds what `ref` imports. `ref` exports what an application
+uses and nothing for the loader: the loader knows a `ref` field as it knows a
+secret field through a package under the module's `internal`, which `ref`
+and `cfg` both import and which imports neither. `ref` hands the loader its
+fields there, the environment and the registered schemes cross there to it,
+and the grammar of a reference is written there once for both.
 
 ## Secrets
 
-    type SecretOf[T any, D Decoder[T]] struct{ ... }
+    type SecretOf[T any, D Decoder[T]] struct{ ... } // a ref.Of marked secret
     type Secret      = SecretOf[string, StringDecoder] // drops one trailing "\n" or "\r\n"
     type SecretBytes = SecretOf[[]byte, BytesDecoder]  // as read
 
     SecretOf[string, TrimSpaceDecoder]                 // drops the whitespace around it
+
+A secret is a `ref.Of` marked secret: it holds what a `ref` field holds and is
+read by the same rules, and the mark is all that sets it apart. A literal
+prints as `<redacted>`, and no more than 64 KiB of a file is read. The
+decoders are `ref`'s, under their names in `cfg` as well. `cfg.Secret` and its
+like stay for every application that names them.
 
 A secret field holds a literal, `${env:NAME}`, `${file:/path}` or a reference
 with a scheme registered with `WithScheme`. In the file, a literal may hold `$`
@@ -199,7 +244,7 @@ call and re-reads it when it changed. The rules come from cr's
   (cr's provisioning case). `Value` fails until the file has been read once,
   so a wrong path still shows on first use;
 - an empty file is a failed read; only a regular file is read (a FIFO would
-  block), and no more than 64 KiB of it.
+  block), and no more than 64 KiB of it (1 MiB into a `ref` field).
 
 Only the trailing newline is removed from a `Secret`: whitespace inside or
 before a credential is the credential's. `TrimSpaceDecoder` is the other rule,

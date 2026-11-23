@@ -689,8 +689,8 @@ func serviceLink(name string, services map[string]bool) bool {
 // refsOf are the references the value v was read through.
 func refsOf(v reflect.Value, r *resolver) []string {
 	if v.CanAddr() {
-		if sf, ok := v.Addr().Interface().(secretField); ok {
-			return sf.refs()
+		if rf, ok := asRefField(v.Addr().Interface()); ok {
+			return rf.refs()
 		}
 	}
 	return slices.Clone(r.refs)

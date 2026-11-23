@@ -176,7 +176,7 @@ func TestExpand(t *testing.T) {
 		{in: "${upper:x}", want: "UP:x"},
 		{in: "${env:NOPE}", err: "NOPE is not set"},
 		{in: "${env:1A}", err: "is not a variable name"},
-		{in: "${file:/run/x}", err: "only read into a secret field"},
+		{in: "${file:/run/x}", err: "only read into a ref.String or a cfg.Secret field"},
 		{in: "${vault:x}", err: `unknown scheme "vault"`},
 		{in: "${upper:fail}", err: "boom"},
 		{in: "${env:PW", err: "unterminated"},

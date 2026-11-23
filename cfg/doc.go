@@ -25,7 +25,8 @@
 //
 // Every field is named after its path (`ldap.addr` in the file,
 // ROSTER_LDAP_ADDR in the environment); a flag is bound to a field by pointer.
-// Every value records where it came from (Loader.Origin). Secrets (Secret,
-// SecretOf) may be references to files that are re-read when they change, and
+// Every value records where it came from (Loader.Origin). A value declared
+// with package ref (ref.String, ref.Of), and a secret (Secret, SecretOf), may
+// be a reference to a file that is read again when it changes, and
 // Loader.Watch reloads the file. See DESIGN.md for the decisions and why.
 package cfg
