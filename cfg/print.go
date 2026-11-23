@@ -15,6 +15,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/lesomnus/xli/cfg/internal/reference"
 )
 
 // Print writes the configuration as YAML that reads back as the same
@@ -23,7 +24,9 @@ import (
 //
 // What is secret is redacted, so that the output can be pasted into a ticket:
 //
-//   - a Secret prints as its reference, or as "<redacted>" for a literal;
+//   - a Secret prints as its reference, or as "<redacted>" for a literal; a
+//     ref.Of prints a literal as itself, unless one of the rules below
+//     redacts it;
 //   - so does a field tagged `cfg:",secret"`, at any depth;
 //   - and, as payday did, every value under a name that says it is secret:
 //     token, password, secret(s), seal, key(s), credential(s), and names
@@ -176,7 +179,7 @@ func (p *printer) leaf(f *field, v reflect.Value, o Origin) (string, error) {
 		// Under a block named keys, as much as a field named key.
 		secret = secret || secretName(n)
 	}
-	if w, ok := p.written[f.key]; ok && o.Source == SourceFile && !holdsSecret(f.typ) {
+	if w, ok := p.written[f.key]; ok && o.Source == SourceFile && !holdsRef(f.typ) {
 		// Read through references from the file, and not set over since:
 		// as written.
 		b := &strings.Builder{}
@@ -197,7 +200,7 @@ func writeWritten(b *strings.Builder, v any, secret bool, name string, flow bool
 	switch v := v.(type) {
 	case string:
 		switch {
-		case secret && !isRef(v):
+		case secret && !reference.IsRef(v):
 			b.WriteString(redacted)
 		case dsnName(name):
 			b.WriteString(scalar(redactDsn(v), flow))
@@ -253,7 +256,7 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 		return nil
 	}
 	t := v.Type()
-	if isSecret(t) {
+	if isRefType(t) {
 		if v.Kind() == reflect.Pointer {
 			if v.IsNil() {
 				b.WriteString("null")
@@ -261,13 +264,7 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 			}
 			v = v.Elem()
 		}
-		// The reference as written, "<redacted>", or "" if not given.
-		s := v.Interface().(fmt.Stringer).String()
-		if s == redacted {
-			b.WriteString(redacted)
-		} else {
-			b.WriteString(scalar(s, flow))
-		}
+		writeRef(b, v, secret, name, flow)
 		return nil
 	}
 	switch v.Kind() {
@@ -403,6 +400,27 @@ func writeValue(b *strings.Builder, v reflect.Value, secret bool, name string, f
 		return fmt.Errorf("cannot print %s", t)
 	}
 	return nil
+}
+
+// writeRef writes v, a ref.Of or a Secret: its reference as written, or "" if
+// not given. A Secret's literal is "<redacted>"; a ref.Of's is itself, unless
+// it is secret by its name or its tag.
+func writeRef(b *strings.Builder, v reflect.Value, secret bool, name string, flow bool) {
+	r := v.Interface().(interface {
+		Ref() string
+		IsZero() bool
+		String() string
+	})
+	switch {
+	case r.Ref() != "" || r.IsZero():
+		b.WriteString(scalar(r.Ref(), flow))
+	case secret || isSecret(v.Type()):
+		b.WriteString(redacted)
+	case dsnName(name):
+		b.WriteString(scalar(escapeRefs(redactDsn(r.String())), flow))
+	default:
+		b.WriteString(scalar(escapeRefs(r.String()), flow))
+	}
 }
 
 // writePlain writes plain values (as goccy/go-yaml decodes into any) in flow
@@ -573,27 +591,28 @@ func fieldAt(v reflect.Value, index []int) (reflect.Value, bool) {
 	return v, true
 }
 
-// holdsSecret reports whether a value of type t holds a Secret anywhere.
-func holdsSecret(t reflect.Type) bool {
-	return holdsSecretIn(t, map[reflect.Type]bool{})
+// holdsRef reports whether a value of type t holds a ref.Of or a Secret
+// anywhere, which prints itself.
+func holdsRef(t reflect.Type) bool {
+	return holdsRefIn(t, map[reflect.Type]bool{})
 }
 
-func holdsSecretIn(t reflect.Type, seen map[reflect.Type]bool) bool {
+func holdsRefIn(t reflect.Type, seen map[reflect.Type]bool) bool {
 	if seen[t] {
 		return false
 	}
 	seen[t] = true
-	if isSecret(t) {
+	if isRefType(t) {
 		return true
 	}
 	switch t.Kind() {
 	case reflect.Pointer, reflect.Slice, reflect.Array:
-		return holdsSecretIn(t.Elem(), seen)
+		return holdsRefIn(t.Elem(), seen)
 	case reflect.Map:
-		return holdsSecretIn(t.Key(), seen) || holdsSecretIn(t.Elem(), seen)
+		return holdsRefIn(t.Key(), seen) || holdsRefIn(t.Elem(), seen)
 	case reflect.Struct:
 		for i := range t.NumField() {
-			if f := t.Field(i); f.IsExported() && holdsSecretIn(f.Type, seen) {
+			if f := t.Field(i); f.IsExported() && holdsRefIn(f.Type, seen) {
 				return true
 			}
 		}
@@ -637,7 +656,7 @@ func redactDsn(s string) string {
 	return dsnPassword.ReplaceAllStringFunc(s, func(m string) string {
 		g := dsnPassword.FindStringSubmatch(m)
 		pw := strings.Trim(g[2], `'"`)
-		if pw == "" || isRef(pw) {
+		if pw == "" || reference.IsRef(pw) {
 			return m
 		}
 		return g[1] + redacted
@@ -676,7 +695,7 @@ func redactUserinfo(s string) string {
 	}
 	colon += start
 	pw := s[colon+1 : at]
-	if pw == "" || isRef(pw) {
+	if pw == "" || reference.IsRef(pw) {
 		return s
 	}
 	return s[:colon+1] + redacted + s[at:]

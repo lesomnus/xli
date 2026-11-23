@@ -12,6 +12,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/lesomnus/xli/cfg/internal/reference"
 )
 
 // Resolver reads the value a reference of a registered scheme names:
@@ -24,15 +25,25 @@ type resolver struct {
 	lookup  func(string) (string, bool)
 	schemes map[string]Resolver
 	// verbatim is set for values from the environment and flags, which are
-	// taken as they are: only a secret given as exactly one reference reads
-	// it.
+	// taken as they are: only a ref.Of or a secret given as exactly one
+	// reference reads it.
 	verbatim bool
 	// keepFiles leaves `${file:}` references as they are, for a type that
-	// decodes itself, whose secrets read them.
+	// decodes itself, whose ref.Of and secret fields read them.
 	keepFiles bool
 	// refs collects the references the current value was read through.
 	refs []string
 }
+
+// LookupEnv, Scheme and Verbatim make r a reference.Resolver, by which a
+// ref.Of reads.
+var _ reference.Resolver = (*resolver)(nil)
+
+func (r *resolver) LookupEnv(name string) (string, bool) { return r.lookup(name) }
+
+func (r *resolver) Scheme(name string, ref string) ([]byte, error) { return r.scheme(name, ref) }
+
+func (r *resolver) Verbatim() bool { return r.verbatim }
 
 // asGiven is r for values from the environment and flags.
 func (r *resolver) asGiven() *resolver {
@@ -40,7 +51,7 @@ func (r *resolver) asGiven() *resolver {
 }
 
 // expand resolves the references in s, a string from the configuration file
-// going into a field that is not a secret.
+// going into a field that is neither a ref.Of nor a secret.
 func (r *resolver) expand(s string) (string, error) {
 	if r.verbatim || !strings.Contains(s, "$") {
 		return s, nil
@@ -76,34 +87,14 @@ func (r *resolver) expand(s string) (string, error) {
 	return b.String(), nil
 }
 
-// parseRef splits "${scheme:rest}".
-func parseRef(ref string) (scheme string, rest string, err error) {
-	body, ok := strings.CutPrefix(ref, "${")
-	if ok {
-		body, ok = strings.CutSuffix(body, "}")
-	}
-	if !ok {
-		return "", "", fmt.Errorf("%q: not a reference", ref)
-	}
-	scheme, rest, ok = strings.Cut(body, ":")
-	if !ok || scheme == "" {
-		return "", "", fmt.Errorf("%q: want ${scheme:...}", ref)
-	}
-	if strings.Contains(rest, "${") {
-		// `${env:A:-${env:B}}`: the first "}" would end the outer one.
-		return "", "", fmt.Errorf("%q: a reference cannot hold another", ref)
-	}
-	return scheme, rest, nil
-}
-
 func (r *resolver) expandRef(ref string) (string, error) {
-	scheme, rest, err := parseRef(ref)
+	scheme, rest, err := reference.Parse(ref)
 	if err != nil {
 		return "", err
 	}
 	switch scheme {
 	case "env":
-		v, err := r.env(rest)
+		v, err := reference.Env(r.lookup, rest)
 		if err != nil {
 			return "", err
 		}
@@ -114,7 +105,7 @@ func (r *resolver) expandRef(ref string) (string, error) {
 			r.refs = append(r.refs, ref)
 			return ref, nil
 		}
-		return "", fmt.Errorf("%s: a file is only read into a secret field (cfg.Secret), which re-reads it when it changes", ref)
+		return "", fmt.Errorf("%s: a file is only read into a ref.String or a cfg.Secret field, which read it again when it changes", ref)
 	}
 	v, err := r.scheme(scheme, rest)
 	if err != nil {
@@ -122,36 +113,6 @@ func (r *resolver) expandRef(ref string) (string, error) {
 	}
 	r.refs = append(r.refs, ref)
 	return string(v), nil
-}
-
-// env resolves the body of `${env:NAME}` or `${env:NAME:-default}`.
-func (r *resolver) env(body string) (string, error) {
-	name, def, hasDef := strings.Cut(body, ":-")
-	if !validEnvName(name) {
-		return "", fmt.Errorf("${env:%s}: %q is not a variable name", body, name)
-	}
-	if v, ok := r.lookup(name); ok {
-		return v, nil
-	}
-	if hasDef {
-		return def, nil
-	}
-	return "", fmt.Errorf("${env:%s}: %s is not set", body, name)
-}
-
-func validEnvName(s string) bool {
-	if s == "" {
-		return false
-	}
-	for i, c := range s {
-		switch {
-		case c == '_', c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z':
-		case c >= '0' && c <= '9' && i > 0:
-		default:
-			return false
-		}
-	}
-	return true
 }
 
 func (r *resolver) scheme(name string, ref string) ([]byte, error) {
@@ -166,7 +127,7 @@ var durationType = reflect.TypeFor[time.Duration]()
 
 // setText reads s into v, as from an environment variable or a flag: lists and
 // maps are comma separated or YAML flow syntax. References are not expanded
-// except by secret fields.
+// except by ref.Of and secret fields.
 func setText(v reflect.Value, s string, r *resolver) error {
 	if v.Kind() == reflect.Pointer {
 		p := reflect.New(v.Type().Elem())
@@ -177,8 +138,8 @@ func setText(v reflect.Value, s string, r *resolver) error {
 		v.Set(p)
 		return err
 	}
-	if sf, ok := v.Addr().Interface().(secretField); ok {
-		return sf.setSecret(s, r)
+	if rf, ok := asRefField(v.Addr().Interface()); ok {
+		return rf.setRef(s, r)
 	}
 	if readsItself(v.Type()) {
 		// Read whole, into a new value, as from the file.

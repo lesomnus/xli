@@ -205,13 +205,13 @@ func (d *decoder) decode(n ast.Node, v reflect.Value, key string, root bool) (es
 	}
 
 	ptr := v.Addr().Interface()
-	if sf, ok := ptr.(secretField); ok {
+	if sf, ok := asRefField(ptr); ok {
 		text, _, ok := scalarText(n)
 		if !ok {
 			es.addf(d.at(n, key), "want a string")
 			return es
 		}
-		if err := sf.setSecret(text, d.r); err != nil {
+		if err := sf.setRef(text, d.r); err != nil {
 			es.add(d.at(n, key), err)
 		}
 		refs = sf.refs()

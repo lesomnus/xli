@@ -3,6 +3,8 @@ package cfg
 import (
 	"fmt"
 	"strings"
+
+	"github.com/lesomnus/xli/cfg/internal/reference"
 )
 
 // Source is the layer a value came from.
@@ -174,12 +176,13 @@ func within(at string, err error) error {
 	return fmt.Errorf("%s: %w", at, err)
 }
 
-// isPending reports whether err is a secret file not there yet, and nothing
-// else: every one of joined errors has to be.
+// isPending reports whether err is a file of a ref.Of or a secret not there
+// yet, and nothing else: every one of joined errors has to be.
 func isPending(err error) bool {
-	switch e := err.(type) {
-	case *pendingError:
+	if reference.IsPending(err) {
 		return true
+	}
+	switch e := err.(type) {
 	case interface{ Unwrap() []error }:
 		vs := e.Unwrap()
 		for _, err := range vs {
